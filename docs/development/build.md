@@ -1,4 +1,4 @@
-﻿# 构建指南
+# 构建指南
 
 本项目使用 pnpm、Vue、Tauri 2 和 Rust 构建。以下版本为当前开发环境与项目依赖的实际版本；更新依赖前应先确认其兼容性。
 
@@ -7,7 +7,7 @@
 | Node.js | `v22.18.0` | 运行 Vite、Vue 类型检查与 Tauri CLI |
 | pnpm | `12.3.4` | 安装与锁定前端依赖 |
 | Rust / Cargo | `1.97.1` | 编译桌面端与执行 Rust 测试 |
-| `@tauri-apps/cli` | `2.11.1` | 启动开发环境与生成发行包 |
+| `@tauri-apps/cli` | `2.11.4` | 启动开发环境与生成发行包 |
 | `tauri` | `2.11.5` | 桌面端运行时 |
 
 ## Windows 前置条件
@@ -27,7 +27,7 @@ cargo --version
 pnpm exec tauri --version
 ```
 
-输出应分别包含 Node.js `v22.18.0`、pnpm `12.3.4`、Rust/Cargo `1.97.1` 与 Tauri CLI `2.11.1`。
+输出应分别包含 Node.js `v22.18.0`、pnpm `12.3.4`、Rust/Cargo `1.97.1` 与 Tauri CLI `2.11.4`。
 
 ## 安装依赖
 
@@ -67,10 +67,14 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml
 确认通过后生成桌面端发行包：
 
 ```powershell
+# 通用 Tauri 打包构建
 pnpm exec tauri build
+
+# 或使用 Windows 专用打包命令（自动同步版本并归档为 uxs-<version>-win-x64.exe）
+pnpm run build:windows
 ```
 
-构建产物位于仓库根目录的 `target/release/bundle/`。发布前至少安装并验证一次生成的安装包，确认开屏动画、课程 WebView 登录、模型配置保存和正常退出均可用。
+构建产物位于仓库根目录的 `target/release/bundle/`（若使用 `build:windows` 则输出在 `src-tauri/target/release/`）。发布前至少安装并验证一次生成的安装包，确认开屏动画、课程 WebView 登录、模型配置保存和正常退出均可用。
 
 ## 本地数据
 

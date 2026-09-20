@@ -71,7 +71,7 @@ flowchart TB
 
 ## 前端
 
-`src` 包含 Vue 页面、布局、组件和由 Tauri Specta 生成的命令绑定。Configuration 管理模型和课程选项；课程仪表盘订阅后端状态事件；顶部控制栏负责课程 WebView 的导航和缩放。
+`src` 包含 Vue 页面、布局、组件和由 Tauri Specta 生成的命令绑定。Configuration 管理模型和课程选项；课程仪表盘订阅后端状态事件；WebView 控制栏负责课程页面的导航和缩放。
 
 ## 后端与 WebView
 

@@ -4,16 +4,17 @@
 
 ## 配置步骤
 
-1. 打开 **Configuration**。
-2. 选择 Provider 和 Model。
-3. 输入对应供应商的 API Key。
-4. 点击 **Save**。
+1. 打开左下角 **Configuration** 中的 **API** 面板。
+2. 选择 Provider 与 Model（支持直接点击加号新增自定义供应商与模型）。
+3. 若为自定义供应商，可在 **Endpoint** 中配置 API 基础地址。
+4. 输入对应供应商的 API Key（本地 Ollama 等免 Key 服务可留空）。
+5. 点击底部的 **Save** 按钮保存配置。
 
 本地默认配置包含 BigModel、DeepSeek、Google、Moonshot、OpenAI、OpenRouter 和 Ollama。具体可用模型以供应商当前文档和账户权限为准。
 
 ## 本地 Ollama
 
-使用 Ollama 前，需在本机启动服务并安装模型。服务未启动或没有可用模型时，模型列表无法更新。
+Ollama 默认预设地址为 `http://localhost:11434/api/chat`。使用前请确保本机已启动 Ollama 服务，并在 Model 选择器中添加本地已下载的模型名称（例如 `llama3.2`、`qwen2.5` 等）。
 
 ## 加密字体还原
 
