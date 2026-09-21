@@ -51,7 +51,8 @@ fn collect_project_commands() -> (Vec<CommandEntry>, Vec<String>, String) {
             }
 
             let content = fs::read_to_string(path).expect("auto_handler: failed to read file");
-            let syntax_tree = syn::parse_file(&content).expect("auto_handler: failed to parse file");
+            let syntax_tree =
+                syn::parse_file(&content).expect("auto_handler: failed to parse file");
             let mut visitor = CommandVisitor {
                 module_name: components.join("::"),
                 commands: Vec::new(),
@@ -61,7 +62,10 @@ fn collect_project_commands() -> (Vec<CommandEntry>, Vec<String>, String) {
         }
     }
 
-    let mut names: Vec<String> = commands.iter().map(|command| command.name.clone()).collect();
+    let mut names: Vec<String> = commands
+        .iter()
+        .map(|command| command.name.clone())
+        .collect();
     names.sort();
     names.dedup();
     if let Ok(content) = fs::read_to_string(&perm_file) {

@@ -2,14 +2,25 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "webview.default",
   "description": "Default capability for the application webviews",
-  "webviews": ["main", "mask"],
+  "webviews": [
+    "main",
+    "mask"
+  ],
   "permissions": [
     "core:default",
     "opener:default",
     {
       "identifier": "opener:allow-open-path",
-      "allow": [{ "path": "$APPDATA" }, { "path": "$APPDATA/**" }]
+      "allow": [
+        {
+          "path": "$APPDATA"
+        },
+        {
+          "path": "$APPDATA/**"
+        }
+      ]
     },
-    "commands-main"
+    "commands-main",
+    "log:default"
   ]
 }

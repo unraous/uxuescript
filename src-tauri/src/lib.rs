@@ -13,8 +13,6 @@ pub fn run() {
     use app::window;
     use commands::chaoxing::CourseMetaMap;
 
-    core::logger::init().expect("Failed to initialize logger");
-
     // 禁用 WebView2 硬件 GPU 加速以降低 100MB+ 内存占用并提升性能
     std::env::set_var(
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
@@ -26,6 +24,7 @@ pub fn run() {
     );
 
     tauri::Builder::default()
+        .plugin(core::logger::plugin())
         .plugin(tauri_plugin_opener::init())
         .on_window_event(window::listener)
         .manage(UrlStack::default())
