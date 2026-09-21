@@ -13,6 +13,7 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "commands-chaoxing"
+    "commands-chaoxing",
+    "log:default"
   ]
 }

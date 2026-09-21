@@ -85,6 +85,7 @@ pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn s
             )
             .background_color((242, 244, 247).into())
             .devtools(true)
+            .initialization_script(include_str!("../scripts/webview-log.js"))
             .initialization_script_for_all_frames(include_str!("../scripts/iframe-init.js"))
             .on_navigation(|url| {
                 log::debug!("检测到页面导航: {}", url);

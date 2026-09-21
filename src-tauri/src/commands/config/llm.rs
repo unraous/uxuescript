@@ -34,8 +34,7 @@ fn find_provider_id(
 ) -> Option<String> {
     let normalized_name = name.trim().to_lowercase();
     providers.iter().find_map(|(id, provider)| {
-        (id.to_lowercase() == normalized_name
-            || provider.name.to_lowercase() == normalized_name)
+        (id.to_lowercase() == normalized_name || provider.name.to_lowercase() == normalized_name)
             .then(|| id.clone())
     })
 }

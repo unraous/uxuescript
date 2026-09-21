@@ -8,8 +8,7 @@ use super::typr::{glyph_hash, loca_offsets};
 
 static FONT_HASH_TABLE: LazyLock<HashMap<String, u32>> = LazyLock::new(|| {
     let raw: HashMap<String, serde_json::Value> =
-        serde_json::from_slice(include_bytes!("table.json"))
-            .expect("内置字体哈希字典格式无效");
+        serde_json::from_slice(include_bytes!("table.json")).expect("内置字体哈希字典格式无效");
     raw.into_iter()
         .filter_map(|(hash, value)| Some((hash, value.as_u64()? as u32)))
         .collect()
