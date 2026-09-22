@@ -2,7 +2,7 @@
 import { reactive, ref, watch } from "vue";
 import VButton from "@/components/base/VButton.vue";
 import TheAPIPanel from "@/components/TheConfigPanel/TheAPIPanel.vue";
-import TheCourseConfigPanel from "@/components/panels/TheCourseConfigPanel.vue";
+import TheCourseConfigPanel from "./TheConfigPanel/TheCourseConfigPanel.vue";
 import TheSidebar from "./TheConfigPanel/TheSidebar.vue";
 import { commands } from "@/services/cmds";
 
@@ -76,6 +76,7 @@ watch(
 .config-panel-content {
   position: absolute;
   inset: 0;
+  padding: 7.5%;
   width: 100%;
   height: 100%;
 }

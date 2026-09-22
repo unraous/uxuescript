@@ -95,7 +95,6 @@ const saveApiKey = () =>
   display: flex;
   flex-direction: column;
   gap: 5%;
-  padding: 5%;
   overflow-y: auto;
   overscroll-behavior-y: contain;
 }

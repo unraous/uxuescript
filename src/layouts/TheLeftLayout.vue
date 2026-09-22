@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import TheConfigPanel from "@/components/TheConfigPanel.vue";
-import TheInfoPanel from "@/components/panels/TheInfoPanel.vue";
+import TheInfoPanel from "@/components/TheInfoPanel.vue";
 </script>
 
 <template>

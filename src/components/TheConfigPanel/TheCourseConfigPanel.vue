@@ -60,7 +60,6 @@ onMounted(async () => {
         placeholder="input number here"
         label="Playing Speed"
         aria-label=""
-        pattern="\d+(?:\.\d*)?"
         class="option speed-input"
         @change="saveOptions"
       />
@@ -79,7 +78,6 @@ onMounted(async () => {
   flex: 1;
   display: flex;
   gap: 5%;
-  padding: 5%;
   flex-direction: column;
 }
 .option {
