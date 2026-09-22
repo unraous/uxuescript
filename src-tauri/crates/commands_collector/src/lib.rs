@@ -1,15 +1,15 @@
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use syn::{visit::Visit, ItemFn};
 use walkdir::WalkDir;
 
 struct CommandEntry {
-    path: syn::Path,
+    module_name: String,
     name: String,
-    cfgs: Vec<syn::Attribute>,
+    cfgs: Vec<String>,
     is_specta: bool,
 }
 
@@ -18,68 +18,144 @@ struct CommandVisitor {
     commands: Vec<CommandEntry>,
 }
 
-fn collect_project_commands() -> (Vec<CommandEntry>, Vec<String>, String) {
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let manifest_path = PathBuf::from(&manifest_dir);
-    let commands_dir = manifest_path.join("src").join("commands");
-    let perm_file = manifest_path.join("permissions").join("commands-main.json");
+struct ProjectCommands {
+    commands: Vec<CommandEntry>,
+    tracked_files: Vec<String>,
+    bindings_path: String,
+    permissions_path: PathBuf,
+}
 
-    let mut commands = Vec::new();
-    let mut tracked_files = Vec::new();
+struct SourceFile {
+    path: PathBuf,
+    module_name: String,
+}
 
-    if commands_dir.exists() {
-        for entry in WalkDir::new(&commands_dir)
-            .into_iter()
-            .filter_map(|entry| entry.ok())
-        {
-            let path = entry.path();
+fn discover_source_files(commands_dir: &Path) -> Vec<SourceFile> {
+    let mut files: Vec<_> = WalkDir::new(commands_dir)
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| {
+            let path = entry.into_path();
             if !path.is_file() || path.extension().and_then(|ext| ext.to_str()) != Some("rs") {
-                continue;
+                return None;
             }
 
-            tracked_files.push(path.to_string_lossy().into_owned());
-            let relative = match path.strip_prefix(&commands_dir) {
-                Ok(relative) => relative.with_extension(""),
-                Err(_) => continue,
-            };
+            let relative = path.strip_prefix(commands_dir).ok()?.with_extension("");
             let components: Vec<&str> = relative
                 .components()
                 .filter_map(|component| component.as_os_str().to_str())
                 .collect();
             if components.is_empty() {
-                continue;
+                return None;
             }
 
-            let content = fs::read_to_string(path).expect("auto_handler: failed to read file");
-            let syntax_tree =
-                syn::parse_file(&content).expect("auto_handler: failed to parse file");
-            let mut visitor = CommandVisitor {
+            Some(SourceFile {
+                path,
                 module_name: components.join("::"),
-                commands: Vec::new(),
-            };
-            visitor.visit_file(&syntax_tree);
-            commands.extend(visitor.commands);
-        }
-    }
-
-    let mut names: Vec<String> = commands
-        .iter()
-        .map(|command| command.name.clone())
+            })
+        })
         .collect();
-    names.sort();
-    names.dedup();
-    if let Ok(content) = fs::read_to_string(&perm_file) {
-        if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&content) {
-            if let Some(allow) = json.pointer_mut("/permission/0/commands/allow") {
-                *allow = serde_json::json!(names);
-                if let Ok(updated) = serde_json::to_string_pretty(&json) {
-                    if updated != content {
-                        let _ = fs::write(&perm_file, updated);
-                    }
-                }
+
+    // WalkDir does not promise a stable order. Keep generated output reproducible
+    // even though parsing itself is performed in parallel.
+    files.sort_by(|left, right| left.path.cmp(&right.path));
+    files
+}
+
+fn parse_source_file(source: &SourceFile) -> Vec<CommandEntry> {
+    let content = fs::read_to_string(&source.path).unwrap_or_else(|error| {
+        panic!(
+            "auto_handler: failed to read {}: {error}",
+            source.path.display()
+        )
+    });
+    let syntax_tree = syn::parse_file(&content).unwrap_or_else(|error| {
+        panic!(
+            "auto_handler: failed to parse {}: {error}",
+            source.path.display()
+        )
+    });
+    let mut visitor = CommandVisitor {
+        module_name: source.module_name.clone(),
+        commands: Vec::new(),
+    };
+    visitor.visit_file(&syntax_tree);
+    visitor.commands
+}
+
+fn command_path(command: &CommandEntry) -> syn::Path {
+    let full_path = format!("crate::commands::{}::{}", command.module_name, command.name);
+    syn::parse_str(&full_path).expect("auto_handler: failed to build command path")
+}
+
+fn command_cfgs(command: &CommandEntry) -> Vec<syn::Attribute> {
+    command
+        .cfgs
+        .iter()
+        .map(|cfg| {
+            let source = format!("{cfg}\nfn __auto_handler_cfg_probe() {{}}\n");
+            let file =
+                syn::parse_file(&source).expect("auto_handler: failed to restore cfg attribute");
+            match file.items.into_iter().next() {
+                Some(syn::Item::Fn(function)) => function
+                    .attrs
+                    .into_iter()
+                    .next()
+                    .expect("auto_handler: missing restored cfg attribute"),
+                _ => panic!("auto_handler: failed to restore cfg attribute"),
             }
-        }
-    }
+        })
+        .collect()
+}
+
+fn collect_project_commands() -> ProjectCommands {
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let manifest_path = PathBuf::from(&manifest_dir);
+    let commands_dir = manifest_path.join("src").join("commands");
+
+    let source_files = if commands_dir.exists() {
+        discover_source_files(&commands_dir)
+    } else {
+        Vec::new()
+    };
+    let tracked_files = source_files
+        .iter()
+        .map(|source| source.path.to_string_lossy().into_owned())
+        .collect();
+
+    // Each source file is independent. Keep the chunks and handles in sorted-file
+    // order so the final command order remains deterministic after joining workers.
+    let commands = if source_files.is_empty() {
+        Vec::new()
+    } else {
+        let worker_count = std::thread::available_parallelism()
+            .map(|count| count.get())
+            .unwrap_or(1)
+            .min(source_files.len());
+        let chunk_size = (source_files.len() + worker_count - 1) / worker_count;
+
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = source_files
+                .chunks(chunk_size)
+                .map(|sources| {
+                    scope.spawn(move || {
+                        sources
+                            .iter()
+                            .flat_map(parse_source_file)
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .flat_map(|handle| {
+                    handle
+                        .join()
+                        .expect("auto_handler: command scan thread panicked")
+                })
+                .collect()
+        })
+    };
 
     let bindings_path = manifest_path
         .parent()
@@ -87,7 +163,41 @@ fn collect_project_commands() -> (Vec<CommandEntry>, Vec<String>, String) {
         .join("src/services/cmds.ts")
         .to_string_lossy()
         .into_owned();
-    (commands, tracked_files, bindings_path)
+
+    ProjectCommands {
+        commands,
+        tracked_files,
+        bindings_path,
+        permissions_path: manifest_path.join("permissions").join("commands-main.json"),
+    }
+}
+
+fn permission_names(commands: &[CommandEntry]) -> Vec<String> {
+    let mut names: Vec<String> = commands
+        .iter()
+        .map(|command| command.name.clone())
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+impl ProjectCommands {
+    fn sync_permissions(&self) {
+        let Ok(content) = fs::read_to_string(&self.permissions_path) else {
+            return;
+        };
+        if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(allow) = json.pointer_mut("/permission/0/commands/allow") {
+                *allow = serde_json::json!(permission_names(&self.commands));
+                if let Ok(updated) = serde_json::to_string_pretty(&json) {
+                    if updated != content {
+                        let _ = fs::write(&self.permissions_path, updated);
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl<'ast> Visit<'ast> for CommandVisitor {
@@ -107,22 +217,19 @@ impl<'ast> Visit<'ast> for CommandVisitor {
 
             let fn_name = &node.sig.ident;
             let command_name = fn_name.to_string();
-            let full_path = format!("crate::commands::{}::{}", self.module_name, fn_name);
-            let cfgs: Vec<syn::Attribute> = node
+            let cfgs: Vec<String> = node
                 .attrs
                 .iter()
                 .filter(|attr| attr.path().is_ident("cfg"))
-                .cloned()
+                .map(|attr| attr.to_token_stream().to_string())
                 .collect();
 
-            if let Ok(path) = syn::parse_str::<syn::Path>(&full_path) {
-                self.commands.push(CommandEntry {
-                    path,
-                    name: command_name,
-                    cfgs,
-                    is_specta,
-                });
-            }
+            self.commands.push(CommandEntry {
+                module_name: self.module_name.clone(),
+                name: command_name,
+                cfgs,
+                is_specta,
+            });
         }
 
         syn::visit::visit_item_fn(self, node);
@@ -131,13 +238,16 @@ impl<'ast> Visit<'ast> for CommandVisitor {
 
 #[proc_macro]
 pub fn register(_: TokenStream) -> TokenStream {
-    let (commands, tracked_files, _) = collect_project_commands();
+    let project = collect_project_commands();
+    project.sync_permissions();
+    let tracked_files = &project.tracked_files;
 
-    let all_command_tokens: Vec<_> = commands
+    let all_command_tokens: Vec<_> = project
+        .commands
         .iter()
         .map(|c| {
-            let path = &c.path;
-            let cfgs = &c.cfgs;
+            let path = command_path(c);
+            let cfgs = command_cfgs(c);
             quote! { #(#cfgs)* #path }
         })
         .collect();
@@ -156,13 +266,17 @@ pub fn register(_: TokenStream) -> TokenStream {
 
 #[proc_macro]
 pub fn sync_bindings(_: TokenStream) -> TokenStream {
-    let (commands, tracked_files, bindings_path) = collect_project_commands();
-    let specta_command_tokens: Vec<_> = commands
+    let project = collect_project_commands();
+    project.sync_permissions();
+    let tracked_files = &project.tracked_files;
+    let bindings_path = &project.bindings_path;
+    let specta_command_tokens: Vec<_> = project
+        .commands
         .iter()
         .filter(|c| c.is_specta)
         .map(|c| {
-            let path = &c.path;
-            let cfgs = &c.cfgs;
+            let path = command_path(c);
+            let cfgs = command_cfgs(c);
             quote! { #(#cfgs)* #path }
         })
         .collect();
@@ -202,7 +316,7 @@ mod tests {
         visitor
             .commands
             .iter()
-            .map(|c| c.path.to_token_stream().to_string())
+            .map(|c| command_path(c).to_token_stream().to_string())
             .collect()
     }
 
@@ -316,6 +430,36 @@ mod tests {
         visitor.visit_file(&syntax_tree);
         assert_eq!(visitor.commands.len(), 1);
         assert_eq!(visitor.commands[0].cfgs.len(), 1);
-        assert!(visitor.commands[0].cfgs[0].path().is_ident("cfg"));
+        let cfg = command_cfgs(&visitor.commands[0])
+            .into_iter()
+            .next()
+            .expect("stored cfg attribute should remain parseable");
+        assert!(cfg.path().is_ident("cfg"));
+    }
+
+    #[test]
+    fn sorts_and_deduplicates_permission_names() {
+        let commands = vec![
+            CommandEntry {
+                module_name: "a".to_string(),
+                name: "zeta".to_string(),
+                cfgs: Vec::new(),
+                is_specta: false,
+            },
+            CommandEntry {
+                module_name: "b".to_string(),
+                name: "alpha".to_string(),
+                cfgs: Vec::new(),
+                is_specta: false,
+            },
+            CommandEntry {
+                module_name: "c".to_string(),
+                name: "zeta".to_string(),
+                cfgs: Vec::new(),
+                is_specta: false,
+            },
+        ];
+
+        assert_eq!(permission_names(&commands), vec!["alpha", "zeta"]);
     }
 }
