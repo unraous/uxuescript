@@ -92,12 +92,23 @@ pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn s
                 classify(url) != Type::Unknown
             })
             .on_page_load(load_on),
-            // 齐次比例布局变换公式 (Scale-Invariant Proportional Layout Formulas):
-            // X_pos = W * 0.51  <= 50% (TheLeftLayout 占据左半屏) + 1% (TheRightLayout 内 96% 居中边距)
-            // Y_pos = H * 0.46 <= 4% (TheMenuBar) + 38.75% * 96% (TheCourseDashboard)
-            //              + 9.09% * 55% * 96% (TheChaoxingWebviewController)
-            // W_size = W * 0.48 <= 96% * 50% (TheRightLayout 容器宽度)
-            // H_size = H * 0.48 <= 90.91% * 55% * 96% (controller 之后的 WebView)
+            LogicalPosition::new(logical_size.width * 0.51, logical_size.height * 0.46),
+            LogicalSize::new(logical_size.width * 0.48, logical_size.height * 0.48),
+        ),
+        "chaoxing-mask" => (
+            WebviewBuilder::new(
+                label,
+                WebviewUrl::External(CONFIG.metadata.home_url.clone()),
+            )
+            .background_color((242, 244, 247).into())
+            .devtools(true)
+            .initialization_script(include_str!("../scripts/webview-log.js"))
+            .initialization_script_for_all_frames(include_str!("../scripts/iframe-init.js"))
+            .on_navigation(|url| {
+                log::debug!("检测到页面导航: {}", url);
+                classify(url) != Type::Unknown
+            })
+            .on_page_load(load_on),
             LogicalPosition::new(logical_size.width * 0.51, logical_size.height * 0.46),
             LogicalSize::new(logical_size.width * 0.48, logical_size.height * 0.48),
         ),

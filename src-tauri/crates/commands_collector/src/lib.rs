@@ -132,7 +132,7 @@ fn collect_project_commands() -> ProjectCommands {
             .map(|count| count.get())
             .unwrap_or(1)
             .min(source_files.len());
-        let chunk_size = (source_files.len() + worker_count - 1) / worker_count;
+        let chunk_size = source_files.len().div_ceil(worker_count);
 
         std::thread::scope(|scope| {
             let handles: Vec<_> = source_files
