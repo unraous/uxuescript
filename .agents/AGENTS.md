@@ -1,51 +1,57 @@
-# Project Rules & Engineering Principles
+# Task-Specific Engineering Guidance
 
-## 1. Audit Existing Architecture Before Invention (禁造重复轮子 & 结合已有设计)
+Read only the sections that apply to the current task. The repository-wide rules are in [`../AGENTS.md`](../AGENTS.md).
 
-- **Inspect Established Patterns First**:
-  Before implementing any new feature, bug fix, or codegen logic, thoroughly audit the existing codebase for pre-existing utility macros, helper crates, and architectural patterns (e.g. `auto_handler` proc-macro).
-- **Extend Rather Than Duplicate**:
-  New capabilities must integrate into and extend existing pipelines (e.g., adding TypeScript generation into `auto_handler` alongside permissions JSON sync) rather than introducing standalone scripts, ad-hoc string parsers, or fragmented initialization boilerplate).
-- **Strict Anti-Wheel Policy**:
-  NEVER hand-roll custom implementations for problems solved by established compiler features or official crates (e.g., hand-rolled AST string-to-TS type mappers like `rust_type_to_ts` vs. official reflection with `tauri_specta`).
+## Code Generation and Architecture
 
-## 2. Compile-Time Codegen & Macro Pipeline Abstraction (宏与代码生成标准)
+- Before changing macros, handlers, or generated code, inspect the existing `auto_handler` pipeline and relevant helper crates. Extend that pipeline where it already owns the behavior; avoid duplicate scripts, ad-hoc AST string parsers, or scattered initialization.
+- For Rust type reflection and TypeScript bindings, prefer compiler-supported mechanisms or established crates such as `tauri_specta` over a custom string-to-type mapper. A local implementation is reasonable only when the existing tools do not meet a demonstrated requirement; explain that requirement.
+- Keep related compile-time outputs, such as permission JSON and TypeScript bindings, coordinated within the existing macro traversal when extending it. Keep `src/lib.rs` and `src/main.rs` free of generation/export boilerplate.
+- Preserve the primary Tauri handler routing, including unannotated IPC commands, when adding sub-system helpers or macro expansions.
 
-- **Unified Macro Side-Effect Pipeline**:
-  In projects using proc-macros for code/handler registration, all compile-time side-effects (e.g. permission JSON sync, TypeScript bindings export, routing generation) MUST be structured as parallel, co-located tasks within a single AST traversal pipeline in the macro expansion.
-- **Entrypoint Cleanliness Invariant**:
-  Application entry points (`src/lib.rs`, `src/main.rs`) MUST remain 100% clean, native, and free of verbose generation/export boilerplate.
-- **Preserve System Routing Integrities**:
-  Sub-system helpers or macro expansions MUST NOT break or replace primary framework handlers (e.g., replacing Tauri's `auto_handler` with sub-crate handlers that break unannotated IPC commands).
+## Proportional Layout
 
-## 3. Scale-Invariant Proportional Layout Architecture (齐次比例布局规范)
+- The project intentionally aligns CSS `vw`, `vh`, `%`, and flex proportions with Rust `LogicalSize` factors in `webview.rs`. Check both sides of a layout change.
+- Do not call a proportional factor a "hardcoded hack" solely because it is numeric. Judge whether it maintains the intended alignment across window sizes.
 
-- **Acknowledge Proportional Alignment Design**:
-  In this project (`uxuescript`), percentage-based layout values in CSS (`vw`, `vh`, `%`, `flex: 1`) combined with `LogicalSize` scale factors in Rust (e.g., `logical_size.width * 0.51`, `logical_size.height * 0.46` in `webview.rs`) constitute an intentional, scale-invariant proportional layout architecture.
-- **Do Not Criticize Proportional Factors as "Hardcoded"**:
-  Do NOT criticize or label these scale-invariant percentage/proportional values in `webview.rs` or CSS as "hardcoded hacky numbers" ("硬编码临时方案"). Recognize them as an intentional, scale-invariant design for native Webview alignment across screens.
+## Data and Code Organization
 
-## 4. Pure Data Decoupling & Clean Architecture Invariants (数据与操作解耦与代码命名规范)
+- Keep `LLMConfig`, `LLMProvider`, and similar config/payload structs as pure data. Put locking and operations in command or service handlers, not getters, setters, callbacks, or mutex methods on DTOs.
+- Group templates by directory (for example, `requests/default.json`) without repeating the directory name in filenames.
+- Split genuinely monolithic match blocks into focused helpers. Avoid repeating module or protocol prefixes in names already scoped by a submodule.
+- In Rust, do not use `ref` when matching `Copy` or reference types such as `Option<&str>`; keep Serde attributes minimal.
 
-- **Pure DTO Invariant**:
-  Config and payload structs (`LLMConfig`, `LLMProvider`) MUST remain 100% pure data objects (POD / DTO). NEVER add getters/setters, closure callbacks (`with_active_provider`), or Mutex-locking methods onto data structs. Keep locking and operations strictly in command/service handlers.
-- **Directory Hierarchy & Anti-Redundancy**:
-  Group templates in subdirectories (e.g., `requests/default.json`). Never repeat directory names in filenames (e.g. use `requests/default.json`, not `requests/request.default.json`).
-- **Single-Responsibility Helper Splitting**:
-  Split monolithic match blocks into focused, single-responsibility helper functions. Avoid repeating module or protocol prefixes in function names when already scoped in submodules (e.g., `chat_completions()` instead of `solve_openai_chat_completions()`).
-- **Idiomatic Rust Matching**:
-  Do NOT use `ref` when pattern-matching `Copy` or reference types (`Option<&str>`). Keep Serde attributes minimal and natural.
+## Standalone Script Contract
 
-## 5. Direct Execution Without Preamble (直接执行，拒绝套话与多余评述)
+- `src-tauri/src/scripts/core.js` is intentionally one self-contained delivery artifact: it must work both by direct browser-console copy/injection and by Tauri `include_str!` plus WebView `eval`. Do not introduce imports or splitting that breaks direct-copy execution. Judge its internal boundaries and behavior, not its physical file count.
+- Preserve progressive enhancement: without Tauri, the script uses defaults and handles supported non-Quiz tasks; with Tauri, it gains configuration, Quiz solving, and status IPC. This dual mode predates the Tauri rewrite and is a product contract inherited from `uXuexitongJS`.
+- Chaoxing DOM dependence is inherent to third-party page automation. Assess selector isolation, waits, iframe transitions, and failure boundaries rather than treating DOM dependence itself as a defect.
 
-- **No Value Judgments / Preamble Chatter**:
-  当用户提出具体的代码变更或修改需求且意图明确时，直接执行操作或展示代码变更，严禁附加如“这个职责分离设计非常合乎逻辑”、“这符合最佳实践”等无实操信息的评述或套话前言。
-- **Exception for Technical Risks**:
-  仅当技术方案存在明确的技术隐患、方案冲突或会导致代码报错/破坏现有架构时，才提出针对性风险分析与提醒。
+## WebView Behavior
 
-## 6. ACP / Zed Protocol Tooling Invariants (ACP/Zed 通信与文件写入铁律)
+- Base remote WebView security findings on the effective label, remote-origin scope, capability merging, and exact allowed commands; the presence of Tauri IPC alone does not imply broad access.
+- Verify startup and navigation conclusions against actual WebView creation order and logs. WebView2 initial navigation is timing-sensitive; do not add startup `reload` calls without evidence of the state being fixed.
 
-- **Strict Prohibition of Double Escaping (禁止二次转义换行)**:
-  When invoking file modification tools (`client_edit_file`, `client_create_file`) over ACP in Zed, NEVER format multiline file content by manually inserting escaped `\n` literals. Always pass raw multiline text with native line breaks. Doing so prevents double-escaping issues where literal backslash-n strings corrupt source files into single-line blobs and crash compiler tokenizers (`unknown start of token: \`).
-- **Buffer State Sync (优先使用 Client 工具保持缓冲区同步)**:
-  Always prioritize `client_*` tools over out-of-band disk commands for editing workspace files to ensure Zed's active buffers, language server diagnostics, and disk contents remain strictly consistent.
+## Review and Reporting
+
+- Use evidence in this order: current code and worktree; normal-user call paths and runtime logs; Git history and prior implementations; generic framework conventions. Prefer observed event order over assumed Vue, Tauri, or WebView lifecycle behavior.
+- A static possibility is only a candidate issue. Establish reachability, frequency, and impact before calling it a normal-use reliability problem.
+- Classify findings before judging them:
+  - **Current normal-path defect:** reachable in ordinary use now.
+  - **Exceptional-path risk:** requires a failure, unusual concurrency, invalid state, or rare environment.
+  - **Completion or migration gap:** planned or previously implemented behavior not yet restored.
+  - **Intentional tradeoff or product constraint:** preserves a required delivery or compatibility property.
+  - **Removed experiment or historical regression:** historical evidence, not a current defect.
+  - **Cross-version capability gap:** repeatedly absent across versions with no contrary design evidence.
+  Do not use completion gaps, deliberate constraints, or removed experiments as evidence of poor current runtime quality.
+- Keep feature completeness separate from code quality; current code quality from author capability; normal-use reliability from defensive hardening; AI-assisted volume from technical ownership; and file splitting from logical modularity or delivery requirements.
+- When assessing project evolution or author capability, inspect Git history and, when available, `../uXuexitongJS`. Do not infer inability from one in-progress snapshot. Large diffs or deleted code do not alone prove expensive failed experimentation.
+- README, release notes, and public documentation may be deferred until release; assess them against the actual project stage and historical workflow.
+- Lead with verified behavior and evidence, not a score or generic checklist. State uncertainty where intent, runtime reachability, or historical cost cannot be proven; do not manufacture weaknesses for balance. Treat claims about age, seniority, rarity, or growth rate as inferences, not repository facts.
+
+## Zed and Agent Environment
+
+- The Zed terminal and Agent command runner may have different sandbox access even on the same Windows machine. If a command works for the user but not the Agent, check `Get-Command <command> | Format-List CommandType,Source,Definition` and `<command> --version` in the user's terminal before concluding it is unavailable.
+- Treat `Access is denied` for a known user-level executable as a possible sandbox or permission boundary. Do not tell the user to reinstall pnpm solely from an Agent-runner failure, or change source, lockfiles, or build scripts to work around that boundary. Use the Zed terminal or request access when needed.
+- When using ACP file-edit tools in Zed, pass raw multiline text with actual line breaks, never manually double-escaped `\n` literals.
+- Prefer `client_*` editing tools for Zed buffer synchronization **when those tools are available**. In other environments, use the available file-edit mechanism.

@@ -129,6 +129,7 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
 
     webview::init_on(&window, "main")?.hide()?;
     webview::init_on(&window, "chaoxing")?.hide()?;
+    webview::init_on(&window, "chaoxing-mask")?.hide()?;
     webview::init_on(&window, "mask")?;
 
     log::info!("初始化应用窗口成功");

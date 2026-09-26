@@ -96,19 +96,10 @@ pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn s
             LogicalSize::new(logical_size.width * 0.48, logical_size.height * 0.48),
         ),
         "chaoxing-mask" => (
-            WebviewBuilder::new(
-                label,
-                WebviewUrl::External(CONFIG.metadata.home_url.clone()),
-            )
-            .background_color((242, 244, 247).into())
-            .devtools(true)
-            .initialization_script(include_str!("../scripts/webview-log.js"))
-            .initialization_script_for_all_frames(include_str!("../scripts/iframe-init.js"))
-            .on_navigation(|url| {
-                log::debug!("检测到页面导航: {}", url);
-                classify(url) != Type::Unknown
-            })
-            .on_page_load(load_on),
+            WebviewBuilder::new(label, WebviewUrl::App("mask.chaoxing.html".into()))
+                .background_color((0, 0, 0, 0).into())
+                .devtools(true)
+                .initialization_script(include_str!("../scripts/webview-log.js")),
             LogicalPosition::new(logical_size.width * 0.51, logical_size.height * 0.46),
             LogicalSize::new(logical_size.width * 0.48, logical_size.height * 0.48),
         ),
