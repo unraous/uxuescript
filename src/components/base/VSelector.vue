@@ -248,7 +248,7 @@ onUnmounted(() => {
 .select-edge {
   position: absolute;
   z-index: 3;
-  background: #0d58a4;
+  background: var(--theme-brand);
   pointer-events: none;
   transition: transform 0.24s cubic-bezier(0.25, 1, 0.5, 1);
 }
@@ -327,7 +327,11 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: #ebe2cf;
+  background-image: var(--theme-page-gradient);
+  background-size: 100vw 100vh;
+  background-position: left top;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 .selected-text {
@@ -341,7 +345,7 @@ onUnmounted(() => {
   z-index: 2;
   display: flex;
   transition: transform 0.2s;
-  color: #0d58a4;
+  color: var(--theme-brand);
   transform: rotate(180deg);
 }
 

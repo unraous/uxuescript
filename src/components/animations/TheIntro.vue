@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { gsap } from "gsap";
 import { onMounted, onUnmounted, ref } from "vue";
-import appLogo from "@/assets/logo/raven-scroll-logo.svg?url";
+import AppLogo from "@/assets/logo/raven-scroll-logo.svg?component";
 import { commands } from "@/services/cmds";
 
 const emit = defineEmits<{ finished: [] }>();
@@ -57,10 +57,7 @@ onUnmounted(() => intro.kill());
       ref="logo"
       class="logo"
     >
-      <img
-        :src="appLogo"
-        alt=""
-      />
+      <AppLogo aria-hidden="true" />
     </div>
     <div
       ref="titleAnchor"
@@ -80,8 +77,8 @@ onUnmounted(() => intro.kill());
 .intro-mask {
   position: absolute;
   inset: 0;
-  color: #0d58a4;
-  background: linear-gradient(135deg, #e8dcc4 0%, #f0ebe0 100%);
+  color: var(--theme-brand);
+  background: var(--theme-page-gradient);
   font-family: "DefaultFont", Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
   line-height: 24px;
@@ -105,11 +102,11 @@ onUnmounted(() => intro.kill());
   opacity: 0;
 }
 
-.logo img {
+.logo svg {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  filter: drop-shadow(0 10px 12px rgb(13 88 164 / 28%));
+  filter: drop-shadow(0 10px 12px color-mix(in srgb, var(--theme-brand) 28%, transparent));
 }
 
 .title-anchor {

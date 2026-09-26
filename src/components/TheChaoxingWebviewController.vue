@@ -126,7 +126,7 @@ onUnmounted(() => {
       <VButton
         :icon="ArrowIcon"
         :disabled="!canGoBack || isNavigating"
-        color="#ebe2cf"
+        color="var(--theme-surface-accent)"
         shape="circle"
         size="20%"
         variant="translucent"
@@ -136,7 +136,7 @@ onUnmounted(() => {
       <VButton
         :icon="ArrowIcon"
         :disabled="!canGoForward || isNavigating"
-        color="#ebe2cf"
+        color="var(--theme-surface-accent)"
         shape="circle"
         size="20%"
         variant="translucent"
@@ -145,7 +145,7 @@ onUnmounted(() => {
       <VButton
         :icon="RefreshIcon"
         :disabled="isNavigating"
-        color="#ebe2cf"
+        color="var(--theme-surface-accent)"
         shape="circle"
         size="20%"
         variant="translucent"
@@ -154,7 +154,7 @@ onUnmounted(() => {
       <VButton
         :icon="HomeIcon"
         :disabled="isNavigating"
-        color="#ebe2cf"
+        color="var(--theme-surface-accent)"
         shape="circle"
         size="20%"
         variant="translucent"
@@ -172,7 +172,7 @@ onUnmounted(() => {
       <VButton
         :icon="ZoomOutIcon"
         :disabled="!canZoomOut"
-        color="#0d58a4"
+        color="var(--theme-brand)"
         shape="circle"
         size="1.75rem"
         variant="translucent"
@@ -182,7 +182,7 @@ onUnmounted(() => {
       <VButton
         :icon="ZoomInIcon"
         :disabled="!canZoomIn"
-        color="#0d58a4"
+        color="var(--theme-brand)"
         shape="circle"
         size="1.75rem"
         variant="translucent"
@@ -196,7 +196,7 @@ onUnmounted(() => {
 </template>
 <style scoped>
 .body {
-  background-color: #0d58a4;
+  background-color: var(--theme-brand);
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -238,7 +238,7 @@ onUnmounted(() => {
   text-overflow: ellipsis; /* 超出部分显示省略号 ... */
   white-space: nowrap; /* 强制单行，禁止换行 */
   font-size: 1rem;
-  color: #0b4c8d;
+  color: var(--theme-brand-deep);
 }
 
 .zoom-value {
@@ -250,21 +250,21 @@ onUnmounted(() => {
 .capsule-slot {
   height: 75%;
   flex: 1;
-  background: linear-gradient(135deg, #e8dcc4 0%, #f0ebe0 100%);
+  background: var(--theme-page-gradient);
   border-radius: 999px;
   display: flex;
   align-items: center;
   overflow: hidden;
   padding: 0 2%;
   gap: 8px;
-  border: 2px solid #0b4c8d;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
+  border: 2px solid var(--theme-brand-deep);
+  box-shadow: inset 0 2px 4px color-mix(in srgb, black 25%, transparent);
 }
 
 .title {
   font-size: larger;
   width: 15%;
-  color: #ebe2cf;
+  color: var(--theme-surface-accent);
   display: flex;
   align-items: center;
   justify-content: center;

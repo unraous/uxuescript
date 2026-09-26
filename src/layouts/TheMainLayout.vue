@@ -42,7 +42,7 @@ onMounted(async () => {
   width: 100vw;
   flex-direction: column;
   position: relative;
-  background: linear-gradient(135deg, #e8dcc4 0%, #f0ebe0 100%);
+  background: var(--theme-page-gradient);
 }
 
 .left {

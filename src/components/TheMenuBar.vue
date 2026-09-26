@@ -63,7 +63,7 @@ const closeApp = async () => {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  color: #0d58a4;
+  color: var(--theme-brand);
   letter-spacing: 1px;
   -webkit-text-stroke: 1px currentColor;
   font-size: 2rem;
@@ -74,7 +74,7 @@ button {
   border: none;
   border-radius: 0%;
   background-color: transparent;
-  color: #0d58a4;
+  color: var(--theme-brand);
   height: 100%;
   cursor: pointer;
   display: flex;
@@ -90,7 +90,7 @@ button {
 
 /* 悬停状态 */
 button:hover {
-  background-color: #0d58a4;
-  color: #ede5d5;
+  background-color: var(--theme-brand);
+  color: var(--theme-on-brand-hover);
 }
 </style>

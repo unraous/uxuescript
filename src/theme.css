@@ -1,0 +1,51 @@
+@property --theme-brand {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
+@property --theme-surface {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
+@property --theme-surface-light {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
+:root {
+  --theme-brand: #0d58a4;
+  --theme-surface: #e8dcc4;
+  --theme-surface-light: #f0ebe0;
+  transition:
+    --theme-brand 300ms ease,
+    --theme-surface 300ms ease,
+    --theme-surface-light 300ms ease;
+  --theme-brand-deep: color-mix(in srgb, var(--theme-brand) 86%, black);
+  --theme-brand-deeper: color-mix(in srgb, var(--theme-brand) 75%, black);
+  --theme-surface-accent: rgb(
+    from var(--theme-surface) calc(r + 3) calc(g + 6) calc(b + 11)
+  );
+  --theme-on-brand-hover: rgb(
+    from var(--theme-surface) calc(r + 5) calc(g + 9) calc(b + 17)
+  );
+  --theme-muted: color-mix(in srgb, black 50%, white);
+  --theme-page-gradient: linear-gradient(
+    135deg,
+    var(--theme-surface) 0%,
+    var(--theme-surface-light) 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    transition: none;
+  }
+}
+
+.gsap-ripple {
+  background: color-mix(in srgb, white 75%, transparent);
+}

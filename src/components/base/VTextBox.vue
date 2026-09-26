@@ -76,7 +76,7 @@ const onInput = (event: Event) => {
 
 <style scoped>
 .base-text-box {
-  --brand-color: #0d58a4;
+  --brand-color: var(--theme-brand);
   --base-thickness: 2px;
   --lift-thickness: 5px;
 
@@ -109,7 +109,7 @@ const onInput = (event: Event) => {
   width: 100%;
   height: 100%;
   padding: 0 12px;
-  background-color: var(--bg-color); /* 给输入框一个底色，增强实体感 */
+  background-color: transparent;
   color: var(--brand-color);
   border: 0px;
   border-radius: 0;

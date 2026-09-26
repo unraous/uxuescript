@@ -95,7 +95,7 @@ const buttonStyle = computed(() => ({
   justify-content: center;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px color-mix(in srgb, black 15%, transparent);
   transition:
     opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
     filter 0.25s ease,
@@ -114,8 +114,8 @@ const buttonStyle = computed(() => ({
 
 /* 预设风格 */
 .variant-brand {
-  --brand-color: #0d58a4;
-  color: #e8dcc4;
+  --brand-color: var(--theme-brand);
+  color: var(--theme-surface);
   background: conic-gradient(
     from 145deg at 50% 0%,
     color-mix(in srgb, var(--brand-color), black 25%) 0deg,
@@ -127,7 +127,7 @@ const buttonStyle = computed(() => ({
 }
 
 .variant-translucent {
-  background-color: rgba(0, 0, 0, 0);
+  background-color: transparent;
   backdrop-filter: blur(4px);
 }
 

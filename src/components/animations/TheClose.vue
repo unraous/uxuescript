@@ -28,7 +28,7 @@ onUnmounted(() => tween?.kill());
 .closing-mask {
   position: absolute;
   inset: 0;
-  background: #000;
+  background: black;
   opacity: 0;
 }
 </style>

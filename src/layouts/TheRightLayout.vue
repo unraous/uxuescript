@@ -38,7 +38,7 @@ import TheCourseDashboard from "@/components/TheCourseDashboard.vue";
   left: 0;
   width: calc(100% + 6px);
   height: calc(100% + 6px);
-  background: #0d58a4;
+  background: var(--theme-brand);
   pointer-events: none;
   z-index: 1;
 

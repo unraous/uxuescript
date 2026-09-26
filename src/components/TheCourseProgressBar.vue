@@ -83,7 +83,7 @@ onUnmounted(() => {
   width: 100%;
   height: 60%;
   border-radius: 999px;
-  background-color: rgba(13, 88, 164, 0.25);
+  background-color: color-mix(in srgb, var(--theme-brand) 25%, transparent);
 }
 
 .active-clip {
@@ -96,7 +96,7 @@ onUnmounted(() => {
 
 .active-bar {
   height: 100%;
-  --brand-color: #0d58a4;
+  --brand-color: var(--theme-brand);
   background: conic-gradient(
     from 145deg at 50% 0%,
     color-mix(in srgb, var(--brand-color), black 25%) 0deg,

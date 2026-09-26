@@ -107,14 +107,18 @@ const scaleFeedback = useScaleFeedback({ hoverScale: 1.25 });
 .select-dropdown {
   width: 100%;
   box-sizing: border-box;
-  background-color: #ebe2cf;
-  border: 2px solid #0d58a4;
+  background-image: var(--theme-page-gradient);
+  background-size: 100vw 100vh;
+  background-position: left top;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  border: 2px solid var(--theme-brand);
   border-top: none;
   max-height: 175px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  box-shadow: 0 6px 16px rgba(13, 88, 164, 0.15);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--theme-brand) 15%, transparent);
 }
 
 .select-option {
@@ -132,7 +136,7 @@ const scaleFeedback = useScaleFeedback({ hoverScale: 1.25 });
 }
 
 .select-option:hover {
-  background-color: rgba(0, 0, 0, 0.08);
+  background-color: color-mix(in srgb, black 8%, transparent);
 }
 
 .option-label,
@@ -161,7 +165,7 @@ const scaleFeedback = useScaleFeedback({ hoverScale: 1.25 });
   width: var(--option-height);
   height: 75%;
   padding: 0;
-  color: #0d58a4;
+  color: var(--theme-brand);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -176,7 +180,7 @@ const scaleFeedback = useScaleFeedback({ hoverScale: 1.25 });
   align-items: center;
   gap: 0.375rem;
   justify-content: flex-start;
-  color: #0d58a4;
+  color: var(--theme-brand);
 }
 
 .action-icon {
@@ -196,11 +200,11 @@ const scaleFeedback = useScaleFeedback({ hoverScale: 1.25 });
 }
 
 .select-option.is-selected {
-  background-color: #0d58a4;
-  color: #ffffff;
+  background-color: var(--theme-brand);
+  color: white;
 }
 
 .is-selected .option-action {
-  color: #ffffff;
+  color: white;
 }
 </style>

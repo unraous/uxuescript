@@ -67,7 +67,7 @@ const openIssues = async () => {
   text-align: center;
   gap: 16px;
   padding: 0 10%;
-  color: #0d58a4;
+  color: var(--theme-brand);
   font-size: 1.25rem;
   line-height: 1.5;
   overflow-y: auto;

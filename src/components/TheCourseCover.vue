@@ -91,8 +91,8 @@ defineProps<{
   position: absolute;
   top: 0;
   left: 0;
-  --brand-color: #0d58a4;
-  color: #e8dcc4;
+  --brand-color: var(--theme-brand);
+  color: var(--theme-surface);
   background: conic-gradient(
     from 145deg at 50% 0%,
     color-mix(in srgb, var(--brand-color), black 25%) 0deg,
@@ -111,7 +111,7 @@ defineProps<{
 .placeholder-text {
   font-size: 2rem;
   letter-spacing: 1px;
-  text-shadow: 0 5px 2px rgba(0, 0, 0, 0.7);
+  text-shadow: 0 5px 2px color-mix(in srgb, black 70%, transparent);
 }
 
 /* 交叉渐变动画：旧元素淡出的同时新元素直接在其上淡入，无空白间隙 */

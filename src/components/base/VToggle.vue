@@ -181,15 +181,15 @@ onUnmounted(() => {
                 >
                   <stop
                     offset="0%"
-                    stop-color="#0a427b"
+                    stop-color="var(--theme-brand-deeper)"
                   />
                   <stop
                     offset="50%"
-                    stop-color="#0d58a4"
+                    stop-color="var(--theme-brand)"
                   />
                   <stop
                     offset="100%"
-                    stop-color="#0d58a4"
+                    stop-color="var(--theme-brand)"
                   />
                 </linearGradient>
               </defs>
@@ -245,7 +245,7 @@ onUnmounted(() => {
   /* 基础尺寸与颜色 */
   --size: 80%;
   --max-size: 3rem;
-  --color: #0d58a4;
+  --color: var(--theme-brand);
   --ball-size: 60%;
 
   width: min(var(--size), var(--max-size));

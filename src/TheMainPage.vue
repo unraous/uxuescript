@@ -55,7 +55,7 @@ body,
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
-  color: #0d58a4;
+  color: var(--theme-brand);
   background-color: transparent;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -81,7 +81,7 @@ textarea {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #0b4c8d;
+  background-color: var(--theme-brand-deep);
   border-radius: 0;
 }
 </style>
