@@ -19,6 +19,7 @@
           "minimize",
           "options",
           "paths",
+          "platform",
           "providers",
           "query_course_meta",
           "reload",

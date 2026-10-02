@@ -62,3 +62,9 @@ pub fn send_status(webview: tauri::Webview, status: CourseStatus) -> CommandsRes
     webview.emit_to("main", "status-update", status).ok();
     Ok(())
 }
+
+#[tauri::command]
+#[specta::specta]
+pub fn platform() -> CommandsResult<String> {
+    Ok(std::env::consts::OS.to_string())
+}

@@ -115,13 +115,11 @@
       try {
         console.info("正在从后端加载配置...");
         const res = await tauriInvoke("options");
-        if (res) {
-          this.hasBackend = true;
-          this.muteVideo = res.muteWebview ?? this.muteVideo;
-          this.lockingSpeed = res.speedLock ?? this.lockingSpeed;
-          this.videoSpeedValue = res.speedValue ?? this.videoSpeedValue;
-          console.info("配置设置成功：", this);
-        }
+        this.hasBackend = true;
+        this.muteVideo = res.muteWebview ?? this.muteVideo;
+        this.lockingSpeed = res.speedLock ?? this.lockingSpeed;
+        this.videoSpeedValue = res.speedValue ?? this.videoSpeedValue;
+        console.info("配置设置成功：", this);
       } catch (e) {
         console.error("从后端加载配置失败：", e);
       }
@@ -1055,11 +1053,7 @@
 
 是否确认开始运行？`,
     );
-    if (
-      config.hasBackend &&
-      (navigator.platform.includes("Mac") ||
-        navigator.userAgent.includes("Mac OS X"))
-    ) {
+    if ((await tauriInvoke("platform")) === "macos") {
       // 临时补丁：macOS WKWebView 未接入 JavaScript confirm，避免误判为用户取消。
       isConfirmed = true;
     }

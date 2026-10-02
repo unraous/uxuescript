@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, type Component } from "vue";
 import { useMagnetic } from "@/composables/useMagnetic";
-import { createRipple } from "@/effects/ripple";
+import { createRipple } from "@/composables/ripple";
 
 const buttonRef = ref<HTMLElement | null>(null);
 const contentRef = ref<HTMLElement | null>(null);
