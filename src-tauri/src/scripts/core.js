@@ -5,6 +5,12 @@
   /** @type {<T = any>(cmd: string, args?: Record<string, any>) => Promise<T>} */
   let tauriInvoke = /** @type {any} */ (window).__TAURI_INTERNALS__?.invoke;
 
+  // 只替换脚本内部的确认调用，保留第三方页面同步 window.confirm 的语义。
+  /** @type {(message: string) => boolean | Promise<boolean>} */
+  const confirm = tauriInvoke
+    ? (message) => tauriInvoke("confirm", { message })
+    : window.confirm.bind(window);
+
   /** SELECTORS 选择器及静态字符串统一配置表 */
   const SELECTORS = {
     courseTree: {
@@ -71,7 +77,7 @@
       console.error(errorMessage, e);
       if (config.debugTaskTypes.length) {
         const msg = `[DEBUG 异常]\n提示: ${errorMessage}\n详情: ${e instanceof Error ? e.message : String(e)}\n\n确定：忽略并继续；取消：终止。`;
-        if (!confirm(msg)) throw e;
+        if (!(await confirm(msg))) throw e;
       }
     }
   };
@@ -619,7 +625,7 @@
     if (config.debugTaskTypes.includes("Video")) {
       await sleep(5000);
       assert(
-        confirm(
+        await confirm(
           "[DEBUG] Video 任务点处理完成。点击 [确定] 继续，点击 [取消] 中断。",
         ),
         "调试中断：用户取消了 Video 任务点",
@@ -657,7 +663,7 @@
 
     if (config.debugTaskTypes.includes("PDF")) {
       assert(
-        confirm(
+        await confirm(
           "[DEBUG] PDF 任务点自动滚动完成。点击 [确定] 继续，点击 [取消] 中断。",
         ),
         "调试中断：用户取消了 PDF 任务点",
@@ -828,7 +834,7 @@
 
     if (config.debugTaskTypes.includes("Quiz")) {
       assert(
-        confirm(
+        await confirm(
           "[DEBUG] 答案已自动填充完成。点击[确定]继续提交，点击[取消]中断提交。",
         ),
         "调试中断：用户取消了 Quiz 提交",
@@ -1040,7 +1046,7 @@
       : `${config.videoSpeedValue}x`;
     const configSummary = `当前配置：[视频倍速: ${speedInfo} | 自动静音: ${config.muteVideo ? "已开启" : "已关闭"}]`;
 
-    let isConfirmed = confirm(
+    const isConfirmed = await confirm(
       `[使用须知与运行指南 v2.1.4]
 1. 免责声明：本脚本仅供自动化测试与学习交流使用，请遵守相关法律法规及平台规定。
 2. 前置准备：建议关闭浏览器开发者工具(DevTools)，避免触发调试拦截。
@@ -1053,10 +1059,6 @@
 
 是否确认开始运行？`,
     );
-    if ((await tauriInvoke("platform")) === "macos") {
-      // 临时补丁：macOS WKWebView 未接入 JavaScript confirm，避免误判为用户取消。
-      isConfirmed = true;
-    }
     if (!isConfirmed) {
       console.info("用户已取消脚本运行");
       await emit.cancelled();

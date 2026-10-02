@@ -44,7 +44,7 @@ async fn close(window: Window) {
 
 fn resize(webview: &Webview, size: LogicalSize<f64>) -> Result<()> {
     let (pos, size) = match webview.label() {
-        "chaoxing" => (
+        "chaoxing" | "chaoxing-mask" => (
             LogicalPosition::new(size.width * 0.51, size.height * 0.46),
             LogicalSize::new(size.width * 0.48, size.height * 0.48),
         ),

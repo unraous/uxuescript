@@ -103,16 +103,18 @@ onUnmounted(() => animation?.kill());
 }
 
 .confirmation-dialog {
-  width: 25%;
-  height: 50%;
+  width: 33%;
+  height: 67%;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   padding: 1.5vmin 2vmin 2vmin;
-  border-radius: 1.25rem;
+  border-radius: 1.25em;
+  /* 两个遮罩的视口不同，以各自视口设置局部字号，子元素用 em 跟随。 */
+  font-size: 1.8vmin;
   background: var(--theme-page-gradient);
   color: var(--theme-brand);
-  box-shadow: 0 1.25rem 3rem rgb(0 0 0 / 25%);
+  box-shadow: 0 1.25em 3em rgb(0 0 0 / 25%);
 }
 
 .title {
@@ -121,7 +123,7 @@ onUnmounted(() => animation?.kill());
   align-items: center;
   justify-content: center;
   margin: 0;
-  font-size: 2rem;
+  font-size: 2em;
 }
 
 .message {
@@ -133,27 +135,27 @@ onUnmounted(() => animation?.kill());
   text-align: center;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 1.25rem;
+  font-size: 1.25em;
   line-height: 1.5;
 }
 
 .actions {
-  flex: 0 0 calc(2.5rem + 2vmin);
+  flex: 0 0 calc(2.5em + 2vmin);
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
-  gap: 0.5rem;
+  gap: 0.5em;
 }
 
 .choice-button {
-  width: 5.5rem;
-  height: 2.5rem;
+  width: 4.4em;
+  height: 2em;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--theme-brand);
   font: inherit;
-  font-size: 1.25rem;
+  font-size: 1.25em;
   font-weight: 600;
   cursor: pointer;
 }
