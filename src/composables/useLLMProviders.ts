@@ -1,6 +1,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import type { SelectorData } from "@/components/base/VSelector.types";
 import { commands, type LLMProvider } from "@/services/cmds";
+import { showError } from "@/services/errors";
 
 export function useLLMProviders() {
   const providers = reactive<LLMProvider[]>([]);
@@ -32,7 +33,7 @@ export function useLLMProviders() {
     };
   });
   const logCommandError = (cause: unknown) =>
-    console.error("配置命令执行失败:", cause);
+    showError("配置命令执行失败:", cause);
   const saveSelectedProvider = () =>
     commands.upsertProvider(selectedProvider.value!).catch(logCommandError);
 

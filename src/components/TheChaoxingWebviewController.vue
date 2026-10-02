@@ -9,8 +9,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import VButton from "@/components/base/VButton.vue";
 import VRollTransition from "@/components/base/VRollTransition.vue";
 import { commands } from "@/services/cmds";
-
-const console = globalThis.console;
+import { showError } from "@/services/errors";
 
 // Webview 缩放控制阶梯表
 const ZOOM_LEVELS = [
@@ -29,9 +28,9 @@ const canZoomIn = computed(() => zoomIndex.value < ZOOM_LEVELS.length - 1);
 const canZoomOut = computed(() => zoomIndex.value > 0);
 
 watch(zoomIndex, async (newIndex) => {
-  await commands.setZoom(ZOOM_LEVELS[newIndex]).catch((e) => {
-    console.error("设置Webview缩放失败", e);
-  });
+  await commands.setZoom(ZOOM_LEVELS[newIndex]).catch((e) =>
+    showError("设置Webview缩放失败", e),
+  );
 });
 
 const zoomIn = () => zoomIndex.value++;
@@ -54,7 +53,7 @@ const updateNavState = async () => {
     canGoForward.value = forward;
     currentUrl.value = url ?? "";
   } catch (err) {
-    console.error("获取导航状态失败:", err);
+    await showError("获取导航状态失败:", err);
   } finally {
     isNavigating.value = false;
   }
@@ -72,7 +71,7 @@ const withNavLock = (
     try {
       await action();
     } catch (err) {
-      console.error(errMsg, err);
+      await showError(errMsg, err);
       isNavigating.value = false;
     }
   };
@@ -108,7 +107,7 @@ onMounted(async () => {
     });
     zoomIndex.value = 5; //感觉默认改到80%好一点
   } catch (err) {
-    console.error("注册 URL 监听失败:", err);
+    await showError("注册 URL 监听失败:", err);
   }
 });
 

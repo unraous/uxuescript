@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import VInput from "@/components/base/VInput.vue";
 import VToggle from "@/components/base/VToggle.vue";
 import { commands, type OptionsConfig } from "@/services/cmds";
+import { showError } from "@/services/errors";
 
 const options = ref<OptionsConfig>();
 const speedValue = computed<number>({
@@ -14,7 +15,7 @@ const speedValue = computed<number>({
 const saveOptions = () =>
   commands
     .setOptions(options.value!)
-    .catch((cause) => console.error("保存课程配置失败:", cause));
+    .catch((cause) => showError("保存课程配置失败:", cause));
 
 onMounted(async () => {
   options.value = await commands.options();

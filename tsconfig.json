@@ -25,7 +25,6 @@
     /* Paths mapping */
     "paths": {
       "@/*": ["./src/*"],
-      "@panels/*": ["./src/components/panels/*"],
     },
   },
   "include": [
@@ -34,7 +33,6 @@
     "src/**/*.tsx",
     "src/**/*.vue",
     "tests/**/*.ts",
-    "new-core.js",
     "src-tauri/src/scripts/core.js",
   ],
   "references": [{ "path": "./tsconfig.node.json" }],

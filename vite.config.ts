@@ -11,8 +11,7 @@ export default defineConfig(async () => ({
 
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '@panels': fileURLToPath(new URL('./src/components/panels', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
 
