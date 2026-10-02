@@ -11,6 +11,7 @@ export const commands = {
 	cover: string,
 } | null>("query_course_meta", { courseId }),
 	sendStatus: (status: CourseStatus) => __TAURI_INVOKE<null>("send_status", { status }),
+	platform: () => __TAURI_INVOKE<string>("platform"),
 	/**  从本地 Ollama 服务拉取可用模型列表更新至内存配置。 */
 	fetchOllamaModels: () => __TAURI_INVOKE<null>("fetch_ollama_models"),
 	/**  获取当前可用的全部大语言模型提供商列表。 */
@@ -34,7 +35,9 @@ export const commands = {
 	/**  将内存中的全局配置持久化保存至本地文件。 */
 	saveConfig: () => __TAURI_INVOKE<null>("save_config"),
 	paths: () => __TAURI_INVOKE<PathsConfig>("paths"),
-	/**  显示主窗口并启动遮罩开屏动画。 */
+	/**  显示调用方对应的确认遮罩，并在退出动画及隐藏完成后返回选择。 */
+	confirm: (message: string) => __TAURI_INVOKE<boolean>("confirm", { message }),
+	/**  遮罩监听器就绪后显示窗口并发送开屏事件。 */
 	startMask: () => __TAURI_INVOKE<null>("start_mask"),
 	/**  显示已在后台加载完成的主界面和超星 Webview。 */
 	showContent: () => __TAURI_INVOKE<null>("show_content"),

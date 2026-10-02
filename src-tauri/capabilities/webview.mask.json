@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "webview.mask",
+  "description": "Local animation mask webviews",
+  "webviews": [
+    "mask",
+    "chaoxing-mask"
+  ],
+  "permissions": [
+    "core:default",
+    "commands-mask",
+    "log:default"
+  ]
+}

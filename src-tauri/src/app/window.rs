@@ -23,7 +23,7 @@ async fn notify_exit_animation(window: &Window) {
     if let Some(mask) = window.get_webview("mask") {
         log::debug!("执行关闭动画并关闭窗口");
         mask.show().ok();
-        if let Err(e) = mask.emit("close-event", &()) {
+        if let Err(e) = mask.emit_to("mask", "close-event", &()) {
             log::error!("发送关闭动画事件失败: {}", e);
         }
         log::debug!("关闭动画触发完毕");

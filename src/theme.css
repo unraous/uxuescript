@@ -49,3 +49,16 @@
 .gsap-ripple {
   background: color-mix(in srgb, white 75%, transparent);
 }
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--theme-brand-deep);
+  border-radius: 0;
+}

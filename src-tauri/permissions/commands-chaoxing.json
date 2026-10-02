@@ -4,6 +4,7 @@
     {
       "commands": {
         "allow": [
+          "confirm",
           "insert_course_meta_map",
           "options",
           "platform",

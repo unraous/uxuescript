@@ -3,13 +3,24 @@ import { gsap } from "gsap";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import TheMaskPage from "@/TheMaskPage.vue";
+import TheChaoxingMaskPage from "@/TheChaoxingMaskPage.vue";
 import { commands } from "@/services/cmds";
+import { emitTo } from "@tauri-apps/api/event";
 
-const events = vi.hoisted(() => new Map<string, () => void>());
+const events = vi.hoisted(
+  () => new Map<string, (event?: { payload: unknown }) => void>(),
+);
 const timelineCompletions = vi.hoisted(() => [] as Array<() => void>);
+const animationCompletions = vi.hoisted(() => [] as Array<() => void>);
+const currentWebview = vi.hoisted(() => ({ label: "mask" }));
+
+vi.mock("@tauri-apps/api/event", () => ({
+  emitTo: vi.fn(async () => {}),
+}));
 
 vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({
+    label: currentWebview.label,
     listen: vi.fn(async (name: string, callback: () => void) => {
       events.set(name, callback);
       return () => events.delete(name);
@@ -27,7 +38,8 @@ vi.mock("@/services/cmds", () => ({
 
 vi.mock("gsap", () => ({
   gsap: {
-    timeline: vi.fn(() => {
+    timeline: vi.fn((options?: { onComplete?: () => void }) => {
+      if (options?.onComplete) animationCompletions.push(options.onComplete);
       const timeline = {
         fromTo: vi.fn(),
         to: vi.fn(),
@@ -50,12 +62,15 @@ vi.mock("gsap", () => ({
       return timeline;
     }),
     to: vi.fn(() => ({ kill: vi.fn() })),
+    killTweensOf: vi.fn(),
   },
 }));
 
 afterEach(() => {
   events.clear();
   timelineCompletions.length = 0;
+  animationCompletions.length = 0;
+  currentWebview.label = "mask";
   vi.clearAllMocks();
 });
 
@@ -127,4 +142,35 @@ describe("TheMaskPage", () => {
 
     wrapper.unmount();
   });
+
+  it.each([
+    ["main Yes", TheMaskPage, true],
+    ["main No", TheMaskPage, false],
+    ["chaoxing Yes", TheChaoxingMaskPage, true],
+    ["chaoxing No", TheChaoxingMaskPage, false],
+  ])(
+    "shows a confirmation on %s and reports the choice after its exit animation",
+    async (_name, Page, choice) => {
+      currentWebview.label = _name.startsWith("chaoxing") ? "chaoxing-mask" : "mask";
+      const wrapper = mount(Page);
+      await flushPromises();
+      expect(wrapper.findAll(".mask-layer")).toHaveLength(0);
+
+      events.get("confirmation-pop-up")?.({
+        payload: "Continue?",
+      });
+      await nextTick();
+      expect(wrapper.find('[role="dialog"]').text()).toContain("Continue?");
+      expect(emitTo).not.toHaveBeenCalled();
+
+      await wrapper.findAll("button")[choice ? 0 : 1].trigger("click");
+      expect(emitTo).not.toHaveBeenCalled();
+      animationCompletions.shift()?.();
+      await nextTick();
+
+      expect(emitTo).toHaveBeenCalledWith(currentWebview.label, "confirmation-result", choice);
+      expect(wrapper.findAll(".mask-layer")).toHaveLength(0);
+      wrapper.unmount();
+    },
+  );
 });

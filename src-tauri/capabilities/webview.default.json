@@ -3,8 +3,7 @@
   "identifier": "webview.default",
   "description": "Default capability for the application webviews",
   "webviews": [
-    "main",
-    "mask"
+    "main"
   ],
   "permissions": [
     "core:default",

@@ -20,7 +20,8 @@ export default defineConfig(async () => ({
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./main.html', import.meta.url)),
-        mask: fileURLToPath(new URL('./mask.html', import.meta.url))
+        mask: fileURLToPath(new URL('./mask.html', import.meta.url)),
+        chaoxingMask: fileURLToPath(new URL('./mask.chaoxing.html', import.meta.url))
       }
     }
   },

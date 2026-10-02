@@ -32,7 +32,10 @@ function applyOverrides(next: Partial<ThemeColors>) {
 
 async function syncMask() {
   if (isTauri()) {
-    await emitTo("mask", "theme-colors-changed", overrides.value);
+    await Promise.all([
+      emitTo("mask", "theme-colors-changed", overrides.value),
+      emitTo("chaoxing-mask", "theme-colors-changed", overrides.value),
+    ]);
   }
 }
 

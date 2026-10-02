@@ -1,9 +1,43 @@
 use super::CommandsResult;
 
 use anyhow::anyhow;
-use tauri::{window::Window, Emitter, Manager};
+use tauri::{window::Window, Emitter, Listener, Manager, Webview};
+use tokio::sync::oneshot;
 
-/// 显示主窗口并启动遮罩开屏动画。
+/// 显示调用方对应的确认遮罩，并在退出动画及隐藏完成后返回选择。
+#[tauri::command]
+#[specta::specta]
+pub async fn confirm(webview: Webview, window: Window, message: String) -> CommandsResult<bool> {
+    let mask_label = match webview.label() {
+        "main" => "mask",
+        "chaoxing" => "chaoxing-mask",
+        _ => return Err(anyhow!("此 Webview 不能发起确认弹窗").into()),
+    };
+    let mask = window
+        .get_webview(mask_label)
+        .ok_or_else(|| anyhow!("未找到遮罩 Webview: {mask_label}"))?;
+    let (sender, receiver) = oneshot::channel();
+    let listener = mask.once("confirmation-result", move |event| {
+        let _ = sender.send(serde_json::from_str::<bool>(event.payload()));
+    });
+
+    if let Err(error) = mask
+        .show()
+        .and_then(|_| mask.emit_to(mask_label, "confirmation-pop-up", message))
+    {
+        mask.unlisten(listener);
+        return Err(error.into());
+    }
+
+    let choice = receiver
+        .await
+        .map_err(|_| anyhow!("确认弹窗未能返回结果"))?
+        .map_err(anyhow::Error::from)?;
+    mask.hide()?;
+    Ok(choice)
+}
+
+/// 遮罩监听器就绪后显示窗口并发送开屏事件。
 #[tauri::command]
 #[specta::specta]
 pub fn start_mask(window: Window) -> CommandsResult<()> {
@@ -11,7 +45,7 @@ pub fn start_mask(window: Window) -> CommandsResult<()> {
     let mask = window
         .get_webview("mask")
         .ok_or_else(|| anyhow!("未找到遮罩 Webview"))?;
-    mask.emit("start-event", &())?;
+    mask.emit_to("mask", "start-event", ())?;
     Ok(())
 }
 
