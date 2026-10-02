@@ -12,8 +12,10 @@ pub fn run() {
     use app::webview::UrlStack;
     use app::window;
     use commands::chaoxing::CourseMetaMap;
+    use commands::mask::Confirmations;
 
     // 禁用 WebView2 硬件 GPU 加速以降低 100MB+ 内存占用并提升性能
+    #[cfg(target_os = "windows")]
     std::env::set_var(
         "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
         "--disable-gpu --disable-background-timer-throttling \
@@ -29,6 +31,7 @@ pub fn run() {
         .on_window_event(window::listener)
         .manage(UrlStack::default())
         .manage(CourseMetaMap::default())
+        .manage(Confirmations::default())
         .invoke_handler(commands_collector::register!())
         .setup(window::init)
         .run(tauri::generate_context!())

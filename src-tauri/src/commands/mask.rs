@@ -1,17 +1,28 @@
 use super::CommandsResult;
 
 use anyhow::anyhow;
-use tauri::{window::Window, Emitter, Listener, Manager, Webview};
-use tokio::sync::oneshot;
+use tauri::{window::Window, Emitter, Listener, Manager, State, Webview};
+use tokio::sync::{oneshot, Mutex};
+
+#[derive(Default)]
+pub struct Confirmations(Mutex<()>, Mutex<()>);
 
 /// 显示调用方对应的确认遮罩，并在退出动画及隐藏完成后返回选择。
 #[tauri::command]
 #[specta::specta]
-pub async fn confirm(webview: Webview, window: Window, message: String) -> CommandsResult<bool> {
-    let mask_label = match webview.label() {
-        "main" => "mask",
-        "chaoxing" => "chaoxing-mask",
+pub async fn confirm(
+    webview: Webview,
+    window: Window,
+    state: State<'_, Confirmations>,
+    message: String,
+) -> CommandsResult<bool> {
+    let (mask_label, active) = match webview.label() {
+        "main" => ("mask", &state.0),
+        "chaoxing" => ("chaoxing-mask", &state.1),
         _ => return Err(anyhow!("此 Webview 不能发起确认弹窗").into()),
+    };
+    let Ok(_active) = active.try_lock() else {
+        return Ok(false);
     };
     let mask = window
         .get_webview(mask_label)

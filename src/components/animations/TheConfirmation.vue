@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { gsap } from "gsap";
 import { onMounted, onUnmounted, ref } from "vue";
-import VButton from "@/components/base/VButton.vue";
+import { useScaleFeedback } from "@/composables/useScaleFeedback";
 
 defineProps<{ message: string }>();
 const emit = defineEmits<{ finished: [choice: boolean] }>();
+const scaleFeedback = useScaleFeedback({ hoverScale: 1.25 });
 
 const backdrop = ref<HTMLElement | null>(null);
 const dialog = ref<HTMLElement | null>(null);
@@ -61,14 +62,28 @@ onUnmounted(() => animation?.kill());
       <h1 class="title">Confirmation</h1>
       <div class="message custom-scrollbar">{{ message }}</div>
       <div class="actions">
-        <VButton
-          label="Yes"
+        <button
+          type="button"
+          class="choice-button"
           @click="choose(true)"
-        />
-        <VButton
-          label="No"
+          @pointerenter="scaleFeedback.handlePointerEnter"
+          @pointerleave="scaleFeedback.handlePointerLeave"
+          @pointerdown="scaleFeedback.handlePointerDown"
+          @pointerup="scaleFeedback.handlePointerUp"
+        >
+          Yes
+        </button>
+        <button
+          type="button"
+          class="choice-button"
           @click="choose(false)"
-        />
+          @pointerenter="scaleFeedback.handlePointerEnter"
+          @pointerleave="scaleFeedback.handlePointerLeave"
+          @pointerdown="scaleFeedback.handlePointerDown"
+          @pointerup="scaleFeedback.handlePointerUp"
+        >
+          No
+        </button>
       </div>
     </section>
   </div>
@@ -93,7 +108,7 @@ onUnmounted(() => animation?.kill());
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  padding: 1.5vmin 2vmin;
+  padding: 1.5vmin 2vmin 2vmin;
   border-radius: 1.25rem;
   background: var(--theme-page-gradient);
   color: var(--theme-brand);
@@ -123,15 +138,23 @@ onUnmounted(() => animation?.kill());
 }
 
 .actions {
-  flex: 0 0 20%;
+  flex: 0 0 calc(2.5rem + 2vmin);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
-.actions :deep(.base-button) {
-  width: min(9rem, 45%);
+.choice-button {
+  width: 5.5rem;
   height: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--theme-brand);
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 </style>
