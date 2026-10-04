@@ -13,35 +13,30 @@ fn chaoxing_webview(window: &window::Window) -> CommandsResult<Webview> {
         .ok_or_else(|| anyhow!("未找到webview [chaoxing]"))?)
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn set_zoom(window: window::Window, scale: f64) -> CommandsResult<()> {
     chaoxing_webview(&window)?.set_zoom(scale)?;
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn can_go_back(url_stack: tauri::State<UrlStack>) -> bool {
     url_stack.can_back()
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn can_go_forward(url_stack: tauri::State<UrlStack>) -> bool {
     url_stack.can_forward()
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn go_home(window: window::Window) -> CommandsResult<()> {
     let webview = chaoxing_webview(&window)?;
     webview.navigate(CONFIG.metadata.home_url.clone())?;
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn go_back(window: window::Window, url_stack: tauri::State<UrlStack>) -> CommandsResult<()> {
     if let Some(url) = url_stack.back() {
         chaoxing_webview(&window)?.navigate(url)?;
@@ -52,8 +47,7 @@ pub fn go_back(window: window::Window, url_stack: tauri::State<UrlStack>) -> Com
     }
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn go_forward(window: window::Window, url_stack: tauri::State<UrlStack>) -> CommandsResult<()> {
     if let Some(url) = url_stack.forward() {
         log::debug!("[chaoxing] 前进至: {}", url);
@@ -65,14 +59,12 @@ pub fn go_forward(window: window::Window, url_stack: tauri::State<UrlStack>) -> 
     }
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn current_url(url_stack: tauri::State<UrlStack>) -> Option<String> {
     url_stack.current().map(|url| url.to_string())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn reload(window: window::Window) -> CommandsResult<()> {
     chaoxing_webview(&window)?.reload()?;
     Ok(())

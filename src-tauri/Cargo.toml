@@ -47,7 +47,7 @@ async-trait = "0.1.91"
 reqwest = { version = "0.13.4", features = ["json", "blocking"] }
 dotenv = "0.15.0"
 strum = { version = "0.28.0", features = ["derive"] }
-commands_collector = { path = "./crates/commands_collector" }
+uxs_commands = { path = "./crates/uxs_commands" }
 parking_lot = { version = "0.12.5", features = ["serde"] }
 thiserror = "2.0.19"
 md5 = "0.7"

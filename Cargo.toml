@@ -1,5 +1,5 @@
 [workspace]
-members = ["src-tauri", "src-tauri/crates/commands_collector"]
+members = ["src-tauri", "src-tauri/crates/uxs_commands"]
 default-members = ["src-tauri"]
 resolver = "2"
 

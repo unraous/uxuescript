@@ -8,8 +8,8 @@
           "insert_course_meta_map",
           "options",
           "platform",
-          "solve_quiz",
-          "send_status"
+          "send_status",
+          "solve_quiz"
         ],
         "deny": []
       },

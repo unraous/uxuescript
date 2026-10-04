@@ -5,8 +5,7 @@ use super::CommandsResult;
 use crate::config::{llm::LLMProvider, CONFIG};
 
 /// 获取当前可用的全部大语言模型提供商列表。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn providers() -> Vec<LLMProvider> {
     log::debug!("正在获取可用 AI Provider 列表...");
     let mut providers: Vec<LLMProvider> = CONFIG.llm.providers.lock().values().cloned().collect();
@@ -20,8 +19,7 @@ pub fn providers() -> Vec<LLMProvider> {
 }
 
 /// 获取当前选中的大语言模型提供商。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn current_provider() -> String {
     let provider = CONFIG.llm.active_provider.lock().clone();
     log::debug!("正在获取当前 AI Provider: {}", provider);
@@ -40,8 +38,7 @@ fn find_provider_id(
 }
 
 /// 新增或更新一个自定义大语言模型提供商。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn upsert_provider(mut provider: LLMProvider) -> CommandsResult<()> {
     provider.name = provider.name.trim().to_owned();
     if provider.name.is_empty() {
@@ -74,8 +71,7 @@ pub fn upsert_provider(mut provider: LLMProvider) -> CommandsResult<()> {
 }
 
 /// 移除一个自定义大语言模型提供商。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn remove_provider(name: String) -> CommandsResult<()> {
     let name = name.trim().to_owned();
     if name.is_empty() {
@@ -96,8 +92,7 @@ pub fn remove_provider(name: String) -> CommandsResult<()> {
 }
 
 /// 将当前大语言模型提供商切换为指定提供商。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn switch_provider(name: String) -> CommandsResult<()> {
     log::debug!("正在切换 AI Provider 到 [{}]", name);
     let providers = CONFIG.llm.providers.lock();
@@ -111,8 +106,7 @@ pub fn switch_provider(name: String) -> CommandsResult<()> {
 }
 
 /// 将当前大语言模型提供商的选用模型切换为指定模型。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn switch_model(index: u32) {
     let active_id = CONFIG.llm.active_provider.lock();
     let mut providers = CONFIG.llm.providers.lock();
@@ -141,8 +135,7 @@ pub fn switch_model(index: u32) {
 }
 
 /// 设置当前大语言模型提供商的 API 密钥。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn set_key(key: String) -> CommandsResult<()> {
     log::debug!("正在设置 API 密钥...");
     let active_id = CONFIG.llm.active_provider.lock();

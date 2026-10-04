@@ -20,7 +20,7 @@ flowchart TB
 
     %% Rust / Tauri 2 宿主与调度核心
     subgraph Backend["Rust / Tauri 2 宿主与调度核心"]
-        MacroHandler["编译期命令分发器 (commands_collector)"]
+        MacroHandler["统一命令与权限宏 (uxs_commands)"]
         WindowEngine["窗口几何管理 (app::window / webview)<br/>- 齐次比例自适应布局与历史栈"]
         RouteEngine["页面分类与脚本调度 (core::url / script)<br/>- 页面特征识别与动态 eval 注入"]
         ConfigStore["纯 DTO 配置管理 (config)<br/>- API Key 脱敏与运行参数持久化"]

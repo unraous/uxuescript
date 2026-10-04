@@ -88,7 +88,7 @@ flowchart LR
     end
 
     subgraph Backend [Rust / Tauri 后端]
-        MacroHandler[命令路由<br/>commands_collector]
+        MacroHandler[统一命令宏<br/>uxs_commands]
         WindowEngine[窗口与比例布局<br/>WebView 几何自适应]
         Injector[URL 识别与脚本注入]
         QuizEngine[字体解析与还原<br/>TTF 轮廓与哈希映射]

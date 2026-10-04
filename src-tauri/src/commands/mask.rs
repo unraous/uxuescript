@@ -8,8 +8,7 @@ use tokio::sync::{oneshot, Mutex};
 pub struct Confirmations(Mutex<()>, Mutex<()>);
 
 /// 显示调用方对应的确认遮罩，并在退出动画及隐藏完成后返回选择。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command(webview = "chaoxing")]
 pub async fn confirm(
     webview: Webview,
     window: Window,
@@ -49,8 +48,7 @@ pub async fn confirm(
 }
 
 /// 遮罩监听器就绪后显示窗口并发送开屏事件。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command(webview = "mask")]
 pub fn start_mask(window: Window) -> CommandsResult<()> {
     window.show()?;
     let mask = window
@@ -61,8 +59,7 @@ pub fn start_mask(window: Window) -> CommandsResult<()> {
 }
 
 /// 显示初始化时隐藏的主界面和超星 Webview；此命令不检查页面加载状态。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command(webview = "mask")]
 pub fn show_content(window: Window) -> CommandsResult<()> {
     let main = window
         .get_webview("main")
@@ -77,8 +74,7 @@ pub fn show_content(window: Window) -> CommandsResult<()> {
 }
 
 /// 异步隐藏遮罩，避免遮罩 Webview 在自身 IPC 调用链中等待可见性更新。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command(webview = "mask")]
 pub fn hide_mask(window: Window) -> CommandsResult<()> {
     let mask = window
         .get_webview("mask")

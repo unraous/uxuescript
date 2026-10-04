@@ -10,8 +10,7 @@ use crate::core::quiz::{llm::AnswerItem, solve};
 
 use tauri::Emitter;
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command(webview = "chaoxing")]
 pub async fn solve_quiz(html: String) -> CommandsResult<Vec<AnswerItem>> {
     match solve(&html).await {
         Ok(answers) => {
@@ -25,8 +24,7 @@ pub async fn solve_quiz(html: String) -> CommandsResult<Vec<AnswerItem>> {
     }
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command(webview = "chaoxing")]
 pub fn insert_course_meta_map(
     state: tauri::State<CourseMetaMap>,
     course_id: String,
@@ -36,8 +34,7 @@ pub fn insert_course_meta_map(
     state.insert(course_id, metadata);
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn query_course_meta(
     state: tauri::State<CourseMetaMap>,
     course_id: String,
@@ -51,8 +48,7 @@ pub fn query_course_meta(
     metadata
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command(webview = "chaoxing")]
 pub fn send_status(webview: tauri::Webview, status: CourseStatus) -> CommandsResult<()> {
     log::debug!(
         "接收到来自 [{}] 的章节完成状态: {:?}",
@@ -63,8 +59,7 @@ pub fn send_status(webview: tauri::Webview, status: CourseStatus) -> CommandsRes
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command(webview = "chaoxing")]
 pub fn platform() -> CommandsResult<String> {
     Ok(std::env::consts::OS.to_string())
 }
