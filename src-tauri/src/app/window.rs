@@ -84,7 +84,7 @@ pub fn listener(window: &tauri::Window, event: &tauri::WindowEvent) {
     }
 }
 
-/// 根据分辨率、方向与标识符定位目标调试显示器，默认降级回退主屏。
+/// 调试构建优先选取 1920×1080 显示器，否则使用枚举到的第一块显示器。
 fn select_monitor_from(monitors: &[tauri::Monitor]) -> &tauri::Monitor {
     if cfg!(debug_assertions) {
         log::debug!("开始检测1080p屏幕");
@@ -101,7 +101,9 @@ fn select_monitor_from(monitors: &[tauri::Monitor]) -> &tauri::Monitor {
 }
 
 /**
- * Initializes the application by creating the main window and adding two webviews.
+ * Creates a hidden fullscreen window and four child WebViews in order:
+ * main, chaoxing, chaoxing-mask, mask. The first three are hidden initially;
+ * the startup mask controls when the window and content become visible.
  *
  * Doesn't use `anyhow::Result` because `tauri::Builder::setup` strictly expects
  * `std::result::Result<(), Box<dyn std::error::Error>>` to prevent public API signature coupling with third-party error crates.

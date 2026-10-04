@@ -1,6 +1,6 @@
 # 构建指南
 
-本项目使用 pnpm、Vue、Tauri 2 和 Rust 构建。以下版本为当前开发环境与项目依赖的实际版本；更新依赖前应先确认其兼容性。
+本项目使用 pnpm、Vue、Tauri 2 和 Rust 构建。以下 Node.js 与 pnpm 版本与发布 CI 一致，Rust 为开发环境参考版本（CI 使用 stable），Tauri 版本来自项目依赖；更新依赖前应先确认其兼容性。
 
 | 组件 | 当前版本 | 用途 |
 | --- | --- | --- |
@@ -27,7 +27,9 @@ cargo --version
 pnpm exec tauri --version
 ```
 
-输出应分别包含 Node.js `v22.18.0`、pnpm `12.3.4`、Rust/Cargo `1.97.1` 与 Tauri CLI `2.11.4`。
+按上述版本安装时，输出应分别包含 Node.js `v22.18.0`、pnpm `12.3.4`、Rust/Cargo `1.97.1` 与 Tauri CLI `2.11.4`。
+
+仓库的 `.cargo/config.toml` 对 `x86_64-pc-windows-msvc` 指定了 `lld-link.exe` 和 `target-cpu=x86-64-v3`。还需确保该链接器可用；生成的 Windows 程序要求支持 x86-64-v3 的处理器。
 
 ## 安装依赖
 
@@ -57,12 +59,24 @@ pnpm run dev
 
 ## 发布前检查
 
-依次执行前端类型检查与生产构建、Rust 测试：
+依次执行前端测试、类型检查与生产构建、Rust 测试及命令收集宏测试：
 
 ```powershell
+pnpm test
 pnpm run build
 cargo test --locked --manifest-path src-tauri/Cargo.toml
+cargo test --locked -p commands_collector
 ```
+
+默认 Rust 测试跳过标记为 `#[ignore]` 的外部服务测试与长时间基准；不要在没有对应服务或凭据时追加 `--ignored`。
+
+修改 IPC 命令或其 DTO 后，在仓库根目录运行：
+
+```powershell
+cargo sync-bindings
+```
+
+该 Cargo 别名运行 `sync-bindings` 二进制，通过 `tauri_specta` 导出 `src/services/cmds.ts`；普通构建只注册处理器，不执行 TypeScript 导出。`commands_collector` 在编译期扫描 `src-tauri/src/commands/` 下的 Rust 文件，注册所有 `#[tauri::command]`，仅为同时标记 `#[specta::specta]` 的命令生成绑定。两个宏都会同步已有的 `src-tauri/permissions/commands-main.json` 中的命令允许列表。
 
 确认通过后生成桌面端发行包：
 
@@ -70,12 +84,19 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml
 # 通用 Tauri 打包构建
 pnpm exec tauri build
 
-# 或使用 Windows 专用打包命令（自动同步版本并归档为 uxs-<version>-win-x64.exe）
-pnpm run build:windows
+# 发布前从 src-tauri/Cargo.toml 同步版本，再生成 Windows MSI
+pnpm sync:version
+pnpm exec tauri build --bundles msi
 ```
 
-构建产物位于仓库根目录的 `target/release/bundle/`（若使用 `build:windows` 则输出在 `src-tauri/target/release/`）。发布前至少安装并验证一次生成的安装包，确认开屏动画、课程 WebView 登录、模型配置保存和正常退出均可用。
+构建产物默认位于 Cargo workspace 根目录的 `target/release/bundle/`，可执行文件位于 `target/release/`。设置 `CARGO_TARGET_DIR` 时以该目录为准。现有 `pnpm run build:windows` 虽会同步版本并执行 Tauri 构建，但其归档脚本仍查找 `src-tauri/target/release/uxuescript.exe`，与默认 workspace 输出路径不一致；不要将它视为当前可用的默认归档流程。
+
+版本同步以 `src-tauri/Cargo.toml` 为源，更新 `package.json`、`tauri.conf.json`、Rust 元数据与注入脚本的版本提示。发布 CI 由 `v*` 标签触发：先在 Linux 运行前端和应用 Rust 测试，再构建 Windows MSI/便携 EXE 与 macOS ARM64 DMG，验证标签与 Cargo 版本一致，最后发布到 GitHub Release。CI 的便携 EXE 归档直接使用 `target/release/`，不调用上述 Windows 归档脚本。
+
+发布前至少安装并验证一次生成的安装包，确认开屏动画、课程 WebView 登录、模型配置保存和正常退出均可用。
 
 ## 本地数据
 
-运行时会在应用工作目录的 `uxs-data` 下保存配置和日志。该目录已被 Git 忽略；提交日志或打包问题报告前，请检查其中是否包含 API Key、课程信息或其他敏感内容。
+默认数据目录为系统数据目录下的应用标识符 `top.unraous.uxs` 子目录（Windows 通常为 `%APPDATA%\top.unraous.uxs`），配置为 `config.toml`，日志在 `logs/` 下。只有无法取得系统数据目录时，才回退到工作目录的 `uxs-data`。已保存的配置也可包含自定义路径。
+
+设置命令先修改内存配置；点击保存调用 `save_config`，正常窗口关闭也会尝试保存。配置读取或解析失败时回退默认配置；加载旧版本配置只更新版本元数据，不清空用户设置。API Key 的日志格式化输出会脱敏，但配置序列化保留明文；提交配置、日志或打包问题报告前，请检查并移除 API Key、课程信息或其他敏感内容。

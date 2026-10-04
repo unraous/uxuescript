@@ -251,7 +251,7 @@ onUnmounted(() => {
   width: min(var(--size), var(--max-size));
   aspect-ratio: 1;
   height: auto;
-  color: var(--color); /* 传导给 SVG 的 scaleColor */
+  color: var(--color); /* SVG 环的颜色由上方 linearGradient 的 stop-color 指定。 */
 }
 
 .bowl-ring {

@@ -62,7 +62,9 @@ pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<V
     Ok(all_answers)
 }
 
-/// 发送 HTTP 请求，若遇到 429 (Too Many Requests) 则解析 Retry-After 头并使用指数退避自动重试
+/// 仅对 HTTP 429 最多重试三次（含首次共四次请求）。
+/// Retry-After 只解析整数秒，缺失或解析失败时依次等待 1、2、4 秒；
+/// 网络发送错误直接返回，其他状态及最终响应交由协议处理函数判断。
 async fn send_with_retry<F>(build_req: F) -> Result<reqwest::Response>
 where
     F: Fn() -> reqwest::RequestBuilder,

@@ -60,7 +60,7 @@ pub fn start_mask(window: Window) -> CommandsResult<()> {
     Ok(())
 }
 
-/// 显示已在后台加载完成的主界面和超星 Webview。
+/// 显示初始化时隐藏的主界面和超星 Webview；此命令不检查页面加载状态。
 #[tauri::command]
 #[specta::specta]
 pub fn show_content(window: Window) -> CommandsResult<()> {

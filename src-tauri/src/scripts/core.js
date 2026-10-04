@@ -107,7 +107,7 @@
     videoSpeedValue = 2.0;
 
     /**
-     * 调试重试的任务类型列表 (空数组代表正常生产模式，非空如 ["Quiz"] 代表开启该类型的调试重试与确认卡点)
+     * 调试任务类型列表：列出的类型不跳过已完成任务，并在处理后确认；非空时异常也弹出确认框。
      * @type {Array<"Video" | "PDF" | "Quiz" | "Other">}
      */
     debugTaskTypes = [];
@@ -254,12 +254,12 @@
    * @typedef {{ index: number, category: string }} TaskProgressPayload
    * @typedef {
    *   | { kind: "waiting", payload: null }
-   *   | { kind: "started", payload: null }
-   *   | { kind: "chapterProgress", payload: ChapterProgressPayload }
-   *   | { kind: "tabProgress", payload: TabProgressPayload }
-   *   | { kind: "taskProgress", payload: TaskProgressPayload }
-   *   | { kind: "cancelled", payload: null }
-   *   | { kind: "finished", payload: null }
+   *   | { kind: "start", payload: null }
+   *   | { kind: "chapter", payload: ChapterProgressPayload }
+   *   | { kind: "tab", payload: TabProgressPayload }
+   *   | { kind: "task", payload: TaskProgressPayload }
+   *   | { kind: "cancel", payload: null }
+   *   | { kind: "finish", payload: null }
    * } CourseStatus
    */
 
@@ -1069,7 +1069,7 @@
 
     do {
       await safeRun(() => handleCourse(totalChapterList()), "课程处理失败");
-      await sleep(5000); // 懒得搞了反正除了粗糙点没啥太大的技术债，死循环算了
+      await sleep(5000); // 等待章节状态更新；仍有 Blocking 章节时重新扫描课程。
     } while (blockingCount(totalChapterList()) > 0);
 
     await emit.finished();

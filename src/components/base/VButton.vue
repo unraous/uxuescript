@@ -20,7 +20,7 @@ const {
   label?: string;
   icon?: Component;
   shape?: "pill" | "circle";
-  /** 预设风格：'brand' (主色极光) | 'translucent' (黑半透明) | 'custom' (自定义) */
+  /** 风格：'brand'（主题色渐变）| 'translucent'（透明背景与背后模糊）| 'custom'（仅基础样式，可通过 background/color 自定义） */
   variant?: "brand" | "translucent" | "custom";
   background?: string;
   color?: string;

@@ -59,7 +59,7 @@ const updateNavState = async () => {
   }
 };
 
-/** 导航防抖锁高阶包装函数 */
+/** 导航互斥包装：等待 URL 事件更新导航状态后解锁，命令失败时立即解锁。 */
 const withNavLock = (
   action: () => Promise<unknown>,
   condition: () => boolean = () => true,

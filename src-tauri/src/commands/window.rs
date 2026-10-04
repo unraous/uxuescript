@@ -1,5 +1,5 @@
 use tauri::window::Window;
-/// 带有渐隐过渡效果的应用窗口关闭指令。
+/// 发起窗口关闭请求；保存配置与退场动画由窗口事件监听器处理。
 #[tauri::command]
 #[specta::specta]
 pub fn close(window: Window) {
