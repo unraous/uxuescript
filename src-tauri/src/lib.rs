@@ -3,14 +3,11 @@ pub mod commands;
 pub mod config;
 pub mod core;
 
-uxs_commands::collect_commands!();
-
-pub fn sync_bindings() {
-    __uxs_commands_generated::sync_bindings();
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(debug_assertions)]
+    uxs_commands::sync_bindings!();
+
     use app::webview::UrlStack;
     use app::window;
     use commands::chaoxing::CourseMetaMap;
@@ -34,7 +31,7 @@ pub fn run() {
         .manage(UrlStack::default())
         .manage(CourseMetaMap::default())
         .manage(Confirmations::default())
-        .invoke_handler(__uxs_commands_generated::handler())
+        .invoke_handler(uxs_commands::register!())
         .setup(window::init)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

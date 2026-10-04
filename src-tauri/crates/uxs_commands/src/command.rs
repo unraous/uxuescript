@@ -93,8 +93,9 @@ pub(super) fn parse_webview_args(
 }
 
 impl CommandEntry {
-    pub(super) fn path(&self) -> syn::Path {
-        let full_path = format!("crate::commands::{}::{}", self.module_name, self.name);
+    pub(super) fn path_from(&self, root: &syn::Path) -> syn::Path {
+        let root = quote::ToTokens::to_token_stream(root);
+        let full_path = format!("{root}::commands::{}::{}", self.module_name, self.name);
         syn::parse_str(&full_path).expect("uxs_commands: failed to build command path")
     }
 
@@ -141,7 +142,10 @@ mod tests {
         };
 
         assert_eq!(
-            command.path().to_token_stream().to_string(),
+            command
+                .path_from(&syn::parse_quote!(crate))
+                .to_token_stream()
+                .to_string(),
             "crate :: commands :: admin :: users :: list_users"
         );
     }

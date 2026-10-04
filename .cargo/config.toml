@@ -10,4 +10,4 @@ rustflags = [
 ]
 
 [alias]
-sync-bindings = "run -p uxuescript --bin sync-bindings"
+sync-bindings = "run -p uxuescript --bin sync-bindings --features sync-bindings"

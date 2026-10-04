@@ -15,6 +15,14 @@ edition = "2021"
 name = "uxs_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+sync-bindings = []
+
+[[bin]]
+name = "sync-bindings"
+path = "src/bin/sync-bindings.rs"
+required-features = ["sync-bindings"]
+
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
 

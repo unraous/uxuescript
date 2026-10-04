@@ -21,6 +21,11 @@ pub fn command(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn collect_commands(_: TokenStream) -> TokenStream {
-    codegen::expand_registry()
+pub fn register(_: TokenStream) -> TokenStream {
+    codegen::expand_register()
+}
+
+#[proc_macro]
+pub fn sync_bindings(input: TokenStream) -> TokenStream {
+    codegen::expand_sync_bindings(input)
 }

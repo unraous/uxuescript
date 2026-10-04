@@ -75,7 +75,12 @@ mod tests {
         visitor
             .commands
             .iter()
-            .map(|command| command.path().to_token_stream().to_string())
+            .map(|command| {
+                command
+                    .path_from(&syn::parse_quote!(crate))
+                    .to_token_stream()
+                    .to_string()
+            })
             .collect()
     }
 

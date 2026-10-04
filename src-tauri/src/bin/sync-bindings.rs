@@ -1,3 +1,3 @@
 fn main() {
-    uxs_lib::sync_bindings();
+    uxs_commands::sync_bindings!(uxs_lib);
 }

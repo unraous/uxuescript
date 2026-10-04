@@ -70,13 +70,7 @@ cargo test --locked -p uxs_commands
 
 默认 Rust 测试跳过标记为 `#[ignore]` 的外部服务测试与长时间基准；不要在没有对应服务或凭据时追加 `--ignored`。
 
-修改 IPC 命令或其 DTO 后，在仓库根目录运行：
-
-```powershell
-cargo sync-bindings
-```
-
-该 Cargo 别名运行 `sync-bindings` 二进制，通过 `tauri_specta` 导出 `src/services/cmds.ts`；普通构建只注册处理器，不执行 TypeScript 导出。`uxs_commands` 在编译期扫描 `src-tauri/src/commands/` 下的 Rust 文件；每个命令统一使用 `#[uxs_commands::command]`，同时生成 Tauri 命令与 Specta 绑定。`webview = "chaoxing"` 或 `webview = "mask"` 参数会将命令加入对应 WebView 的权限清单，未标注额外范围的命令只加入主界面清单。收集宏同步 `commands-main.json`、`commands-chaoxing.json` 和 `commands-mask.json`；不应手动在这些 allowlist 中增删命令。
+`uxs_commands` 在编译期扫描 `src-tauri/src/commands/` 下的 Rust 文件；每个命令统一使用 `#[uxs_commands::command]`。`uxs_commands::register!()` 展开为 Tauri handler，`uxs_commands::sync_bindings!()` 展开为通过 `tauri_specta` 导出 `src/services/cmds.ts` 的代码。两个宏都会同步 `commands-main.json`、`commands-chaoxing.json` 和 `commands-mask.json`；不应手动在这些 allowlist 中增删命令。开发模式启动应用时会自动导出 TypeScript 绑定；修改 IPC 命令或其 DTO 后，也可以在仓库根目录运行 `cargo sync-bindings`，由独立的 `sync-bindings` 二进制主动导出。
 
 确认通过后生成桌面端发行包：
 
