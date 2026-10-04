@@ -74,7 +74,7 @@ mod tests {
 
     #[test]
     fn sorts_and_deduplicates_permission_names() {
-        let commands = vec![
+        let commands = [
             CommandEntry {
                 module_name: "a".to_string(),
                 name: "zeta".to_string(),
