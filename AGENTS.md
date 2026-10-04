@@ -12,6 +12,8 @@
 
 ## Read the Relevant Engineering Guidance
 
+Follow the shared design principles in [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) when writing or reviewing code. It defines coding conduct, file independence, side-effect scope, and structural boundaries.
+
 The detailed rules in [`.agents/AGENTS.md`](.agents/AGENTS.md) are task-specific. Read the matching section before work in that area; do not load every section for an unrelated change.
 
 - Rust macros, handler registration, or generated bindings: [Code generation and architecture](.agents/AGENTS.md#code-generation-and-architecture).
