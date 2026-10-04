@@ -7,6 +7,7 @@
 - Before adding defensive code such as a guard, fallback, or lifecycle check, decide whether the actual business flow or a realistic failure case needs it. Do not add checks for merely imagined states. When the reason is not obvious, add a concise comment explaining when the case occurs and why it needs handling.
 - Inspect nearby patterns before introducing a new helper or pipeline, in proportion to the task. Do not require a full architecture audit for a small, local edit.
 - Communicate directly: skip praise and generic "best practice" preambles; explain concrete risks or tradeoffs when they matter.
+- When a question calls for a conclusion, lead with a clear answer and take a definite position. Make the best judgment supported by the available evidence; be willing to be wrong, then acknowledge and correct mistakes directly. Do not evade conclusions through excessive caveats, irrelevant theoretical exceptions, or presenting both sides without choosing. If essential evidence is missing, identify it and still state the best-supported current judgment without inventing facts.
 - User and system instructions take precedence over this file and the linked engineering guidance.
 
 ## Read the Relevant Engineering Guidance
