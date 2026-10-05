@@ -39,7 +39,7 @@ export const commands = {
 	confirm: (message: string) => __TAURI_INVOKE<boolean>("confirm", { message }),
 	/**  遮罩监听器就绪后显示窗口并发送开屏事件。 */
 	startMask: () => __TAURI_INVOKE<null>("start_mask"),
-	/**  显示已在后台加载完成的主界面和超星 Webview。 */
+	/**  显示初始化时隐藏的主界面和超星 Webview；此命令不检查页面加载状态。 */
 	showContent: () => __TAURI_INVOKE<null>("show_content"),
 	/**  异步隐藏遮罩，避免遮罩 Webview 在自身 IPC 调用链中等待可见性更新。 */
 	hideMask: () => __TAURI_INVOKE<null>("hide_mask"),
@@ -51,7 +51,7 @@ export const commands = {
 	goForward: () => __TAURI_INVOKE<null>("go_forward"),
 	currentUrl: () => __TAURI_INVOKE<string | null>("current_url"),
 	reload: () => __TAURI_INVOKE<null>("reload"),
-	/**  带有渐隐过渡效果的应用窗口关闭指令。 */
+	/**  发起窗口关闭请求；保存配置与退场动画由窗口事件监听器处理。 */
 	close: () => __TAURI_INVOKE<void>("close"),
 	/**  应用窗口最小化处理指令。 */
 	minimize: () => __TAURI_INVOKE<void>("minimize"),

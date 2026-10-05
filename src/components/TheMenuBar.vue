@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CloseIcon from "@/assets/close.svg?component";
 import MinimizeIcon from "@/assets/remove.svg?component";
+import { animateScale } from "@/composables/useScaleFeedback";
 import { commands } from "@/services/cmds";
 import { ref } from "vue";
 
@@ -11,6 +12,24 @@ defineProps<{
 const minimizeLock = ref(false);
 const closeLock = ref(false);
 const isMacOS = /Macintosh|Mac OS X/i.test(navigator.userAgent);
+const animateIcon = (
+  event: PointerEvent,
+  scale: number,
+  duration: number,
+  ease: string,
+) => {
+  const icon = (event.currentTarget as HTMLElement).querySelector("svg");
+  if (icon) animateScale(icon, scale, { duration, ease });
+};
+
+const handleIconPointerEnter = (event: PointerEvent) =>
+  animateIcon(event, 1.3, 0.75, "elastic.out");
+const handleIconPointerLeave = (event: PointerEvent) =>
+  animateIcon(event, 1, 0.5, "back.out");
+const handleIconPointerDown = (event: PointerEvent) =>
+  animateIcon(event, 0.95, 0.25, "power1.out");
+const handleIconPointerUp = (event: PointerEvent) =>
+  animateIcon(event, 1.3, 0.75, "elastic.out");
 
 const minimizeApp = async () => {
   if (minimizeLock.value) return;
@@ -36,6 +55,10 @@ const closeApp = async () => {
       v-if="!isMacOS"
       type="button"
       @click="minimizeApp"
+      @pointerenter="handleIconPointerEnter"
+      @pointerleave="handleIconPointerLeave"
+      @pointerdown="handleIconPointerDown"
+      @pointerup="handleIconPointerUp"
     >
       <MinimizeIcon class="icon" />
     </button>
@@ -43,6 +66,10 @@ const closeApp = async () => {
       v-if="!isMacOS"
       type="button"
       @click="closeApp"
+      @pointerenter="handleIconPointerEnter"
+      @pointerleave="handleIconPointerLeave"
+      @pointerdown="handleIconPointerDown"
+      @pointerup="handleIconPointerUp"
     >
       <CloseIcon class="icon" />
     </button>

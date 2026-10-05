@@ -15,7 +15,7 @@ export interface UseScaleFeedbackOptions {
 }
 
 export function animateScale(
-  target: HTMLElement,
+  target: HTMLElement | SVGElement,
   scale: number,
   options: ScaleAnimationOptions,
 ) {
