@@ -23,7 +23,7 @@ fn parse_models(body: &str) -> Result<Vec<String>, serde_json::Error> {
 }
 
 /// 从本地 Ollama 服务拉取可用模型列表。
-/// 服务未启动或请求失败时静默返回空 Vec，不影响其他初始化流程。
+/// 连接失败、响应体读取失败或模型列表解析失败时静默返回空 Vec。
 pub async fn fetch_models(base_url: &str) -> Vec<String> {
     let client = reqwest::Client::new();
     let tags_url = tags_url(base_url);

@@ -12,6 +12,7 @@ import {
 import TheCourseCover from "./TheCourseCover.vue";
 import TheCourseProgressBar from "./TheCourseProgressBar.vue";
 import VRollTransition from "@/components/base/VRollTransition.vue";
+import { showError } from "@/services/errors";
 
 interface CourseInfo {
   state: "loading" | "executing" | "finished";
@@ -89,7 +90,7 @@ onMounted(async () => {
       handleStatusChange(event.payload);
     });
   } catch (err) {
-    console.error("注册 status-update 监听失败:", err);
+    await showError("注册 status-update 监听失败:", err);
   }
 });
 

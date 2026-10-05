@@ -5,8 +5,7 @@ use super::CommandsResult;
 use crate::config::{metadata::MetadataConfig, options::OptionsConfig, path::PathsConfig, CONFIG};
 
 /// 获取包含版本及作者信息的应用元数据。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn metadata() -> MetadataConfig {
     log::debug!("正在获取元数据...");
     let metadata = CONFIG.metadata.clone();
@@ -14,8 +13,7 @@ pub fn metadata() -> MetadataConfig {
     metadata
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command(webview = "chaoxing")]
 pub fn options() -> OptionsConfig {
     log::debug!("正在获取配置信息...");
     let options = *CONFIG.options.lock();
@@ -23,8 +21,7 @@ pub fn options() -> OptionsConfig {
     options
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn set_options(options: OptionsConfig) {
     log::debug!("正在设置配置信息...");
     *CONFIG.options.lock() = options;
@@ -32,8 +29,7 @@ pub fn set_options(options: OptionsConfig) {
 }
 
 /// 将内存中的全局配置持久化保存至本地文件。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn save_config() -> CommandsResult<()> {
     log::debug!("正在保存配置文件...");
     CONFIG.save()?;
@@ -41,8 +37,7 @@ pub fn save_config() -> CommandsResult<()> {
     Ok(())
 }
 
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub fn paths() -> PathsConfig {
     log::debug!("正在获取路径配置...");
     let paths = CONFIG.paths.clone();

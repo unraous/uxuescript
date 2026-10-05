@@ -11,8 +11,7 @@ export default defineConfig(async () => ({
 
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '@panels': fileURLToPath(new URL('./src/components/panels', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
 
@@ -20,7 +19,8 @@ export default defineConfig(async () => ({
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./main.html', import.meta.url)),
-        mask: fileURLToPath(new URL('./mask.html', import.meta.url))
+        mask: fileURLToPath(new URL('./mask.html', import.meta.url)),
+        chaoxingMask: fileURLToPath(new URL('./mask.chaoxing.html', import.meta.url))
       }
     }
   },

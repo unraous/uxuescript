@@ -4,6 +4,7 @@ import VInput from "@/components/base/VInput.vue";
 import VSelector from "@/components/base/VSelector.vue";
 import { useLLMProviders } from "@/composables/useLLMProviders";
 import { commands } from "@/services/cmds";
+import { showError } from "@/services/errors";
 
 const {
   providerData,
@@ -35,7 +36,7 @@ const apiKey = computed({
 const saveApiKey = () =>
   commands
     .setKey(apiKey.value)
-    .catch((cause) => console.error("配置命令执行失败:", cause));
+    .catch((cause) => showError("配置命令执行失败:", cause));
 </script>
 
 <template>

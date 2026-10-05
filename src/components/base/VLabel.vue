@@ -23,7 +23,7 @@ const { label, for: htmlFor } = defineProps<{
   justify-content: center;
   align-items: center;
   font-size: 1.25rem;
-  color: #0d58a4;
+  color: var(--theme-brand);
   letter-spacing: 1px;
 }
 </style>

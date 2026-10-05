@@ -16,7 +16,9 @@ function readUtf8(path) {
 function replaceExactlyOnce(source, pattern, replacement, path) {
   const matches = source.match(pattern);
   if (matches?.length !== 1) {
-    throw new Error(`${path}: expected exactly one version marker, found ${matches?.length ?? 0}`);
+    throw new Error(
+      `${path}: expected exactly one version marker, found ${matches?.length ?? 0}`,
+    );
   }
   return source.replace(pattern, replacement);
 }

@@ -48,7 +48,7 @@ uXueScript 是面向学习通网页版课程的自动化辅助客户端。桌面
 - **课程任务自动处理：**
   - 自动识别章节目录树与任务点状态，跳过已完成小节，推进未完成任务。
   - 视频任务：支持自动播放、倍速调节、静音与防暂停。
-  - 文档任务：支持 PDF 与富文本文档自动滚动触底以完成阅读。
+  - PDF 任务：自动滚动内嵌阅读页面至底部，并等待任务点完成标记。
 - **混淆字体还原与 AI 答题：**
   - 解析超星 `font-cxsecret` 动态混淆字体，比对 TTF 轮廓特征还原真实题目文本。
   - 支持调用大语言模型生成参考答案，覆盖单选、多选、判断、填空与简答题并自动回填。
@@ -64,8 +64,8 @@ uXueScript 是面向学习通网页版课程的自动化辅助客户端。桌面
 | :------------------------------- | :-------------------------------: | :----------------------------: |
 | **执行环境**                     |         内嵌桌面 WebView          | 任意现代浏览器控制台 (Console) |
 | **环境依赖**                     |     无需额外运行时 (解压即用)     |    需自行登录并手动注入脚本    |
-| **视频自动播放 / 静音 / 倍速**   |     支持 (本地配置记忆与锁定)     |  支持 (默认 2.0x 倍速与静音)   |
-| **PDF / 文档阅读自动滚动**       |               支持                |              支持              |
+| **视频自动播放 / 静音 / 倍速**   |     支持 (本地配置记忆与锁定)     | 默认静音；默认不修改播放速度，可在脚本配置中开启倍速锁定 |
+| **PDF 阅读自动滚动**              |               支持                |              支持              |
 | **后台运行 / 失焦防暂停**        |               支持                |              支持              |
 | **课程章节自动连续流转**         |               支持                |              支持              |
 | **课程章节与任务进度监控**       |       支持 (客户端界面展示)       |     仅浏览器控制台日志输出     |
@@ -88,7 +88,7 @@ flowchart LR
     end
 
     subgraph Backend [Rust / Tauri 后端]
-        MacroHandler[命令路由<br/>commands_collector]
+        MacroHandler[统一命令宏<br/>uxs_commands]
         WindowEngine[窗口与比例布局<br/>WebView 几何自适应]
         Injector[URL 识别与脚本注入]
         QuizEngine[字体解析与还原<br/>TTF 轮廓与哈希映射]
@@ -134,10 +134,10 @@ flowchart LR
 
 ### 核心工作流程：
 
-1. **脚本注入**：课程 WebView 发生页面导航时，后端根据 URL 特征（[`core::url`](file:///Users/plochirm/Workspace/uxuescript/src-tauri/src/core/url.rs)）进行识别；页面加载完成后由 [`core::script`](file:///Users/plochirm/Workspace/uxuescript/src-tauri/src/core/script.rs) 将单文件 [`core.js`](file:///Users/plochirm/Workspace/uxuescript/src-tauri/src/scripts/core.js) 注入到页面。
-2. **字体还原**：进入测验任务时，页面抓取包含加密字体的 HTML 传给后端的 [`solve_quiz`](file:///Users/plochirm/Workspace/uxuescript/src-tauri/src/commands/chaoxing.rs)；[`typr.rs`](file:///Users/plochirm/Workspace/uxuescript/src-tauri/src/core/quiz/typr.rs) 解析 TTF 文件的字形轮廓，比对特征哈希表 [`table.json`](file:///Users/plochirm/Workspace/uxuescript/src-tauri/src/core/quiz/table.json) 将混淆字符还原为明文。
-3. **题目求解**：明文题目由 [`dispatcher.rs`](file:///Users/plochirm/Workspace/uxuescript/src-tauri/src/core/quiz/llm/dispatcher.rs) 分批（每批 5 题）调用已配置的 LLM 服务，遇到 429 速率限制时根据 `Retry-After` 指数退避重试；解析后的答案返回至页面并自动完成选项点击或内容填入。
-4. **进度同步**：自动化脚本中的 `MutationObserver` 检测到任务点完成标记（`ans-job-finished`）后，通过 [`send_status`](file:///Users/plochirm/Workspace/uxuescript/src-tauri/src/commands/chaoxing.rs) 通知后端，后端向主窗口广播 `status-update` 事件以更新界面进度展示。
+1. **脚本注入**：课程 WebView 页面加载完成时，后端根据 URL 特征（[`core::url`](src-tauri/src/core/url.rs)）进行识别；由 [`core::script`](src-tauri/src/core/script.rs) 将单文件 [`core.js`](src-tauri/src/scripts/core.js) 注入到课程页面。
+2. **字体还原**：进入测验任务时，页面抓取题目 HTML 传给后端的 [`solve_quiz`](src-tauri/src/commands/chaoxing.rs)；字体解析与映射逻辑位于 [`typr.rs`](src-tauri/src/core/quiz/typr.rs) 和 [`mapper.rs`](src-tauri/src/core/quiz/mapper.rs)，使用特征哈希表 [`table.json`](src-tauri/src/core/quiz/table.json) 将混淆字符还原为明文。
+3. **题目求解**：明文题目由 [`dispatcher.rs`](src-tauri/src/core/quiz/llm/dispatcher.rs) 分批（每批最多 5 题、最多 10 批并发）调用已配置的 LLM 服务。遇到 429 时优先使用整数秒格式的 `Retry-After`，否则按 1、2、4 秒退避，最多重试 3 次；解析后的答案返回至页面并自动完成选项点击或内容填入。
+4. **进度同步**：自动化脚本通过 [`send_status`](src-tauri/src/commands/chaoxing.rs) 通知后端，后端向主窗口发送 `status-update` 事件以更新界面进度展示。
 
 详细架构说明参见[架构概览文档](docs/architecture/overview.md)。
 
@@ -163,7 +163,7 @@ flowchart LR
 2. 运行 `uxuescript`。
 3. 在左侧 **Configuration** 中配置 **Provider**、**Model** 与 **API Key** 并保存（如无需 AI 答题可跳过）。
 4. 在右侧内嵌 WebView 中登录学习通，进入目标课程小节。
-5. 脚本加载后，点击页面弹出的确认按钮即可开始自动处理。
+5. 脚本加载后，在课程区域的客户端确认遮罩中点击 **Yes** 即可开始自动处理，点击 **No** 取消。
 
 详细操作与图文流程参见[桌面端使用指南](docs/usage/desktop.md)。
 
@@ -172,7 +172,7 @@ flowchart LR
 开发与构建前请确保本地具备以下环境：
 
 - [Node.js](https://nodejs.org/) (>= 18) 与 [pnpm](https://pnpm.io/)
-- [Rust](https://www.rust-lang.org/) (>= 1.97) 与 Cargo
+- [Rust](https://www.rust-lang.org/) stable 与 Cargo（CI 使用 stable；项目尚未声明最低支持版本 MSRV）
 - 操作系统对应的 [Tauri 2 构建前置依赖](https://v2.tauri.app/start/prerequisites/)
 
 ```bash
@@ -197,7 +197,7 @@ pnpm tauri build
 - **平台支持：** 目前主要在 Windows（x64）环境下测试与验证；macOS 与 Linux 平台的支持处于持续完善中。
 - **免责声明：** 本项目仅供个人学习、软件工程研究与自动化技术交流，不对使用本工具造成的任何后果承担责任。请遵守相关使用规范，严禁用于任何违规用途。
 - **AI 答题局限：** 模型生成的答题结果受模型自身知识与题目类型限制，仅供参考，无法保证正确率。
-- **凭据安全：** API Key 仅保存在本地配置文件中，不会上传至任何第三方云端。
+- **凭据安全：** API Key 保存在本地配置文件中；调用模型服务时，会作为请求认证信息发送到所配置的 API 地址。请仅配置可信服务，不要分享包含密钥的配置文件。
 
 ## 文档导航
 

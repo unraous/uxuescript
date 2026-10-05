@@ -1,8 +1,7 @@
 use crate::{commands::CommandsResult, config::CONFIG};
 
 /// 从本地 Ollama 服务拉取可用模型列表更新至内存配置。
-#[tauri::command]
-#[specta::specta]
+#[uxs_commands::command]
 pub async fn fetch_ollama_models() -> CommandsResult<()> {
     log::debug!("正在从 Ollama 服务拉取最新模型列表...");
     let base_url = {

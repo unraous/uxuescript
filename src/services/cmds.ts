@@ -11,6 +11,7 @@ export const commands = {
 	cover: string,
 } | null>("query_course_meta", { courseId }),
 	sendStatus: (status: CourseStatus) => __TAURI_INVOKE<null>("send_status", { status }),
+	platform: () => __TAURI_INVOKE<string>("platform"),
 	/**  从本地 Ollama 服务拉取可用模型列表更新至内存配置。 */
 	fetchOllamaModels: () => __TAURI_INVOKE<null>("fetch_ollama_models"),
 	/**  获取当前可用的全部大语言模型提供商列表。 */
@@ -34,9 +35,11 @@ export const commands = {
 	/**  将内存中的全局配置持久化保存至本地文件。 */
 	saveConfig: () => __TAURI_INVOKE<null>("save_config"),
 	paths: () => __TAURI_INVOKE<PathsConfig>("paths"),
-	/**  显示主窗口并启动遮罩开屏动画。 */
+	/**  显示调用方对应的确认遮罩，并在退出动画及隐藏完成后返回选择。 */
+	confirm: (message: string) => __TAURI_INVOKE<boolean>("confirm", { message }),
+	/**  遮罩监听器就绪后显示窗口并发送开屏事件。 */
 	startMask: () => __TAURI_INVOKE<null>("start_mask"),
-	/**  显示已在后台加载完成的主界面和超星 Webview。 */
+	/**  显示初始化时隐藏的主界面和超星 Webview；此命令不检查页面加载状态。 */
 	showContent: () => __TAURI_INVOKE<null>("show_content"),
 	/**  异步隐藏遮罩，避免遮罩 Webview 在自身 IPC 调用链中等待可见性更新。 */
 	hideMask: () => __TAURI_INVOKE<null>("hide_mask"),
@@ -48,7 +51,7 @@ export const commands = {
 	goForward: () => __TAURI_INVOKE<null>("go_forward"),
 	currentUrl: () => __TAURI_INVOKE<string | null>("current_url"),
 	reload: () => __TAURI_INVOKE<null>("reload"),
-	/**  带有渐隐过渡效果的应用窗口关闭指令。 */
+	/**  发起窗口关闭请求；保存配置与退场动画由窗口事件监听器处理。 */
 	close: () => __TAURI_INVOKE<void>("close"),
 	/**  应用窗口最小化处理指令。 */
 	minimize: () => __TAURI_INVOKE<void>("minimize"),

@@ -23,7 +23,7 @@ async fn notify_exit_animation(window: &Window) {
     if let Some(mask) = window.get_webview("mask") {
         log::debug!("执行关闭动画并关闭窗口");
         mask.show().ok();
-        if let Err(e) = mask.emit("close-event", &()) {
+        if let Err(e) = mask.emit_to("mask", "close-event", &()) {
             log::error!("发送关闭动画事件失败: {}", e);
         }
         log::debug!("关闭动画触发完毕");
@@ -44,7 +44,7 @@ async fn close(window: Window) {
 
 fn resize(webview: &Webview, size: LogicalSize<f64>) -> Result<()> {
     let (pos, size) = match webview.label() {
-        "chaoxing" => (
+        "chaoxing" | "chaoxing-mask" => (
             LogicalPosition::new(size.width * 0.51, size.height * 0.46),
             LogicalSize::new(size.width * 0.48, size.height * 0.48),
         ),
@@ -84,7 +84,7 @@ pub fn listener(window: &tauri::Window, event: &tauri::WindowEvent) {
     }
 }
 
-/// 根据分辨率、方向与标识符定位目标调试显示器，默认降级回退主屏。
+/// 调试构建优先选取 1920×1080 显示器，否则使用枚举到的第一块显示器。
 fn select_monitor_from(monitors: &[tauri::Monitor]) -> &tauri::Monitor {
     if cfg!(debug_assertions) {
         log::debug!("开始检测1080p屏幕");
@@ -101,7 +101,9 @@ fn select_monitor_from(monitors: &[tauri::Monitor]) -> &tauri::Monitor {
 }
 
 /**
- * Initializes the application by creating the main window and adding two webviews.
+ * Creates a hidden fullscreen window and four child WebViews in order:
+ * main, chaoxing, chaoxing-mask, mask. The first three are hidden initially;
+ * the startup mask controls when the window and content become visible.
  *
  * Doesn't use `anyhow::Result` because `tauri::Builder::setup` strictly expects
  * `std::result::Result<(), Box<dyn std::error::Error>>` to prevent public API signature coupling with third-party error crates.
@@ -129,6 +131,7 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
 
     webview::init_on(&window, "main")?.hide()?;
     webview::init_on(&window, "chaoxing")?.hide()?;
+    webview::init_on(&window, "chaoxing-mask")?.hide()?;
     webview::init_on(&window, "mask")?;
 
     log::info!("初始化应用窗口成功");

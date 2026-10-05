@@ -88,7 +88,7 @@ const {
   top: 0;
   width: 100%;
   height: var(--item-height);
-  background: rgb(128 128 128 / 10%);
+  background: color-mix(in srgb, var(--theme-muted) 10%, transparent);
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -102,7 +102,7 @@ const {
   height: var(--item-height);
   border-radius: 0px;
   border: 0px;
-  color: #0d58a4;
+  color: var(--theme-brand);
   font-size: 1.25em;
   background-color: transparent;
   transform-origin: center;

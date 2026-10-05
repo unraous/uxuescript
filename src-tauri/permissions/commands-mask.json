@@ -1,0 +1,17 @@
+{
+  "default": null,
+  "permission": [
+    {
+      "commands": {
+        "allow": [
+          "hide_mask",
+          "show_content",
+          "start_mask"
+        ],
+        "deny": []
+      },
+      "description": "Commands used by local animation mask webviews",
+      "identifier": "commands-mask"
+    }
+  ]
+}

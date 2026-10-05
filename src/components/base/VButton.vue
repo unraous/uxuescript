@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, type Component } from "vue";
 import { useMagnetic } from "@/composables/useMagnetic";
-import { createRipple } from "@/effects/ripple";
+import { createRipple } from "@/composables/ripple";
 
 const buttonRef = ref<HTMLElement | null>(null);
 const contentRef = ref<HTMLElement | null>(null);
@@ -20,7 +20,7 @@ const {
   label?: string;
   icon?: Component;
   shape?: "pill" | "circle";
-  /** 预设风格：'brand' (主色极光) | 'translucent' (黑半透明) | 'custom' (自定义) */
+  /** 风格：'brand'（主题色渐变）| 'translucent'（透明背景与背后模糊）| 'custom'（仅基础样式，可通过 background/color 自定义） */
   variant?: "brand" | "translucent" | "custom";
   background?: string;
   color?: string;
@@ -95,7 +95,7 @@ const buttonStyle = computed(() => ({
   justify-content: center;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px color-mix(in srgb, black 15%, transparent);
   transition:
     opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
     filter 0.25s ease,
@@ -114,8 +114,8 @@ const buttonStyle = computed(() => ({
 
 /* 预设风格 */
 .variant-brand {
-  --brand-color: #0d58a4;
-  color: #e8dcc4;
+  --brand-color: var(--theme-brand);
+  color: var(--theme-surface);
   background: conic-gradient(
     from 145deg at 50% 0%,
     color-mix(in srgb, var(--brand-color), black 25%) 0deg,
@@ -127,7 +127,7 @@ const buttonStyle = computed(() => ({
 }
 
 .variant-translucent {
-  background-color: rgba(0, 0, 0, 0);
+  background-color: transparent;
   backdrop-filter: blur(4px);
 }
 

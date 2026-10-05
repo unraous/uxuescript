@@ -98,7 +98,7 @@ const handleSavePointerEnter = (event: PointerEvent) => {
   padding: 0;
   border: 0;
   background: transparent;
-  color: #0d58a4;
+  color: var(--theme-brand);
   cursor: pointer;
   display: flex;
   align-items: center;

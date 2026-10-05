@@ -4,10 +4,12 @@
     {
       "commands": {
         "allow": [
+          "confirm",
           "insert_course_meta_map",
           "options",
-          "solve_quiz",
-          "send_status"
+          "platform",
+          "send_status",
+          "solve_quiz"
         ],
         "deny": []
       },

@@ -25,7 +25,6 @@ export function createRipple(
   circle.style.position = "absolute";
   circle.style.borderRadius = "50%";
   circle.style.pointerEvents = "none";
-  circle.style.background = "rgba(255, 255, 255, 0.75)";
   circle.style.left = `${x}px`;
   circle.style.top = `${y}px`;
   circle.style.width = `${size}px`;

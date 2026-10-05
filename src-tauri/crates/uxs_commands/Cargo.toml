@@ -1,9 +1,9 @@
 [package]
-name = "commands_collector"
+name = "uxs_commands"
 version = "2.0.1"
 authors = ["unraous"]
 edition = "2021"
-description = "Procedural macro to automatically collect Tauri commands, generate auto handler, and sync permission JSON files."
+description = "Project-specific Tauri command, Specta binding, and WebView permission macros."
 
 [lib]
 proc-macro = true

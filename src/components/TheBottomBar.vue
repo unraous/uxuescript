@@ -63,7 +63,7 @@ const handleDirectoryKeydown = (event: KeyboardEvent) => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #0d58a4;
+  color: var(--theme-brand);
   cursor: pointer;
   font-size: 1.25rem;
   transform-origin: center;
