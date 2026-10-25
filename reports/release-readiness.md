@@ -29,8 +29,10 @@ not a verified production build.
   - `@types/jsdom` is missing.
   - npm registry is unreachable; installing is outside this round.
 - Vitest/Vite are additionally blocked by SAC's unsigned rolldown native module.
-- Therefore **no current Vitest, typecheck, Vite build, or userscript build
-  PASS exists**.
+- Therefore **no current Vitest, typecheck, or full Vite app build PASS exists**.
+  The standalone browser userscript/script build (`node scripts/build-scripts.mjs`)
+  did pass this round, but it is not evidence that the full application build
+  passes.
 
 ### 2. Rust verification incomplete for a default build
 
