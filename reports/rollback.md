@@ -2,7 +2,7 @@
 
 ## Original worktree
 
-- Path: `D:\Projects\xuexitong-ai-v0.2\source\uxuescript`
+- Path: `<ORIGINAL_REPO>`
 - Branch: `fix/security-v0.2`
 - HEAD: `4fada3777c319eadc5bbcbbab1dff81b6e5793b7`
 - The original worktree was not modified during migration. No rollback is
@@ -10,7 +10,7 @@
 
 ## Isolated migration worktree
 
-- Path: `C:\Users\李星宇\AppData\Local\Temp\uxuescript-v02-migration-20261025-221845\repo`
+- Path: `<MIGRATION_REPO>`
 - Branch: `migrate/v02-security`
 - Base: upstream `21420f28a4d3ea7d6a409f6090143172231fb5e0`
 - No remote was pushed.
@@ -20,7 +20,7 @@
 If the candidate is rejected, remove only the isolated directory:
 
 ```powershell
-Remove-Item -LiteralPath 'C:\Users\李星宇\AppData\Local\Temp\uxuescript-v02-migration-20261025-221845' -Recurse
+Remove-Item -LiteralPath '<MIGRATION_ROOT>' -Recurse
 ```
 
 Do not remove or reset the original worktree. Do not `git reset`/`rebase` the
@@ -35,7 +35,7 @@ clone. This round did not reset, rebase, or clean either worktree.
 ### Preserve the legacy commit
 
 The original commit remains in the original repository and in the isolated
-clone's `legacy` remote (`file:///D:/Projects/xuexitong-ai-v0.2/source/uxuescript`).
+clone's `legacy` remote (`<ORIGINAL_REPO_FILE_URL>`).
 It is not deleted or rewritten.
 
 ## Remotes

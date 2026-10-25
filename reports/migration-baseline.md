@@ -1,8 +1,8 @@
 # V0.2 Migration Baseline
 
 - Date: 2026-10-25 (Asia/Shanghai)
-- Original worktree: `D:\Projects\xuexitong-ai-v0.2\source\uxuescript`
-- Isolated worktree: `C:\Users\李星宇\AppData\Local\Temp\uxuescript-v02-migration-20261025-221845\repo`
+- Original worktree: `<ORIGINAL_REPO>`
+- Isolated worktree: `<MIGRATION_REPO>`
 - Migration branch: `migrate/v02-security`
 - Upstream: `https://github.com/unraous/uxuescript`
 

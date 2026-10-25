@@ -1,6 +1,6 @@
 # V0.2 Test Results (this round)
 
-- Isolated worktree: `C:\Users\李星宇\AppData\Local\Temp\uxuescript-v02-migration-20261025-221845\repo`
+- Isolated worktree: `<MIGRATION_REPO>`
 - Date: 2026-10-25
 - Statuses are only for **this round**; no historical PASS is reused.
 
