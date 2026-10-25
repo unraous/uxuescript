@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import VInput from "@/components/base/VInput.vue";
 import VSelector from "@/components/base/VSelector.vue";
 import VButton from "@/components/base/VButton.vue";
@@ -29,16 +29,49 @@ const endpoint = computed({
     selectedProvider.value!.baseUrl = String(value);
   },
 });
-const apiKey = computed({
-  get: () => selectedProvider.value?.apiKey ?? "",
-  set: (value: string | number) => {
-    selectedProvider.value!.apiKey = String(value) || null;
-  },
+
+/** 只保存“新输入的 Key”；已有 Key 永远不会回填到前端。 */
+const newApiKey = ref("");
+const savingKey = ref(false);
+const clearingKey = ref(false);
+
+watch(selectedProvider, () => {
+  newApiKey.value = "";
 });
-const saveApiKey = () =>
-  commands
-    .setKey(apiKey.value)
-    .catch((cause) => showError("配置命令执行失败:", cause));
+
+const saveApiKey = async () => {
+  const value = newApiKey.value.trim();
+  const provider = selectedProvider.value;
+  if (!value || !provider || savingKey.value) return;
+  savingKey.value = true;
+  try {
+    await commands.setKey(value);
+    provider.hasKey = true;
+    newApiKey.value = "";
+    await commands.confirm(label("keySaved"));
+  } catch (cause) {
+    await showError("设置 API Key 失败:", cause);
+  } finally {
+    savingKey.value = false;
+  }
+};
+
+const clearApiKey = async () => {
+  const provider = selectedProvider.value;
+  if (!provider?.hasKey || clearingKey.value) return;
+  const confirmed = await commands.confirm(label("clearKeyConfirm"));
+  if (!confirmed) return;
+  clearingKey.value = true;
+  try {
+    await commands.clearKey();
+    provider.hasKey = false;
+    newApiKey.value = "";
+  } catch (cause) {
+    await showError("清除 API Key 失败:", cause);
+  } finally {
+    clearingKey.value = false;
+  }
+};
 
 const testing = ref(false);
 const testConnection = async () => {
@@ -87,15 +120,36 @@ const testConnection = async () => {
         @change="saveSelectedProvider"
       />
       <VInput
-        v-model="apiKey"
+        v-model="newApiKey"
         :label="label('apiKey')"
-        annotation="粘贴服务商控制台生成的 API Key，密钥需至少 12 个 ASCII 字符。"
+        annotation="已保存的 Key 不会回显。输入新 Key 可替换，或使用下方按钮清除；正式答题仍由你本人在平台原生界面提交。"
         :disabled="!selectedProvider"
-        placeholder="Enter API key"
-        mask-on-blur
+        placeholder="输入新 API Key（不会显示旧 Key）"
+        secret
         class="element"
         @change="saveApiKey"
       />
+      <div class="key-status">
+        <span :class="{ configured: selectedProvider?.hasKey }">
+          {{ selectedProvider?.hasKey ? label("keyConfigured") : label("keyMissing") }}
+        </span>
+      </div>
+      <div class="key-actions">
+        <VButton
+          :label="label('setKey')"
+          :disabled="!newApiKey.trim() || savingKey || !selectedProvider"
+          class="button-text"
+          style="width: 48%; height: 100%"
+          @click="saveApiKey"
+        />
+        <VButton
+          :label="label('clearKey')"
+          :disabled="!selectedProvider?.hasKey || clearingKey || !selectedProvider"
+          class="button-text"
+          style="width: 48%; height: 100%"
+          @click="clearApiKey"
+        />
+      </div>
       <div class="element test-button">
         <VButton
           :label="label(testing ? 'testing' : 'testConnection')"
@@ -116,12 +170,13 @@ const testConnection = async () => {
   display: flex;
   flex-direction: column;
 }
+
 .settings-container {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 5%;
+  gap: 2.5%;
   padding: 0 5%;
   overflow-y: auto;
   overscroll-behavior-y: contain;
@@ -129,11 +184,35 @@ const testConnection = async () => {
 
 .element {
   flex: 0 0 auto;
-  height: 17.5%;
+  height: 14%;
   width: 100%;
 }
 
+.key-status {
+  flex: 0 0 auto;
+  min-height: 4%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 0.8rem;
+  color: var(--theme-brand);
+  opacity: 0.8;
+}
+
+.key-status .configured {
+  font-weight: 700;
+}
+
+.key-actions {
+  flex: 0 0 9%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4%;
+}
+
 .test-button {
+  flex: 0 0 10%;
   display: flex;
   align-items: center;
   justify-content: center;

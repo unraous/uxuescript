@@ -11,7 +11,6 @@ interface Overrides {
   handleAudio: TaskHandler;
   handlePDF: TaskHandler;
   handleQuiz: TaskHandler;
-  preserveFocusState(): void;
   handleCourse(chapters: HTMLElement[]): Promise<void>;
   blockingCount(chapters: HTMLElement[]): number;
   totalChapterList(): HTMLElement[];
@@ -40,6 +39,7 @@ interface CoreApi {
     switchingCd: number | null;
     muteVideo: boolean;
     lockSpeed: number | null;
+    quizReview: boolean;
     loadFromBackend(): Promise<void>;
   };
   wait: {
@@ -71,6 +71,15 @@ interface CoreApi {
   handleTab(chapter: Document): Promise<void>;
   handleQuiz: TaskHandler;
   handleAudio: TaskHandler;
+  resolveQuizPolicy(
+    taskDoc: Document,
+    label: string,
+  ): Promise<{
+    kind: string;
+    allowFill: boolean;
+    allowSubmit: boolean;
+    reason: string;
+  }>;
   sleep(ms: number, fluctuationPercent?: number): Promise<void>;
   switchingCooldown(): Promise<void>;
   resolveInteractiveQuizAnswer(
@@ -100,7 +109,7 @@ export function loadCore(
     entry,
     `
     ${assignments.join("\n")}
-    return { config, wait, handleTab, handleQuiz, handleAudio, sleep, switchingCooldown, resolveInteractiveQuizAnswer, main };
+    return { config, wait, handleTab, handleQuiz, handleAudio, resolveQuizPolicy, sleep, switchingCooldown, resolveInteractiveQuizAnswer, main };
   `,
   );
   const sandbox = {

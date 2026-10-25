@@ -30,6 +30,8 @@ export const commands = {
 	switchModel: (index: number) => __TAURI_INVOKE<void>("switch_model", { index }),
 	/**  设置当前大语言模型提供商的 API 密钥。 */
 	setKey: (key: string) => __TAURI_INVOKE<null>("set_key", { key }),
+	/**  清除当前大语言模型提供商的 API 密钥。 */
+	clearKey: () => __TAURI_INVOKE<null>("clear_key"),
 	general: () => __TAURI_INVOKE<GeneralConfig>("general"),
 	setGeneral: (general: GeneralConfig) => __TAURI_INVOKE<void>("set_general", { general }),
 	/**  Return the selected color theme for the main and mask WebViews. */
@@ -103,14 +105,6 @@ export type AnswerItem_Serialize = {
 	content: string,
 };
 
-/**
- *  API 密钥。
- * 
- *  序列化时保持原始字符串格式，以兼容现有配置文件；格式化输出始终脱敏，
- *  防止在日志中直接打印密钥明文。
- */
-export type ApiKey = string;
-
 export type ChapterProgressPayload = {
 	title: string,
 	index: number,
@@ -132,15 +126,15 @@ export type GeneralConfig = {
 /**  支持的大模型 API 发包协议族 */
 export type LLMProtocol = "OpenAIChatCompletions" | "OpenAIResponses" | "GoogleGemini";
 
-/**  统一的大模型提供商结构体（内置与用户自定义提供商通用纯数据 DTO） */
+/**  可安全返回给前端的 Provider 视图：不含 API Key。 */
 export type LLMProvider = {
 	name: string,
 	isCustom: boolean,
 	protocol: LLMProtocol,
 	baseUrl: string,
-	apiKey: ApiKey | null,
 	models: string[],
 	chosenModel: number | null,
+	hasKey: boolean,
 };
 
 export type LabelLanguage = "en" | "zh";

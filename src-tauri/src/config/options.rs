@@ -16,7 +16,7 @@ impl Default for OptionsConfig {
             mute_webview: true,
             lock_speed: None,
             switching_cd: None,
-            quiz_review: false,
+            quiz_review: true,
         }
     }
 }

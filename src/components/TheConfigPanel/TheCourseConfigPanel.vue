@@ -51,9 +51,9 @@ onMounted(async () => {
       />
       <VToggle
         id="quiz-review-toggle"
-        :model-value="options.quizReview ?? false"
+        :model-value="options.quizReview ?? true"
         :label="label('quizReview')"
-        annotation="提交测验前先人工核验答案。点击 Yes 立即提交；点击 No 会留出 30 秒检查或修改答案，再次询问。如需停止脚本，请点击左上角的刷新或 Home。"
+        annotation="默认只提供参考答案；自动填写和自动提交需要任务级授权。开启本项时，提交前还会再次人工确认；关闭也只影响授权练习，正式/计分任务仍不会自动提交。"
         class="option"
         @update:model-value="
           options.quizReview = $event;

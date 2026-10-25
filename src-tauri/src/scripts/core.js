@@ -81,11 +81,152 @@
     if (!cond) throw new Error(msg);
   };
 
+  class AutomationStopped extends Error {}
+  class ManualReviewRequired extends AutomationStopped {}
+  class TaskStopped extends AutomationStopped {}
+
+  const TaskState = Object.freeze({
+    IDLE: "IDLE",
+    RUNNING: "RUNNING",
+    PAUSING: "PAUSING",
+    PAUSED: "PAUSED",
+    STOPPING: "STOPPING",
+    STOPPED: "STOPPED",
+    FAILED: "FAILED",
+  });
+
+  /** 页面内可见的任务控制条：暂停、恢复、停止。 */
+  const controller = {
+    state: TaskState.IDLE,
+    media: null,
+    panel: null,
+    status: null,
+    pauseButton: null,
+    resumeButton: null,
+    stopButton: null,
+
+    setState(next) {
+      this.state = next;
+      console.info(`任务状态：${next}`);
+      this.render();
+    },
+
+    setMedia(media) {
+      this.media = media ?? null;
+    },
+
+    async checkpoint() {
+      while (this.state === TaskState.PAUSED) await sleep(250);
+      if (
+        this.state === TaskState.STOPPING ||
+        this.state === TaskState.STOPPED
+      ) {
+        throw new TaskStopped("任务已停止");
+      }
+    },
+
+    pause() {
+      if (this.state !== TaskState.RUNNING) return;
+      this.setState(TaskState.PAUSING);
+      try {
+        this.media?.pause();
+      } catch (error) {
+        console.warn("暂停媒体失败", error);
+      }
+      this.setState(TaskState.PAUSED);
+    },
+
+    resume() {
+      if (this.state !== TaskState.PAUSED) return;
+      this.setState(TaskState.RUNNING);
+      try {
+        this.media?.play();
+      } catch (error) {
+        console.warn("恢复媒体失败", error);
+      }
+    },
+
+    stop() {
+      if (
+        this.state === TaskState.STOPPING ||
+        this.state === TaskState.STOPPED
+      ) {
+        return;
+      }
+      this.setState(TaskState.STOPPING);
+      try {
+        this.media?.pause();
+      } catch (error) {
+        console.warn("停止媒体失败", error);
+      }
+      this.setState(TaskState.STOPPED);
+    },
+
+    start() {
+      this.setState(TaskState.RUNNING);
+      this.attachPanel();
+    },
+
+    finish() {
+      if (this.state !== TaskState.STOPPED) {
+        this.setState(TaskState.STOPPED);
+      }
+    },
+
+    render() {
+      if (!this.status) return;
+      this.status.textContent = `状态：${this.state}`;
+      if (this.pauseButton) this.pauseButton.disabled = this.state !== TaskState.RUNNING;
+      if (this.resumeButton) this.resumeButton.disabled = this.state !== TaskState.PAUSED;
+      if (this.stopButton) {
+        this.stopButton.disabled =
+          this.state === TaskState.IDLE ||
+          this.state === TaskState.STOPPING ||
+          this.state === TaskState.STOPPED;
+      }
+    },
+
+    attachPanel() {
+      if (
+        this.panel ||
+        typeof document === "undefined" ||
+        !document.body
+      ) {
+        return;
+      }
+      const panel = document.createElement("div");
+      panel.id = "uxs-task-control";
+      panel.style.cssText =
+        "position:fixed;left:16px;bottom:16px;z-index:2147483646;display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #1d4ed8;border-radius:8px;background:#fff;color:#111827;font:13px/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.22);";
+      const status = document.createElement("span");
+      status.textContent = `状态：${this.state}`;
+      const make = (text, handler) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = text;
+        button.style.cssText =
+          "border:1px solid #1d4ed8;border-radius:5px;background:#fff;color:#1d4ed8;padding:3px 8px;cursor:pointer;";
+        button.addEventListener("click", handler);
+        panel.appendChild(button);
+        return button;
+      };
+      panel.appendChild(status);
+      this.pauseButton = make("暂停", () => this.pause());
+      this.resumeButton = make("恢复", () => this.resume());
+      this.stopButton = make("停止", () => this.stop());
+      this.status = status;
+      document.body.appendChild(panel);
+      this.panel = panel;
+      this.render();
+    },
+  };
+
   /** @type {(action: () => any, errorMessage: string) => Promise<void>} */
   const safeRun = async (action, errorMessage) => {
     try {
       await action();
     } catch (e) {
+      if (e instanceof AutomationStopped) throw e;
       console.error(errorMessage, e);
       if (config.debugTaskTypes.length) {
         const msg = `[DEBUG 异常]\n提示: ${errorMessage}\n详情: ${e instanceof Error ? e.message : String(e)}\n\n确定：忽略并继续；取消：终止。`;
@@ -119,7 +260,7 @@
     lockSpeed = null;
     /** @type {number | null} */
     switchingCd = null;
-    quizReview = false;
+    quizReview = true;
 
     /**
      * 非空时只处理列出的附件类型，不受任务点标识或完成状态限制，也不等待任务点完成标记；处理后确认，异常时弹窗。
@@ -140,7 +281,7 @@
         this.muteVideo = res.muteWebview ?? this.muteVideo;
         this.lockSpeed = res.lockSpeed ?? null;
         this.switchingCd = res.switchingCd ?? null;
-        this.quizReview = res.quizReview ?? false;
+        this.quizReview = res.quizReview ?? true;
         console.info("配置设置成功：", this);
       } catch (e) {
         console.error("从后端加载配置失败：", e);
@@ -171,6 +312,7 @@
     until: async (getter, timeout = 5000, interval = 250) => {
       const start = performance.now();
       while (performance.now() - start < timeout) {
+        await controller.checkpoint();
         const el = await getter();
         if (el) return el;
         await sleep(interval);
@@ -277,6 +419,203 @@
         });
       });
     },
+  };
+
+
+  /**
+   * 参考/答案面板：非模态、可滚动、只读；不会点击平台提交按钮。
+   * @param {string} title
+   * @param {string} intro
+   * @param {{ question: string, answer: string, explanation: string }[]} items
+   * @returns {Promise<void>} 用户点击关闭后 resolve
+   */
+  const showManualReviewPanel = (title, intro, items) =>
+    new Promise((resolve) => {
+      const existing = document.getElementById("uxs-manual-review");
+      if (existing) existing.remove();
+
+      const panel = document.createElement("div");
+      panel.id = "uxs-manual-review";
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-label", title);
+      panel.style.cssText =
+        "position:fixed;top:16px;right:16px;width:min(430px,92vw);max-height:82vh;overflow:auto;z-index:2147483647;background:#fff;color:#111827;border:2px solid #1d4ed8;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.28);font:14px/1.55 system-ui,-apple-system,'Segoe UI',sans-serif;padding:14px;box-sizing:border-box;";
+
+      const header = document.createElement("div");
+      header.style.cssText = "display:flex;align-items:flex-start;gap:8px;";
+      const heading = document.createElement("h2");
+      heading.textContent = title;
+      heading.style.cssText = "margin:0;font-size:16px;line-height:1.35;flex:1;";
+      const closeIcon = document.createElement("button");
+      closeIcon.type = "button";
+      closeIcon.textContent = "×";
+      closeIcon.setAttribute("aria-label", "关闭");
+      closeIcon.style.cssText =
+        "border:0;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:#111827;";
+      header.appendChild(heading);
+      header.appendChild(closeIcon);
+      panel.appendChild(header);
+
+      const note = document.createElement("p");
+      note.textContent = intro;
+      note.style.cssText = "margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere;";
+      panel.appendChild(note);
+
+      for (const [index, item] of items.entries()) {
+        const block = document.createElement("div");
+        block.style.cssText = "border-top:1px solid #d1d5db;padding:9px 0;";
+        const question = document.createElement("div");
+        question.textContent = `${index + 1}. ${item.question || `第 ${index + 1} 题`}`;
+        question.style.cssText = "font-weight:600;overflow-wrap:anywhere;";
+        const answer = document.createElement("div");
+        answer.textContent = `参考答案：${item.answer || "未生成"}`;
+        answer.style.cssText = "margin-top:4px;overflow-wrap:anywhere;";
+        const explanation = document.createElement("div");
+        explanation.textContent = `解析：${item.explanation || "未提供"}`;
+        explanation.style.cssText = "margin-top:2px;color:#374151;overflow-wrap:anywhere;";
+        block.appendChild(question);
+        block.appendChild(answer);
+        block.appendChild(explanation);
+        panel.appendChild(block);
+      }
+
+      const closeButton = document.createElement("button");
+      closeButton.type = "button";
+      closeButton.textContent = "关闭并停止自动化";
+      closeButton.style.cssText =
+        "margin-top:14px;width:100%;padding:10px 12px;border:0;border-radius:8px;background:#1d4ed8;color:#fff;font:inherit;cursor:pointer;";
+      panel.appendChild(closeButton);
+
+      let closed = false;
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        panel.remove();
+        resolve();
+      };
+      closeIcon.addEventListener("click", close);
+      closeButton.addEventListener("click", close);
+      const host = document.body ?? document.documentElement;
+      host.appendChild(panel);
+    });
+
+  /** @param {{ question: string, answer: string, explanation: string }[]} items */
+  const formatReviewItems = (items) =>
+    items
+      .map(
+        (item, index) =>
+          `${index + 1}. ${item.question || `第 ${index + 1} 题`}\n答案：${item.answer || "未生成"}\n解析：${item.explanation || "未提供"}`,
+      )
+      .join("\n\n");
+
+  /**
+   * 任务级授权：默认只读；用户必须显式确认是不计分练习，才允许填写。
+   * 自动提交是第二个独立确认；正式/计分信号直接拒绝。
+   * @param {Document} taskDoc
+   * @param {string} label
+   */
+  const resolveQuizPolicy = async (taskDoc, label) => {
+    const pageText = String(taskDoc?.body?.innerText ?? "").slice(0, 50_000);
+    if (/(禁止自动化|禁止ai|restricted)/i.test(pageText)) {
+      const policy = {
+        kind: "RESTRICTED",
+        allowFill: false,
+        allowSubmit: false,
+        reason: "页面明确限制自动化",
+      };
+      console.info(`任务策略：${label}`, policy);
+      return policy;
+    }
+    if (/(正式考试|考试|计分|graded|exam)/i.test(pageText)) {
+      const policy = {
+        kind: "GRADED",
+        allowFill: false,
+        allowSubmit: false,
+        reason: "页面出现正式考试/计分信号",
+      };
+      console.info(`任务策略：${label}`, policy);
+      return policy;
+    }
+
+    const allowFill = await confirm(
+      `检测到${label}。\n\n默认只显示参考答案，不自动填写、不自动提交。\n\n只有当你确认这是明确允许自动化的非计分练习时，才选择 Yes 允许自动填写。`,
+    );
+    if (!allowFill) {
+      const policy = {
+        kind: "NEEDS_CONFIRMATION",
+        allowFill: false,
+        allowSubmit: false,
+        reason: "用户未授权自动填写",
+      };
+      console.info(`任务策略：${label}`, policy);
+      return policy;
+    }
+
+    const allowSubmit = await confirm(
+      `是否允许自动提交？\n\n仅当你确认此任务明确允许自动化、且不是正式考试或计分测验时才选择 Yes。\n选择 No 将只填写答案，由你在平台原生界面手动提交。`,
+    );
+    const policy = {
+      kind: allowSubmit ? "PRACTICE" : "UNGRADED",
+      allowFill: true,
+      allowSubmit,
+      reason: allowSubmit ? "用户确认非计分练习并授权提交" : "用户仅授权填写",
+    };
+    console.info(`任务策略：${label}`, policy);
+    return policy;
+  };
+
+  /** @param {{ allowSubmit?: boolean }} policy */
+  const assertSubmitAllowed = (policy) => {
+    if (!policy?.allowSubmit) {
+      throw new ManualReviewRequired("当前任务策略不允许自动提交");
+    }
+  };
+
+  /** @type {(quizDoc: Document, items: { question: string, answer: string, explanation: string }[], policy: { allowSubmit: boolean }) => Promise<void>} */
+  const submitChapterQuiz = async (quizDoc, items, policy) => {
+    await controller.checkpoint();
+    assertSubmitAllowed(policy);
+    if (config.quizReview) {
+      const accepted = await confirm(
+        `答案已填写完成，请人工核验后确认是否提交。\n\n${formatReviewItems(items)}\n\nYes：提交当前答案。\nNo：不提交，保留当前填写内容并停止自动化。`,
+      );
+      if (!accepted) {
+        throw new ManualReviewRequired("用户在人工审核中拒绝提交");
+      }
+    }
+
+    await controller.checkpoint();
+    const submitBtn = await wait.element(
+      null,
+      SELECTORS.quiz.btnSubmitClass,
+      quizDoc,
+      "未找到题目提交按钮",
+    );
+    submitBtn.click();
+
+    const modal = await wait.element(
+      null,
+      SELECTORS.quiz.modalId,
+      document,
+      "未找到提交确认弹窗",
+    );
+    const popOkBtn = await wait.element(
+      null,
+      SELECTORS.quiz.modalOkBtnId,
+      modal,
+      "未找到弹窗确认按钮",
+    );
+    let hasOpened = false;
+    await wait.until(() => {
+      const isVisible = getComputedStyle(modal).display !== "none";
+      if (isVisible) {
+        hasOpened = true;
+        popOkBtn.click();
+        return null;
+      }
+      return hasOpened ? true : null;
+    });
+    console.info("已按任务策略提交章节测验");
   };
 
   /**
@@ -674,6 +1013,7 @@
   /** @type {(items: InteractiveQuizItem[], quizDatas: ExtQuizData[]) => Promise<void>} */
   const fillInteractiveQuizItems = async (items, quizDatas) => {
     for (const { element, data } of items) {
+      await controller.checkpoint();
       await switchingCooldown();
       console.info(
         `开始处理第 ${quizDatas.indexOf(data) + 1}/${quizDatas.length} 道互动题`,
@@ -683,8 +1023,26 @@
     }
   };
 
-  /** @type {(quizRoot: HTMLElement) => Promise<void>} */
-  const submitInteractiveQuiz = async (quizRoot) => {
+  /**
+   * @param {HTMLElement} quizRoot
+   * @param {{ question: string, answer: string, explanation: string }[]} items
+   * @param {{ allowSubmit: boolean }} policy
+   */
+  const submitInteractiveQuiz = async (quizRoot, items, policy) => {
+    await controller.checkpoint();
+    assertSubmitAllowed(policy);
+    if (config.quizReview) {
+      const accepted = await confirm(
+        `互动题答案已填写，请人工核验。
+
+${formatReviewItems(items)}
+
+Yes：提交当前互动题。
+No：不提交并停止自动化。`,
+      );
+      if (!accepted) throw new ManualReviewRequired("用户在互动题人工审核中拒绝提交");
+    }
+    await controller.checkpoint();
     const submitButton = await wait.element(
       null,
       SELECTORS.video.quizSubmitId,
@@ -710,18 +1068,46 @@
 
   /** @type {(taskDoc: Document, videoEl: HTMLMediaElement) => Promise<void>} */
   const handleInteractiveQuiz = async (taskDoc, videoEl) => {
+    await controller.checkpoint();
     const timeline = await wait.element(
       null,
       SELECTORS.video.timelineClass,
       taskDoc,
     );
+    const policy = await resolveQuizPolicy(taskDoc, "视频互动题");
+    if (!policy.allowFill) {
+      await showManualReviewPanel(
+        "需要人工处理视频互动题",
+        `策略：${policy.kind}（${policy.reason}）。
+
+本工具不会自动读取、验证或提交互动题答案。请直接在播放器中原生完成。`,
+        [],
+      );
+      throw new ManualReviewRequired("视频互动题未授权自动填写");
+    }
+
     const quizDatas = await getInteractiveQuizData(timeline);
+    await controller.checkpoint();
     console.info(
       quizDatas.length
         ? `视频包含 ${quizDatas.length} 道互动题，开始处理`
         : "视频无互动题",
     );
     if (!quizDatas.length) return;
+    const reviewItems = quizDatas.map((data) => ({
+      question: data.description || "视频互动题",
+      answer: String(data.answerContent ?? ""),
+      explanation: "",
+    }));
+    if (!policy.allowSubmit) {
+      await showManualReviewPanel(
+        "互动题答案已填写，但不会自动提交",
+        "请在播放器中原生核对并手动提交；关闭本面板后自动化停止。",
+        reviewItems,
+      );
+      throw new ManualReviewRequired("互动题仅授权填写，未授权提交");
+    }
+
     const lastQuizData = quizDatas[quizDatas.length - 1];
     let lastQuizSubmitted = false;
     while (!lastQuizSubmitted) {
@@ -729,14 +1115,14 @@
       if (!quizRoot) break;
       const items = await matchInteractiveQuizItems(quizRoot, quizDatas);
       await fillInteractiveQuizItems(items, quizDatas);
-      await submitInteractiveQuiz(quizRoot);
+      await submitInteractiveQuiz(quizRoot, reviewItems, policy);
       lastQuizSubmitted = items.some(
         ({ data }) => data.resourceId === lastQuizData.resourceId,
       );
     }
     console.info(
       lastQuizSubmitted
-        ? "视频互动题处理完毕，最后一道题已执行提交流程"
+        ? "视频互动题处理完毕，最后一道题已按策略提交"
         : "视频已结束，停止处理互动题",
     );
   };
@@ -758,6 +1144,7 @@
         "未找到视频播放控件",
       )
     );
+    controller.setMedia(videoEl);
     if (config.muteVideo) muteVideo(videoEl);
 
     const isStarted = await wait.until(() => {
@@ -799,6 +1186,7 @@
         "未找到音频播放控件",
       )
     );
+    controller.setMedia(audioEl);
     if (config.muteVideo) muteVideo(audioEl);
 
     const isStarted = await wait.until(() => {
@@ -816,7 +1204,6 @@
         : null,
     );
     assert(duration != null, "等待音频时长超时");
-    audioEl.currentTime = Math.max(0, duration - 1);
     console.info("Audio任务点处理完成，等待平台完成标记");
 
     if (config.debugTaskTypes.includes("Audio")) {
@@ -995,6 +1382,7 @@
       short: fillShort,
     };
     for (const [index, quizDiv] of quizList.entries()) {
+      await controller.checkpoint();
       await switchingCooldown();
       cleanup(quizDiv);
       const titleEl = quizDiv.querySelector(SELECTORS.quiz.titleClass);
@@ -1024,10 +1412,53 @@
       quizDoc,
     );
 
-    const answersList = await tauriInvoke("solve_quiz", {
-      html: quizDoc.documentElement.outerHTML,
+    await controller.checkpoint();
+    let answersList;
+    try {
+      answersList = await tauriInvoke("solve_quiz", {
+        html: quizDoc.documentElement.outerHTML,
+      });
+    } catch (error) {
+      throw new ManualReviewRequired(
+        `Quiz 答案生成失败，未填写/未提交：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    if (!Array.isArray(answersList) || answersList.length === 0) {
+      throw new ManualReviewRequired("Quiz 未生成答案，未填写/未提交");
+    }
+
+    const items = answersList.map((answer, index) => {
+      const titleEl = quizList[index]?.querySelector(SELECTORS.quiz.titleClass);
+      return {
+        question:
+          titleEl?.textContent?.trim().replace(/\s+/g, " ") ||
+          `第 ${index + 1} 题`,
+        answer: String(answer?.content ?? "").trim(),
+        explanation: String(answer?.explanation ?? "").trim(),
+      };
     });
+    await controller.checkpoint();
+    const policy = await resolveQuizPolicy(taskDoc, "章节测验");
+    if (!policy.allowFill) {
+      await showManualReviewPanel(
+        "参考答案（未自动填写/提交）",
+        `策略：${policy.kind}（${policy.reason}）。
+
+工具没有填写或提交任何答案。请在本页面手动核对并提交。`,
+        items,
+      );
+      throw new ManualReviewRequired("章节测验未授权自动填写");
+    }
+
     await applyAnswers(quizList, answersList);
+    if (!policy.allowSubmit) {
+      await showManualReviewPanel(
+        "答案已填入，但不会自动提交",
+        "请在平台原生界面核对并手动提交；关闭本面板后自动化停止。",
+        items,
+      );
+      throw new ManualReviewRequired("章节测验仅授权填写，未授权提交");
+    }
 
     if (config.debugTaskTypes.includes("Quiz")) {
       assert(
@@ -1037,48 +1468,8 @@
         "调试中断：用户取消了 Quiz 提交",
       );
     }
-
-    const submitBtn = await wait.element(
-      null,
-      SELECTORS.quiz.btnSubmitClass,
-      quizDoc,
-      "未找到题目提交按钮",
-    );
-    if (config.quizReview) {
-      while (
-        !(await confirm(
-          "答案已填写完成，请人工核验后确认是否提交。\n\nYes：立即提交当前答案。\nNo：暂不提交，留出 30 秒检查或修改答案，之后再次弹出本提示。\n\n如需停止脚本，请点击左上角的刷新按钮或 Home。",
-        ))
-      ) {
-        await sleep(30000);
-      }
-    }
-    submitBtn.click();
-
-    const modal = await wait.element(
-      null,
-      SELECTORS.quiz.modalId,
-      document,
-      "未找到提交确认弹窗",
-    );
-    const popOkBtn = await wait.element(
-      null,
-      SELECTORS.quiz.modalOkBtnId,
-      modal,
-      "未找到弹窗确认按钮",
-    );
-    let hasOpened = false;
-    await wait.until(() => {
-      const isVisible = getComputedStyle(modal).display !== "none";
-      if (isVisible) {
-        hasOpened = true;
-        popOkBtn.click();
-        return null;
-      }
-      return hasOpened ? true : null;
-    });
-
-    console.info("已自动填充AI生成的答案并确认提交");
+    await submitChapterQuiz(quizDoc, items, policy);
+    console.info("章节测验已按任务策略处理");
   };
 
   /** @type {(chapterDoc: Document) => Promise<void>} */
@@ -1115,7 +1506,18 @@
       };
       const type = classifyTask(taskDoc);
       if (debugging && !config.debugTaskTypes.includes(type)) continue;
+      const classification =
+        type === "Quiz"
+          ? "NEEDS_CONFIRMATION"
+          : ["Video", "Audio", "PDF"].includes(type)
+            ? "LEARNING"
+            : "RESTRICTED";
+      console.info(`任务分类：${taskInfo}`, { type, classification });
       await emit.taskProgress(index, type);
+      if (classification === "RESTRICTED") {
+        console.info(`${taskInfo} 被分类为 RESTRICTED，跳过自动化`);
+        continue;
+      }
       const handler = taskHandler[type];
       if (
         !debugging &&
@@ -1125,6 +1527,7 @@
         continue;
       }
 
+      await controller.checkpoint();
       await switchingCooldown();
       await safeRun(async () => {
         assert(handler, `未识别的任务点类型: ${taskDoc.location.href}`);
@@ -1164,65 +1567,6 @@
       }, "页签处理失败，自动跳过该页签");
     }
     console.info("本章节处理完毕");
-  };
-
-  const preserveFocusState = () => {
-    const blockedEvents = [
-      "blur",
-      "focusout",
-      "mouseleave",
-      "mouseout",
-      "pagehide",
-      "visibilitychange",
-    ];
-
-    // 1. 清理已有内联监听属性 (DOM Level 0)
-    for (const evt of blockedEvents) {
-      try {
-        /** @type {any} */ (window)[`on${evt}`] = null;
-        /** @type {any} */ (document)[`on${evt}`] = null;
-      } catch (e) {
-        console.error(`清理 ${evt} 事件监听失败:`, e);
-      }
-    }
-
-    // 2. 捕获阶段强行掐断事件
-    /** @param {Event} e */
-    const stopPropagation = (e) => {
-      e.stopImmediatePropagation();
-      e.stopPropagation();
-    };
-
-    for (const evt of blockedEvents) {
-      window.addEventListener(evt, stopPropagation, true);
-      document.addEventListener(evt, stopPropagation, true);
-    }
-
-    // 3. 拦截后续动态 addEventListener
-    const originalAdd = window.EventTarget.prototype.addEventListener;
-    window.EventTarget.prototype.addEventListener = function (
-      /** @type {string} */ type,
-      /** @type {EventListenerOrEventListenerObject} */ listener,
-      /** @type {any} */ options,
-    ) {
-      if (blockedEvents.includes(type)) return;
-      return originalAdd.call(this, type, listener, options);
-    };
-
-    // 4. 伪造 Page Visibility 与 Focus API
-    try {
-      Object.defineProperty(document, "hidden", {
-        get: () => false,
-        configurable: true,
-      });
-      Object.defineProperty(document, "visibilityState", {
-        get: () => "visible",
-        configurable: true,
-      });
-      document.hasFocus = () => true;
-    } catch (e) {
-      console.error("伪造 Page Visibility 与 Focus API 失败:", e);
-    }
   };
 
   /** @param {HTMLElement[]} chapterList */
@@ -1282,19 +1626,31 @@
       await emit.cancelled();
       return;
     }
-    preserveFocusState();
     await emit.started();
+    controller.start();
 
-    do {
-      await safeRun(() => handleCourse(totalChapterList()), "课程处理失败");
-      if (config.debugTaskTypes.length === 0) await sleep(5000);
-      // debug 只扫描一轮，其他类型的任务未处理时，章节可能一直保持 Blocking。
-    } while (
-      config.debugTaskTypes.length === 0 &&
-      blockingCount(totalChapterList()) > 0
-    );
+    try {
+      do {
+        await safeRun(() => handleCourse(totalChapterList()), "课程处理失败");
+        if (config.debugTaskTypes.length === 0) await sleep(5000);
+        // debug 只扫描一轮，其他类型的任务未处理时，章节可能一直保持 Blocking。
+      } while (
+        config.debugTaskTypes.length === 0 &&
+        blockingCount(totalChapterList()) > 0
+      );
 
-    await emit.finished();
+      controller.finish();
+      await emit.finished();
+    } catch (error) {
+      if (error instanceof AutomationStopped) {
+        console.info(error.message);
+        controller.finish();
+        await emit.cancelled();
+        return;
+      }
+      controller.setState(TaskState.FAILED);
+      throw error;
+    }
   };
 
   main();

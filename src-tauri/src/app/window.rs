@@ -15,6 +15,11 @@ use tauri::{
     WindowEvent, image::Image, webview::Webview, window::Window,
 };
 
+/// A second close request must not spawn a second cleanup task.
+static CLOSING: AtomicBool = AtomicBool::new(false);
+
+const CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
+
 /// 执行窗口关闭前的应用状态刷新与持久化收尾工作
 async fn flush_app_state() {
     if let Err(e) = CONFIG.save() {
@@ -25,7 +30,7 @@ async fn flush_app_state() {
 }
 
 /// 触发前端遮罩层退场动画与事件通知
-async fn notify_exit_animation(window: &Window) {
+fn notify_exit_animation(window: &Window) {
     if let Some(mask) = window.get_webview("mask") {
         log::debug!("执行关闭动画并关闭窗口");
         mask.show().ok();
@@ -41,14 +46,25 @@ async fn notify_exit_animation(window: &Window) {
 async fn close(window: Window) {
     log::debug!("执行程序收尾工作，即将关闭应用");
     prepare_exit(&window).await;
-    window.destroy().ok();
+    if let Err(error) = window.destroy() {
+        log::error!("销毁主窗口失败，将强制退出: {error}");
+    }
 }
 
 /// Run the same exit animation and state flush before an updater exits the process directly.
 pub async fn prepare_exit(window: &Window) {
+    let visible = window.is_visible().unwrap_or(false);
+    if visible {
+        notify_exit_animation(window);
+    } else {
+        log::info!("窗口尚未显示，跳过退场动画，仅保存配置");
+    }
     tokio::join!(
-        tokio::time::sleep(Duration::from_millis(750)),
-        notify_exit_animation(window),
+        tokio::time::sleep(if visible {
+            Duration::from_millis(750)
+        } else {
+            Duration::from_millis(0)
+        }),
         flush_app_state(),
     );
 }
@@ -81,7 +97,21 @@ pub fn listener(window: &tauri::Window, event: &tauri::WindowEvent) {
     match event {
         WindowEvent::CloseRequested { api, .. } => {
             api.prevent_close();
-            tauri::async_runtime::spawn(close(window.clone()));
+            if CLOSING.swap(true, Ordering::AcqRel) {
+                log::debug!("已有关闭流程进行中，忽略重复关闭请求");
+                return;
+            }
+            let window = window.clone();
+            tauri::async_runtime::spawn(async move {
+                if tokio::time::timeout(CLOSE_TIMEOUT, close(window.clone()))
+                    .await
+                    .is_err()
+                {
+                    log::error!("关闭流程超时，执行强制退出");
+                }
+                // Always make the process leave after the bounded cleanup attempt.
+                window.app_handle().exit(0);
+            });
         }
         WindowEvent::Destroyed => {
             log::debug!("主程序窗口已销毁，应用已关闭");

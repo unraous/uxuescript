@@ -22,7 +22,7 @@ function makeProvider(overrides: Partial<LLMProvider> = {}): LLMProvider {
     isCustom: false,
     protocol: "OpenAIChatCompletions",
     baseUrl: "https://api.example.com/v1",
-    apiKey: null,
+    hasKey: false,
     models: ["default-model"],
     chosenModel: 0,
     ...overrides,
@@ -109,7 +109,7 @@ describe("useLLMProviders", () => {
       isCustom: true,
       protocol: "OpenAIChatCompletions",
       baseUrl: "https://api.example.com/v1",
-      apiKey: null,
+      hasKey: false,
       models: [],
       chosenModel: null,
     });

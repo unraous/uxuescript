@@ -113,7 +113,6 @@ describe("debug task selection", () => {
         },
       };
       const api = loadCore(context, {
-        preserveFocusState: () => {},
         handleCourse: scan,
         blockingCount,
         totalChapterList: () => [],

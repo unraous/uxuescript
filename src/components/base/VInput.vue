@@ -10,6 +10,7 @@ const {
   placeholder = "",
   pattern = ".*",
   maskOnBlur,
+  secret = false,
   disabled = false,
   id = useId(),
 } = defineProps<{
@@ -19,6 +20,7 @@ const {
   placeholder?: string;
   pattern?: string;
   maskOnBlur?: boolean;
+  secret?: boolean;
   disabled?: boolean;
   id?: string;
 }>();
@@ -41,6 +43,7 @@ const emit = defineEmits(["update:modelValue", "change"]);
       :placeholder="placeholder"
       :pattern="pattern"
       :mask-on-blur="maskOnBlur"
+      :secret="secret"
       :disabled="disabled"
       class="input-section"
       @update:model-value="emit('update:modelValue', $event)"

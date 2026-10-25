@@ -5,10 +5,12 @@ use crate::core::quiz::html::Question;
 use anyhow::Result;
 use reqwest::header::{ACCEPT, HeaderMap, HeaderValue};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Semaphore;
 
 const CHUNK_SIZE: usize = 5;
 const MAX_CONCURRENCY: usize = 10;
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// LLM 求解入口分发器
 pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<Vec<AnswerItem>> {
@@ -32,6 +34,7 @@ pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<V
 
     let client = reqwest::Client::builder()
         .user_agent(concat!("uXueScript/", env!("CARGO_PKG_VERSION")))
+        .timeout(REQUEST_TIMEOUT)
         .default_headers(HeaderMap::from_iter([(
             ACCEPT,
             HeaderValue::from_static("application/json"),
@@ -44,26 +47,48 @@ pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<V
         let client = client.clone();
         let provider = provider.clone();
         let model = chosen_model.to_string();
+        let question_ids = chunk.iter().map(|question| question.id.clone()).collect::<Vec<_>>();
         let chunk = chunk.to_vec();
         let permit = semaphore.clone().acquire_owned().await?;
 
-        handles.push(tokio::spawn(async move {
-            let res = match provider.protocol {
-                LLMProtocol::OpenAIChatCompletions => {
-                    chat_completions(&client, &provider, &model, &chunk).await
-                }
-                LLMProtocol::OpenAIResponses => responses(&client, &provider, &model, &chunk).await,
-                LLMProtocol::GoogleGemini => gemini(&client, &provider, &model, &chunk).await,
-            };
-            drop(permit);
-            res
-        }));
+        handles.push((
+            question_ids,
+            tokio::spawn(async move {
+                let res = match provider.protocol {
+                    LLMProtocol::OpenAIChatCompletions => {
+                        chat_completions(&client, &provider, &model, &chunk).await
+                    }
+                    LLMProtocol::OpenAIResponses => {
+                        responses(&client, &provider, &model, &chunk).await
+                    }
+                    LLMProtocol::GoogleGemini => {
+                        gemini(&client, &provider, &model, &chunk).await
+                    }
+                };
+                drop(permit);
+                res
+            }),
+        ));
     }
 
     let mut all_answers = Vec::with_capacity(questions.len());
-    for handle in handles {
-        let chunk_answers = handle.await??;
-        all_answers.extend(chunk_answers);
+    for (question_ids, handle) in handles {
+        match handle.await {
+            Ok(Ok(chunk_answers)) => all_answers.extend(chunk_answers),
+            Ok(Err(_)) | Err(_) => {
+                // Keep successful batches; mark only this batch as unavailable.
+                // Never auto-submit a partial or empty result.
+                log::warn!(
+                    "一批题目生成失败（题目数 {}），保留其他批次结果",
+                    question_ids.len()
+                );
+                all_answers.extend(question_ids.into_iter().map(|id| AnswerItem {
+                    index: id,
+                    explanation: "该题生成失败；未提交。请重试或人工处理。".to_owned(),
+                    content: String::new(),
+                }));
+            }
+        }
     }
 
     Ok(all_answers)
@@ -141,10 +166,9 @@ async fn chat_completions(
 
     if !response.status().is_success() {
         anyhow::bail!(
-            "{} API 错误 ({}): {}",
+            "{} API 返回 HTTP {}（响应体已隐藏）",
             provider.name,
-            response.status(),
-            response.text().await?
+            response.status()
         );
     }
 
@@ -153,18 +177,10 @@ async fn chat_completions(
         .pointer("/choices/0/message/content")
         .or_else(|| data.pointer("/message/content"))
         .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            anyhow::anyhow!("无法从 {} 响应提取文本。原始响应: {}", provider.name, data)
-        })?;
+        .ok_or_else(|| anyhow::anyhow!("{} 响应未包含答案文本", provider.name))?;
 
-    serde_json::from_str(content).map_err(|e| {
-        anyhow::anyhow!(
-            "从 {} 响应解析答案 JSON 失败: {}。原始返回文本: {}",
-            provider.name,
-            e,
-            content
-        )
-    })
+    serde_json::from_str(content)
+        .map_err(|_| anyhow::anyhow!("{} 响应无法解析为答案 JSON", provider.name))
 }
 
 /// OpenAI /v1/responses 接口处理
@@ -194,9 +210,8 @@ async fn responses(
 
     if !response.status().is_success() {
         anyhow::bail!(
-            "OpenAI API 错误 ({}): {}",
-            response.status(),
-            response.text().await?
+            "OpenAI API 返回 HTTP {}（响应体已隐藏）",
+            response.status()
         );
     }
 
@@ -212,7 +227,7 @@ async fn responses(
                 .pointer("/content/0/text")?
                 .as_str()
         })
-        .ok_or_else(|| anyhow::anyhow!("无法从 OpenAI 响应提取文本。原始响应: {}", data))?;
+        .ok_or_else(|| anyhow::anyhow!("OpenAI 响应未包含答案文本"))?;
 
     if let Ok(wrapper) = serde_json::from_str::<serde_json::Value>(content)
         && let Some(answers) = wrapper.get("answers")
@@ -220,13 +235,8 @@ async fn responses(
         return Ok(serde_json::from_value(answers.clone())?);
     }
 
-    serde_json::from_str::<Vec<AnswerItem>>(content).map_err(|e| {
-        anyhow::anyhow!(
-            "从 OpenAI 响应解析答案 JSON 失败: {}。原始返回文本: {}",
-            e,
-            content
-        )
-    })
+    serde_json::from_str::<Vec<AnswerItem>>(content)
+        .map_err(|_| anyhow::anyhow!("OpenAI 响应无法解析为答案 JSON"))
 }
 
 /// Google Gemini :generateContent 接口处理
@@ -258,9 +268,8 @@ async fn gemini(
 
     if !response.status().is_success() {
         anyhow::bail!(
-            "Google API 错误 ({}): {}",
-            response.status(),
-            response.text().await?
+            "Google API 返回 HTTP {}（响应体已隐藏）",
+            response.status()
         );
     }
 
@@ -268,15 +277,10 @@ async fn gemini(
     let content = data
         .pointer("/candidates/0/content/parts/0/text")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("无法从 Google 响应提取文本。原始响应: {}", data))?;
+        .ok_or_else(|| anyhow::anyhow!("Google 响应未包含答案文本"))?;
 
-    serde_json::from_str::<Vec<AnswerItem>>(content).map_err(|e| {
-        anyhow::anyhow!(
-            "从 Google 响应解析答案 JSON 失败: {}。原始返回文本: {}",
-            e,
-            content
-        )
-    })
+    serde_json::from_str::<Vec<AnswerItem>>(content)
+        .map_err(|_| anyhow::anyhow!("Google 响应无法解析为答案 JSON"))
 }
 
 #[cfg(test)]

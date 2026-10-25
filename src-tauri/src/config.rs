@@ -13,7 +13,10 @@ use theme::ThemeConfig;
 use anyhow::Result;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::LazyLock;
+
+static CONFIG_LOAD_FAILED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
@@ -49,8 +52,24 @@ impl Config {
     // 此处日志系统尚未初始化完成，读取配置文件失败时将直接降级回退至默认配置。
     fn load() -> Self {
         let config = Self::default();
-        Self::parse(&std::fs::read_to_string(&config.paths.files["config"]).unwrap_or_default())
-            .unwrap_or(config)
+        let path = &config.paths.files["config"];
+        let content = match std::fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(error) => {
+                CONFIG_LOAD_FAILED.store(true, Ordering::Release);
+                eprintln!("读取配置失败，拒绝覆盖原配置: {error}");
+                return config;
+            }
+        };
+        match Self::parse(&content) {
+            Ok(parsed) => parsed,
+            Err(error) => {
+                CONFIG_LOAD_FAILED.store(true, Ordering::Release);
+                eprintln!("解析配置失败，拒绝覆盖原配置: {error}");
+                config
+            }
+        }
     }
 
     fn parse(content: &str) -> Result<Self> {
@@ -85,8 +104,21 @@ impl Config {
     }
 
     pub fn save(&self) -> Result<()> {
-        std::fs::write(&self.paths.files["config"], toml::to_string_pretty(&self)?)?;
-        log::info!("配置已保存到 {}", self.paths.files["config"].display());
+        if CONFIG_LOAD_FAILED.load(Ordering::Acquire) {
+            anyhow::bail!("配置加载失败，拒绝覆盖原配置");
+        }
+
+        let path = &self.paths.files["config"];
+        let content = toml::to_string_pretty(&self)?;
+        let backup = path.with_extension("toml.bak");
+        let temporary = path.with_extension("toml.tmp");
+
+        if path.exists() {
+            std::fs::copy(path, &backup)?;
+        }
+        std::fs::write(&temporary, content)?;
+        std::fs::rename(&temporary, path)?;
+        log::info!("配置已保存到 {}", path.display());
         Ok(())
     }
 }

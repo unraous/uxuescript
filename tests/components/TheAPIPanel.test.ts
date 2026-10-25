@@ -22,7 +22,7 @@ beforeEach(() => {
       isCustom: false,
       protocol: "OpenAIChatCompletions",
       baseUrl: "https://example.com",
-      apiKey: null,
+      hasKey: false,
       models: ["test-model"],
       chosenModel: 0,
     },
@@ -60,8 +60,8 @@ describe("API connection test", () => {
     wrapper.unmount();
   });
 
-  it("shows the exact upstream error and allows another test", async () => {
-    mocks.healthy.mockRejectedValue("API 错误 (401): invalid_api_key");
+  it("shows the provider error and allows another test", async () => {
+    mocks.healthy.mockRejectedValue("mock provider error (401)");
     const wrapper = mount(TheAPIPanel);
     await flushPromises();
     const button = wrapper.get<HTMLButtonElement>(
@@ -71,7 +71,7 @@ describe("API connection test", () => {
     await flushPromises();
     expect(mocks.error).toHaveBeenCalledWith(
       "Connection failed:",
-      "API 错误 (401): invalid_api_key",
+      "mock provider error (401)",
     );
     expect(mocks.confirm).not.toHaveBeenCalled();
     expect(button.element.disabled).toBe(false);

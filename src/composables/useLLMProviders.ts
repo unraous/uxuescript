@@ -52,9 +52,9 @@ export function useLLMProviders() {
       isCustom: true,
       protocol: "OpenAIChatCompletions",
       baseUrl: "https://api.example.com/v1",
-      apiKey: null,
       models: [],
       chosenModel: null,
+      hasKey: false,
     };
     await commands.upsertProvider(provider).catch(logCommandError);
     providers.push(provider);

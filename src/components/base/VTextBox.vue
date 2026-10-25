@@ -7,6 +7,7 @@ const {
   pattern,
   id,
   maskOnBlur,
+  secret = false,
   disabled = false,
 } = defineProps<{
   modelValue: string | number;
@@ -14,6 +15,7 @@ const {
   pattern: string;
   id: string;
   maskOnBlur?: boolean;
+  secret?: boolean;
   disabled?: boolean;
 }>();
 
@@ -54,6 +56,7 @@ const onInput = (event: Event) => {
         ref="inputRef"
         :disabled="disabled"
         :value="displayValue"
+        :type="secret ? 'password' : 'text'"
         :placeholder="placeholder"
         :pattern="pattern"
         autocomplete="off"
