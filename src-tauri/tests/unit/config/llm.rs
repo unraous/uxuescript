@@ -1,12 +1,11 @@
 use super::*;
 
 #[test]
-fn test_api_key_display_has_fixed_length_and_preserves_edges() {
+fn test_api_key_display_is_fully_redacted() {
     let key = ApiKey::new("sk-1234567890abcdef".to_string()).unwrap();
 
-    assert_eq!(key.to_string(), "sk-1****cdef");
-    assert_eq!(key.to_string().chars().count(), 12);
-    assert_eq!(format!("{:?}", key), "ApiKey(sk-1****cdef)");
+    assert_eq!(key.to_string(), "***REDACTED***");
+    assert_eq!(format!("{:?}", key), "ApiKey(***REDACTED***)");
 }
 
 #[test]
@@ -18,10 +17,13 @@ fn test_api_key_rejects_too_short_value() {
 }
 
 #[test]
-fn test_api_key_serialization_remains_transparent() {
+fn test_api_key_serialization_is_protected_and_round_trips() {
     let key = ApiKey::new("secret-value".to_string()).unwrap();
 
-    assert_eq!(serde_json::to_string(&key).unwrap(), "\"secret-value\"");
+    let encoded = serde_json::to_string(&key).unwrap();
+    assert!(encoded.starts_with("\"dpapi:v1:"), "{encoded}");
+    let decoded: ApiKey = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(decoded, key);
     assert_eq!(
         serde_json::from_str::<ApiKey>("\"secret-value\"").unwrap(),
         key

@@ -8,6 +8,7 @@
           "can_go_forward",
           "cancel_update_download",
           "check_update",
+          "clear_key",
           "close",
           "confirm",
           "current_provider",

@@ -95,22 +95,33 @@
     FAILED: "FAILED",
   });
 
+  /** @typedef {"IDLE" | "RUNNING" | "PAUSING" | "PAUSED" | "STOPPING" | "STOPPED" | "FAILED"} TaskStateValue */
+
   /** 页面内可见的任务控制条：暂停、恢复、停止。 */
   const controller = {
+    /** @type {TaskStateValue} */
     state: TaskState.IDLE,
+    /** @type {{ pause: () => void, play: () => void } | null} */
     media: null,
+    /** @type {HTMLDivElement | null} */
     panel: null,
+    /** @type {HTMLSpanElement | null} */
     status: null,
+    /** @type {HTMLButtonElement | null} */
     pauseButton: null,
+    /** @type {HTMLButtonElement | null} */
     resumeButton: null,
+    /** @type {HTMLButtonElement | null} */
     stopButton: null,
 
+    /** @param {TaskStateValue} next */
     setState(next) {
       this.state = next;
       console.info(`任务状态：${next}`);
       this.render();
     },
 
+    /** @param {{ pause: () => void, play: () => void } | null} media */
     setMedia(media) {
       this.media = media ?? null;
     },
@@ -200,6 +211,10 @@
         "position:fixed;left:16px;bottom:16px;z-index:2147483646;display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #1d4ed8;border-radius:8px;background:#fff;color:#111827;font:13px/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.22);";
       const status = document.createElement("span");
       status.textContent = `状态：${this.state}`;
+      /**
+       * @param {string} text
+       * @param {() => void} handler
+       */
       const make = (text, handler) => {
         const button = document.createElement("button");
         button.type = "button";
@@ -1514,10 +1529,6 @@ No：不提交并停止自动化。`,
             : "RESTRICTED";
       console.info(`任务分类：${taskInfo}`, { type, classification });
       await emit.taskProgress(index, type);
-      if (classification === "RESTRICTED") {
-        console.info(`${taskInfo} 被分类为 RESTRICTED，跳过自动化`);
-        continue;
-      }
       const handler = taskHandler[type];
       if (
         !debugging &&

@@ -38,7 +38,7 @@ function setup(options: { duration?: number } = {}) {
 }
 
 describe("standalone audio playback", () => {
-  it("starts once, applies mute and speed, then seeks near the end", async () => {
+  it("starts once, applies mute and speed, and does not seek to the end", async () => {
     const page = setup();
     page.api.config.lockSpeed = 2;
     const run = page.api.handleAudio(page.doc);
@@ -47,12 +47,13 @@ describe("standalone audio playback", () => {
     expect(page.click).toHaveBeenCalledOnce();
     expect(page.audio.muted).toBe(true);
     expect(page.audio.playbackRate).toBe(2);
-    expect(page.seek).toHaveBeenCalledExactlyOnceWith(106);
+    expect(page.audio.paused).toBe(false);
+    expect(page.seek).not.toHaveBeenCalled();
     expect((page.doc.querySelector("#audio1_html5_white") as HTMLAudioElement).muted)
       .toBe(false);
   });
 
-  it("waits for media duration after playback starts", async () => {
+  it("waits for media duration after playback starts without seeking", async () => {
     const page = setup({ duration: NaN });
     const run = page.api.handleAudio(page.doc);
     await vi.advanceTimersByTimeAsync(1000);
@@ -60,7 +61,8 @@ describe("standalone audio playback", () => {
     page.setDuration(406);
     await vi.advanceTimersByTimeAsync(250);
     await run;
-    expect(page.seek).toHaveBeenCalledExactlyOnceWith(405);
+    expect(page.audio.paused).toBe(false);
+    expect(page.seek).not.toHaveBeenCalled();
   });
 
   it("reports duration timeout through the existing error path", async () => {
@@ -72,11 +74,23 @@ describe("standalone audio playback", () => {
     expect(page.seek).not.toHaveBeenCalled();
   });
 
-  it("does not seek before zero for subsecond audio", async () => {
+  it("does not seek for subsecond audio", async () => {
     const page = setup({ duration: 0.5 });
     const run = page.api.handleAudio(page.doc);
     await vi.advanceTimersByTimeAsync(1000);
     await run;
-    expect(page.seek).toHaveBeenCalledExactlyOnceWith(0);
+    expect(page.audio.paused).toBe(false);
+    expect(page.seek).not.toHaveBeenCalled();
+  });
+
+  it("stops while waiting for duration without seeking or continuing", async () => {
+    const page = setup({ duration: NaN });
+    const run = page.api.handleAudio(page.doc);
+    await vi.advanceTimersByTimeAsync(1000);
+    page.api.controller.stop();
+    const stopped = expect(run).rejects.toThrow(/任务已停止/);
+    await vi.advanceTimersByTimeAsync(250);
+    await stopped;
+    expect(page.seek).not.toHaveBeenCalled();
   });
 });

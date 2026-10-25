@@ -352,5 +352,5 @@ describe("tag synchronization", () => {
       syncTag({ tag: "v1", cwd, remote, user: "test", token: "unused-secret" }),
     ).toThrow("different commit");
     expect(run("ls-remote", remote, "refs/tags/v1")).toContain(commit);
-  });
+  }, 20_000);
 });

@@ -79,7 +79,7 @@ async fn probes_all_protocols_with_the_selected_model_and_fixed_question() {
 }
 
 #[tokio::test]
-async fn preserves_http_status_and_upstream_error_details() {
+async fn preserves_http_status_without_exposing_upstream_body() {
     for (status, message) in [
         (401, "invalid_api_key"),
         (404, "model_not_found"),
@@ -91,7 +91,7 @@ async fn preserves_http_status_and_upstream_error_details() {
             .unwrap_err()
             .to_string();
         assert!(error.contains(&status.to_string()), "{error}");
-        assert!(error.contains(message), "{error}");
+        assert!(!error.contains(message), "{error}");
         request.await.unwrap();
     }
 }
@@ -108,10 +108,10 @@ async fn rejects_empty_and_unparseable_answers() {
             ),
             "答案为空",
         ),
-        (json!({"choices": []}).to_string(), "无法从"),
+        (json!({"choices": []}).to_string(), "响应未包含答案文本"),
         (
             response(&protocol, json!("not an answer array")),
-            "解析答案 JSON 失败",
+            "响应无法解析为答案 JSON",
         ),
     ] {
         let (url, request) = serve(200, body).await;

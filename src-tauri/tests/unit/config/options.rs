@@ -6,7 +6,7 @@ fn test_options_config_serde_and_default() {
     assert!(opts.mute_webview);
     assert_eq!(opts.lock_speed, None);
     assert_eq!(opts.switching_cd, None);
-    assert!(!opts.quiz_review);
+    assert!(opts.quiz_review);
 
     let json = serde_json::to_string(&opts).unwrap();
     assert!(json.contains("\"muteWebview\":true"));
@@ -35,6 +35,6 @@ fn test_options_config_serde_and_default() {
         let options: OptionsConfig = serde_json::from_str(legacy).unwrap();
         assert_eq!(options.lock_speed, None);
         assert_eq!(options.switching_cd, None);
-        assert!(!options.quiz_review);
+        assert!(options.quiz_review);
     }
 }

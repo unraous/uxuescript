@@ -72,10 +72,32 @@ pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<V
     }
 
     let mut all_answers = Vec::with_capacity(questions.len());
+    let mut succeeded = 0usize;
+    let mut first_error: Option<String> = None;
     for (question_ids, handle) in handles {
         match handle.await {
-            Ok(Ok(chunk_answers)) => all_answers.extend(chunk_answers),
-            Ok(Err(_)) | Err(_) => {
+            Ok(Ok(chunk_answers)) if chunk_answers.is_empty() => {
+                if first_error.is_none() {
+                    first_error = Some("模型实际返回 0 道答案".to_owned());
+                }
+                log::warn!(
+                    "一批题目返回 0 道答案（题目数 {}），保留其他批次结果",
+                    question_ids.len()
+                );
+                all_answers.extend(question_ids.into_iter().map(|id| AnswerItem {
+                    index: id,
+                    explanation: "该题生成失败；未提交。请重试或人工处理。".to_owned(),
+                    content: String::new(),
+                }));
+            }
+            Ok(Ok(chunk_answers)) => {
+                succeeded += 1;
+                all_answers.extend(chunk_answers);
+            }
+            Ok(Err(error)) => {
+                if first_error.is_none() {
+                    first_error = Some(error.to_string());
+                }
                 // Keep successful batches; mark only this batch as unavailable.
                 // Never auto-submit a partial or empty result.
                 log::warn!(
@@ -88,7 +110,28 @@ pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<V
                     content: String::new(),
                 }));
             }
+            Err(error) => {
+                if first_error.is_none() {
+                    first_error = Some(error.to_string());
+                }
+                log::warn!(
+                    "一批题目生成任务异常（题目数 {}），保留其他批次结果",
+                    question_ids.len()
+                );
+                all_answers.extend(question_ids.into_iter().map(|id| AnswerItem {
+                    index: id,
+                    explanation: "该题生成失败；未提交。请重试或人工处理。".to_owned(),
+                    content: String::new(),
+                }));
+            }
         }
+    }
+
+    if succeeded == 0 {
+        return Err(anyhow::anyhow!(
+            "{}",
+            first_error.unwrap_or_else(|| "所有题目生成失败".to_owned())
+        ));
     }
 
     Ok(all_answers)

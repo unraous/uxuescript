@@ -87,6 +87,14 @@ interface CoreApi {
     quiz: { questionType?: string; options?: { name?: string }[] },
     origin: string,
   ): Promise<string>;
+  controller: {
+    state: string;
+    setMedia(media: { pause?(): void; play?(): void } | null): void;
+    pause(): void;
+    resume(): void;
+    stop(): void;
+    checkpoint(): Promise<void>;
+  };
   main(): Promise<void>;
 }
 
@@ -109,7 +117,7 @@ export function loadCore(
     entry,
     `
     ${assignments.join("\n")}
-    return { config, wait, handleTab, handleQuiz, handleAudio, resolveQuizPolicy, sleep, switchingCooldown, resolveInteractiveQuizAnswer, main };
+    return { config, wait, handleTab, handleQuiz, handleAudio, resolveQuizPolicy, controller, sleep, switchingCooldown, resolveInteractiveQuizAnswer, main };
   `,
   );
   const sandbox = {
