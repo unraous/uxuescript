@@ -12,7 +12,7 @@ block; **Not tested** = no execution this round.
 | Chapter quiz and video interactive quiz share gates | `core.js` | `quiz.js`, `interactive.js` | Both call `resolveQuizPolicy` and `assertSubmitAllowed` | static + adapted Vitest tests | Implemented; static PASS; Vitest blocked |
 | Final review before auto-submit | `core.js` review loop | `quiz.js`, `interactive.js` | Mandatory second confirmation, independent of `quizReview` preference | adapted quiz-review tests | Implemented; not executed (SAC) |
 | Submit checkpoint / stop race | `core.js` controller | `safety.controller`; `assertSubmitAllowed`; `controller.checkpoint` | Checkpoint before fill and immediately before submit/modal click | safety test | Implemented; controller test PASS |
-| AI request timeout | legacy dispatcher | `dispatcher.rs` | 60 s reqwest client timeout | Rust unit tests | Implemented; PASS |
+| AI request timeout | legacy dispatcher | `dispatcher.rs` | 60 s reqwest client timeout | Rust compile/tests | Implemented; compile PASS; timeout not directly exercised |
 | Partial batch results | legacy dispatcher | `dispatcher.rs` | Keep successful batches; placeholders for failed question IDs; all-fail errors | Rust unit tests | Implemented; PASS |
 | No full model response/body in errors | legacy dispatcher | `chat.rs`, `responses.rs`, `gemini.rs` | Status-only protocol errors; raw response text removed | static test | PASS (source assertion) |
 | All batches failed / zero answers -> no submit | legacy dispatcher + quiz | dispatcher error; quiz incomplete-answer guard | All-fail `bail!`; empty answers block fill; client checkpoints | static test; quiz guard | Implemented; Node/static PASS |
