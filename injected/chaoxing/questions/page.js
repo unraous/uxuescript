@@ -5,6 +5,7 @@ import { extractPayload, classifyQuestion } from "./extract.js";
 import { fillAnswer } from "./fill.js";
 import { fillMatching } from "./matching.js";
 import { QuestionType } from "./types.js";
+import { controller } from "@injected/chaoxing/safety.js";
 
 /**
  * 整页提取、求解并按显示题号填写；保存由页面入口处理。
@@ -28,6 +29,7 @@ export const answerPage = async (root, selectors) => {
   const byNumber = new Map(answers.map((answer) => [answer.index, answer]));
   const skipped = [];
   for (const [index, node] of nodes.entries()) {
+    await controller.checkpoint();
     const question = payload.questions[index];
     const kind = classifyQuestion(question.kind);
     if (kind === QuestionType.Other) {

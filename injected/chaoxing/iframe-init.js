@@ -1,5 +1,3 @@
-import { preserveFocusState } from "./focus.js";
-
 /**
  * 请求顶层页面导航；跨域直接导航失败时沿用消息转发路径。
  * @param {string} url 目标地址。
@@ -48,11 +46,10 @@ const handleLinkClick = (e) => {
 };
 
 /**
- * 安装框架页面适配和顶层导航转发，并应用焦点适配。
+ * 安装顶层导航转发；不修改焦点、可见性或平台事件监听。
  * @returns {void}
  */
 export function main() {
-  preserveFocusState();
   if (window === window.top)
     window.addEventListener("message", handleNavigationMessage);
   window.open = function (url) {

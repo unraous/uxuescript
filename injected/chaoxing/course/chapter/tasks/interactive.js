@@ -2,6 +2,13 @@ import { cooldown } from "@injected/chaoxing/runtime.js";
 import { wait, assert } from "@injected/utils/async.js";
 import { confirm } from "@injected/utils/backend.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
+import {
+  ManualReviewRequired,
+  assertSubmitAllowed,
+  controller,
+  resolveQuizPolicy,
+  showManualReviewPanel,
+} from "@injected/chaoxing/safety.js";
 import { waitForTimeline } from "./timeline.js";
 /**
  * @typedef {Object} QuizData
@@ -101,7 +108,6 @@ export const resolveInteractiveQuizAnswer = async (
       results.push({ answerContent, isRight: result.isRight });
       console.info("互动题候选答案验证结果", {
         resourceId: quizData.resourceId,
-        answerContent,
         isRight: result.isRight,
       });
       if (result.isRight) return answerContent;
@@ -119,7 +125,7 @@ export const resolveInteractiveQuizAnswer = async (
     throw error;
   }
   throw new Error(
-    `互动题验证未返回正确答案（候选数：${candidates.length}）：${JSON.stringify(results)}`,
+    `互动题验证未返回正确答案（候选数：${candidates.length}）`,
   );
 };
 
@@ -133,15 +139,12 @@ const resolveInteractiveQuizData = async (timeline, datas, validationUrl2) => {
 
   /** @param {unknown} error */
   const showAnswerFailure = async (error) => {
-    const snapshot = {
+    console.error("互动题答案未能解析", {
       timelineId: timeline.id,
-      validationUrl2,
-      quizDatas: datas,
+      resourceCount: datas.length,
       error: error instanceof Error ? error.message : String(error),
-    };
-    const details = JSON.stringify(snapshot, null, 2);
-    console.error("互动题答案未能解析，Ext 数据快照：", snapshot);
-    await confirm(`互动题答案获取失败，请检查 Ext 数据：\n\n${details}`);
+    });
+    await confirm("互动题答案获取失败，未填写、未提交；请人工处理。");
   };
 
   for (const quizData of datas) {
@@ -245,6 +248,7 @@ const matchInteractiveQuizItems = async (quizRoot, quizDatas) => {
  */
 const fillInteractiveQuizItems = async (items, quizDatas) => {
   for (const { element, data } of items) {
+    await controller.checkpoint();
     await cooldown();
     console.info(
       `开始处理第 ${quizDatas.indexOf(data) + 1}/${quizDatas.length} 道互动题`,
@@ -254,15 +258,47 @@ const fillInteractiveQuizItems = async (items, quizDatas) => {
   }
 };
 
+/** @param {{element: Element, data: QuizData}[]} items */
+const interactiveReviewItems = (items) =>
+  items.map(({ data }, index) => ({
+    question: data.description || `第 ${index + 1} 道互动题`,
+    answer: data.answerContent || "未生成",
+    explanation: "",
+  }));
+
 /**
  * @param {Element} quizRoot
+ * @param {{element: Element, data: QuizData}[]} items
+ * @param {{allowSubmit: boolean}} policy
  */
-const submitInteractiveQuiz = async (quizRoot) => {
+const submitInteractiveQuiz = async (quizRoot, items, policy) => {
+  await controller.checkpoint();
+  assertSubmitAllowed(policy);
+
+  // 提交授权之后仍需独立最终审核。
+  {
+    const accepted = await confirm(
+      `互动题答案已填写，请人工核验。\n\nYes：提交当前互动题。\nNo：不提交并停止自动化。\n\n如非明确授权的非计分练习，请选择 No。`,
+    );
+    if (!accepted) {
+      await showManualReviewPanel(
+        "已取消提交互动题",
+        "最终审核未通过，任务已停止；平台原生界面仍可手动处理。",
+        interactiveReviewItems(items),
+      );
+      throw new ManualReviewRequired("用户拒绝自动提交互动题");
+    }
+  }
+
+  await controller.checkpoint();
+  assertSubmitAllowed(policy);
   const submitButton = await wait.element(
     null,
     SELECTORS.video.quizSubmitId,
     quizRoot,
   );
+  await controller.checkpoint();
+  assertSubmitAllowed(policy);
   submitButton.click();
 
   const continueButton = await wait.element(
@@ -301,17 +337,42 @@ export const handleInteractiveQuiz = async (
       : "视频无互动题",
   );
   if (!quizDatas.length || videoEl.ended) return;
+
+  const policy = await resolveQuizPolicy(
+    timeline.ownerDocument,
+    "视频互动题",
+    confirm,
+  );
+  if (!policy.allowFill) {
+    await showManualReviewPanel(
+      "互动题需要人工处理",
+      `策略：${policy.kind}（${policy.reason}）。未读取/验证/填写/提交任何互动题答案。`,
+      [],
+    );
+    throw new ManualReviewRequired("策略不允许自动填写视频互动题");
+  }
+
+  await controller.checkpoint();
   await resolveInteractiveQuizData(timeline, quizDatas, validationUrl2);
   const lastQuizData = quizDatas[quizDatas.length - 1];
   let lastQuizSubmitted = false;
   while (!lastQuizSubmitted && !videoEl.ended) {
+    await controller.checkpoint();
     const quizRoot = await waitForTimeline(timeline, videoEl, () =>
       timeline.querySelector(SELECTORS.video.quizClass),
     );
     if (!quizRoot) break;
     const items = await matchInteractiveQuizItems(quizRoot, quizDatas);
     await fillInteractiveQuizItems(items, quizDatas);
-    await submitInteractiveQuiz(quizRoot);
+    if (!policy.allowSubmit) {
+      await showManualReviewPanel(
+        "互动题已填写，未自动提交",
+        `策略：${policy.kind}（${policy.reason}）。请检查后在平台原生界面手动提交。`,
+        interactiveReviewItems(items),
+      );
+      throw new ManualReviewRequired("策略未授权自动提交视频互动题");
+    }
+    await submitInteractiveQuiz(quizRoot, items, policy);
     lastQuizSubmitted = items.some(
       ({ data }) => data.resourceId === lastQuizData.resourceId,
     );

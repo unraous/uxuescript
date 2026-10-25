@@ -78,7 +78,7 @@ async fn invalid_json_retries_are_bounded_and_rejections_are_not_retried() {
         .unwrap();
     provider.base_url = url;
     let error = solve(&provider, questions(1)).await.unwrap_err();
-    assert!(error.to_string().contains("失败 1 批"));
+    assert!(error.to_string().contains("所有批次均失败"));
     assert_eq!(requests.await.unwrap().len(), 3);
 
     let (url, request) = serve(
@@ -88,7 +88,8 @@ async fn invalid_json_retries_are_bounded_and_rejections_are_not_retried() {
     .await;
     provider.base_url = url;
     let error = solve(&provider, questions(1)).await.unwrap_err();
-    assert!(error.to_string().contains("1301"));
+    assert!(error.to_string().contains("400"), "{error}");
+    assert!(!error.to_string().contains("1301"), "leaked body: {error}");
     request.await.unwrap();
 }
 

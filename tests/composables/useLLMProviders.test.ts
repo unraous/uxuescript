@@ -22,9 +22,9 @@ function makeProvider(overrides: Partial<LLMProvider> = {}): LLMProvider {
     isCustom: false,
     protocol: "OpenAIChatCompletions",
     baseUrl: "https://api.example.com/v1",
-    apiKey: null,
     models: ["default-model"],
     chosenModel: 0,
+    hasKey: false,
     ...overrides,
   };
 }
@@ -109,9 +109,9 @@ describe("useLLMProviders", () => {
       isCustom: true,
       protocol: "OpenAIChatCompletions",
       baseUrl: "https://api.example.com/v1",
-      apiKey: null,
       models: [],
       chosenModel: null,
+      hasKey: false,
     });
     expect(commandMocks.switchProvider).toHaveBeenCalledWith("Custom");
     expect(state.selectedProvider.value?.name).toBe("Custom");

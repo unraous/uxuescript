@@ -6,6 +6,7 @@ import { handleVideoAnnotations } from "./annotation.js";
 import { getVideoTimelineData } from "./timeline.js";
 import { muteVideo, applySpeed } from "./media.js";
 import { wait, sleep, assert } from "@injected/utils/async.js";
+import { controller } from "@injected/chaoxing/safety.js";
 
 /**
  * 启动视频，应用静音和倍速配置，独立处理视频互动题与批注。
@@ -24,6 +25,7 @@ export const handleVideo = async (taskDoc) => {
     await wait.element(null, SELECTORS.video.tag, taskDoc, "未找到视频播放控件")
   );
   if (config.muteVideo) muteVideo(videoEl);
+  controller.setMedia(videoEl);
 
   const isStarted = await wait.until(() => {
     if (videoEl?.currentTime > 0 && !videoEl.paused) return true;

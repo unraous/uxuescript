@@ -16,7 +16,7 @@ export const commands = {
 	platform: () => __TAURI_INVOKE<string>("platform"),
 	/**  从本地 Ollama 服务拉取可用模型列表更新至内存配置。 */
 	fetchOllamaModels: () => __TAURI_INVOKE<null>("fetch_ollama_models"),
-	/**  获取当前可用的全部大语言模型提供商列表。 */
+	/**  获取当前可用的全部大语言模型提供商列表（不包含 API Key）。 */
 	providers: () => __TAURI_INVOKE<LLMProvider[]>("providers"),
 	/**  获取当前选中的大语言模型提供商。 */
 	currentProvider: () => __TAURI_INVOKE<string>("current_provider"),
@@ -30,6 +30,8 @@ export const commands = {
 	switchModel: (index: number) => __TAURI_INVOKE<void>("switch_model", { index }),
 	/**  设置当前大语言模型提供商的 API 密钥。 */
 	setKey: (key: string) => __TAURI_INVOKE<null>("set_key", { key }),
+	/**  清除当前提供商的 API 密钥；不读取、不回显旧值。 */
+	clearKey: () => __TAURI_INVOKE<null>("clear_key"),
 	general: () => __TAURI_INVOKE<GeneralConfig>("general"),
 	setGeneral: (general: GeneralConfig) => __TAURI_INVOKE<void>("set_general", { general }),
 	/**  Return the selected color theme for the main and mask WebViews. */
@@ -118,9 +120,10 @@ export type LLMProvider = {
 	isCustom: boolean,
 	protocol: LLMProtocol,
 	baseUrl: string,
-	apiKey: ApiKey | null,
 	models: string[],
 	chosenModel: number | null,
+	/** 列表视图专用；不包含 API Key 明文。 */
+	hasKey?: boolean,
 };
 
 export type LabelLanguage = "en" | "zh";

@@ -22,9 +22,9 @@ beforeEach(() => {
       isCustom: false,
       protocol: "OpenAIChatCompletions",
       baseUrl: "https://example.com",
-      apiKey: null,
       models: ["test-model"],
       chosenModel: 0,
+      hasKey: false,
     },
   ]);
   mocks.currentProvider.mockResolvedValue("Test Provider");

@@ -11,7 +11,7 @@ class AppConfig {
   /** @type {number | null} */
   switchingCd = null;
 
-  quizReview = false;
+  quizReview = true;
 
   /**
    * 非空时只处理列出的附件类型，不受任务点标识或完成状态限制，也不等待任务点完成标记；处理后确认，异常时弹窗。
@@ -31,7 +31,7 @@ class AppConfig {
       this.muteVideo = res.muteWebview ?? this.muteVideo;
       this.lockSpeed = res.lockSpeed ?? null;
       this.switchingCd = res.switchingCd ?? null;
-      this.quizReview = res.quizReview ?? false;
+      this.quizReview = res.quizReview ?? true;
       console.info("配置设置成功：", this);
     } catch (e) {
       console.error("从后端加载配置失败：", e);

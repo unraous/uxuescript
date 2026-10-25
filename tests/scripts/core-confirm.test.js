@@ -1,10 +1,6 @@
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@injected/chaoxing/focus.js", () => ({
-  preserveFocusState: vi.fn(),
-}));
-
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();

@@ -6,6 +6,11 @@ import { handlePDF } from "@injected/chaoxing/course/chapter/tasks/pdf.js";
 import { handleQuiz } from "@injected/chaoxing/course/chapter/tasks/quiz.js";
 import { wait, assert } from "@injected/utils/async.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
+import {
+  TaskState,
+  classifyTaskPolicy,
+  controller,
+} from "@injected/chaoxing/safety.js";
 /**
  * @param {Document} taskDoc
  */
@@ -41,12 +46,27 @@ const taskPointComplete = (container) => {
 
   return new Promise((resolve) => {
     const observer = new MutationObserver(() => {
+      if (controller.state === TaskState.STOPPED) {
+        cleanup();
+        resolve(false);
+        return;
+      }
       if (isDone()) {
-        observer.disconnect();
+        cleanup();
         console.info("任务点在 DOM 中已更新为完成状态");
         resolve(true);
       }
     });
+    const timer = setInterval(() => {
+      if (controller.state === TaskState.STOPPED) {
+        cleanup();
+        resolve(false);
+      }
+    }, 250);
+    function cleanup() {
+      clearInterval(timer);
+      observer.disconnect();
+    }
     observer.observe(container, {
       attributes: true,
       attributeFilter: ["class"],
@@ -70,6 +90,7 @@ export const handleTab = async (chapterDoc) => {
     debugging ? false : "",
   );
   for (const [index, container] of containers.entries()) {
+    await controller.checkpoint();
     const taskInfo = `第 ${index + 1}/${containers.length} 个任务点`;
     await wait.element(
       null,
@@ -87,6 +108,8 @@ export const handleTab = async (chapterDoc) => {
 
     const type = classifyTask(taskDoc);
     if (debugging && !config.debugTaskTypes.includes(type)) continue;
+    const classification = classifyTaskPolicy(type);
+    console.info(`任务分类：${taskInfo}`, { type, classification });
     await emit.taskProgress(index, type);
     const handler = handlers[type];
     if (
@@ -98,6 +121,7 @@ export const handleTab = async (chapterDoc) => {
     }
 
     await cooldown();
+    await controller.checkpoint();
     await safeRun(async () => {
       assert(handler, `未识别的任务点类型: ${taskDoc.location.href}`);
       if (type === "Quiz")
@@ -105,6 +129,7 @@ export const handleTab = async (chapterDoc) => {
 
       await handler(taskDoc);
       if (!debugging) await taskPointComplete(container);
+      await controller.checkpoint();
     }, `${taskInfo} 处理异常，自动跳过，任务点类别：${type}`);
   }
 };

@@ -115,11 +115,14 @@ describe("homework takeover", () => {
       ).value,
     ).toBe("A");
   });
-  it("stops when the start confirmation is cancelled", async () => {
+  it("stops when fill authorization is cancelled", async () => {
     const page = await setup({ start: false });
+    await flushPromises();
+    const panel = document.querySelector("#uxs-manual-review");
+    expect(panel).not.toBeNull();
+    panel.querySelector("button").click();
     await page.run;
     expect(page.invoke.mock.calls.map(([command]) => command)).toEqual([
-      "options",
       "confirm",
     ]);
     expect(page.saveWork).not.toHaveBeenCalled();
@@ -157,7 +160,7 @@ describe("homework takeover", () => {
     ).toBe("AC");
     expect(page.editor.setContent).toHaveBeenCalledWith("新时代的重大意义。");
     expect(page.saveWork).toHaveBeenCalledOnce();
-    expect(page.confirm).toHaveBeenCalledOnce();
+    expect(page.confirm).toHaveBeenCalledTimes(2);
     expect(page.saveWork.mock.calls[0][0].silentSuccess).toBe(true);
     page.saveWork.mock.calls[0][0].success();
     await page.run;

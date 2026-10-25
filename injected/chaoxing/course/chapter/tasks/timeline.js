@@ -1,5 +1,6 @@
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
 import { wait } from "@injected/utils/async.js";
+import { TaskState, controller } from "@injected/chaoxing/safety.js";
 
 /**
  * @typedef {import("./interactive.js").QuizData} QuizData
@@ -57,12 +58,23 @@ export const getVideoTimelineData = async (taskDoc) => {
 export const waitForTimeline = (timeline, videoEl, read) =>
   new Promise((resolve) => {
     const observer = new MutationObserver(check);
-    function check() {
-      const result = videoEl.ended ? null : read();
-      if (!result && !videoEl.ended) return;
+    const timer = setInterval(() => {
+      if (controller.state === TaskState.STOPPED) finish(null);
+    }, 250);
+    function finish(result) {
+      clearInterval(timer);
       observer.disconnect();
       videoEl.removeEventListener("ended", check);
       resolve(result);
+    }
+    function check() {
+      if (controller.state === TaskState.STOPPED) {
+        finish(null);
+        return;
+      }
+      const result = videoEl.ended ? null : read();
+      if (!result && !videoEl.ended) return;
+      finish(result);
     }
     observer.observe(timeline, {
       childList: true,

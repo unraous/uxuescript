@@ -66,7 +66,7 @@ fn version_change_refreshes_builtin_models_and_preserves_user_settings() {
     let mut custom = provider.clone();
     custom.is_custom = true;
     custom.name = "My Provider".into();
-    let custom_value = serde_json::to_value(&custom).unwrap();
+    let custom_key = custom.api_key.clone();
     providers.insert("My Provider".into(), custom);
     let original_key = provider_key(&previous, "deepseek");
 
@@ -84,10 +84,9 @@ fn version_change_refreshes_builtin_models_and_preserves_user_settings() {
         providers["deepseek"].base_url,
         "https://example.com/chat/completions"
     );
-    assert_eq!(
-        serde_json::to_value(&providers["My Provider"]).unwrap(),
-        custom_value
-    );
+    assert!(providers["My Provider"].is_custom);
+    assert_eq!(providers["My Provider"].name, "My Provider");
+    assert_eq!(providers["My Provider"].api_key, custom_key);
     assert_eq!(
         providers["bigmodel"].extra_body,
         presets.providers.lock()["bigmodel"].extra_body

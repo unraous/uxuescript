@@ -10,10 +10,15 @@ use options::OptionsConfig;
 use path::PathsConfig;
 use theme::ThemeConfig;
 
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::LazyLock;
+
+/// Set when an existing config could not be read/parsed. In that state saves
+/// must be refused rather than silently replacing a possibly recoverable file.
+static CONFIG_LOAD_FAILED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(default)]
@@ -46,11 +51,27 @@ impl Default for Config {
 }
 
 impl Config {
-    // 此处日志系统尚未初始化完成，读取配置文件失败时将直接降级回退至默认配置。
+    // 日志系统尚未初始化，读取/解析失败时记录到 stderr 并拒绝后续覆盖。
     fn load() -> Self {
         let config = Self::default();
-        Self::parse(&std::fs::read_to_string(&config.paths.files["config"]).unwrap_or_default())
-            .unwrap_or(config)
+        let path = &config.paths.files["config"];
+        let content = match std::fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(error) => {
+                CONFIG_LOAD_FAILED.store(true, Ordering::Relaxed);
+                eprintln!("读取配置失败，已拒绝覆盖原文件: {error}");
+                String::new()
+            }
+        };
+        match Self::parse(&content) {
+            Ok(config) => config,
+            Err(error) => {
+                CONFIG_LOAD_FAILED.store(true, Ordering::Relaxed);
+                eprintln!("解析配置失败，已拒绝覆盖原文件: {error:#}");
+                config
+            }
+        }
     }
 
     fn parse(content: &str) -> Result<Self> {
@@ -85,8 +106,41 @@ impl Config {
     }
 
     pub fn save(&self) -> Result<()> {
-        std::fs::write(&self.paths.files["config"], toml::to_string_pretty(&self)?)?;
-        log::info!("配置已保存到 {}", self.paths.files["config"].display());
+        if CONFIG_LOAD_FAILED.load(Ordering::Relaxed) {
+            bail!("配置加载失败，拒绝覆盖现有配置文件");
+        }
+        let path = &self.paths.files["config"];
+        let parent = path.parent().context("配置文件路径没有父目录")?;
+        std::fs::create_dir_all(parent)?;
+        let content = toml::to_string_pretty(self)?;
+        let temp = path.with_extension("toml.tmp");
+        let backup = path.with_extension("toml.bak");
+        {
+            use std::io::Write;
+            let mut file = std::fs::File::create(&temp)?;
+            file.write_all(content.as_bytes())?;
+            file.sync_all()?;
+        }
+        if path.exists() {
+            std::fs::copy(path, &backup)
+                .with_context(|| format!("备份配置失败: {}", backup.display()))?;
+        }
+        match std::fs::rename(&temp, path) {
+            Ok(()) => {}
+            Err(rename_error) => {
+                // Windows cannot atomically replace an existing destination
+                // with std::fs::rename. Preserve the backup and fall back to
+                // a checked copy, leaving the temp file if that also fails.
+                std::fs::copy(&temp, path).with_context(|| {
+                    format!(
+                        "替换配置失败（rename: {rename_error}）: {}",
+                        path.display()
+                    )
+                })?;
+                let _ = std::fs::remove_file(&temp);
+            }
+        }
+        log::info!("配置已保存到 {}", path.display());
         Ok(())
     }
 }

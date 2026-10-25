@@ -57,7 +57,7 @@ function setup(options = {}) {
   };
 }
 describe("standalone audio playback", () => {
-  it("starts once, applies mute and speed, then seeks near the end", async () => {
+  it("starts once, applies mute and speed without seeking to the end", async () => {
     const page = setup();
     page.config.lockSpeed = 2;
     const run = handleAudio(page.doc);
@@ -66,14 +66,14 @@ describe("standalone audio playback", () => {
     expect(page.click).toHaveBeenCalledOnce();
     expect(page.audio.muted).toBe(true);
     expect(page.audio.playbackRate).toBe(2);
-    expect(page.seek).toHaveBeenCalledExactlyOnceWith(106);
+    expect(page.seek).not.toHaveBeenCalled();
     expect(
       /** @type {HTMLAudioElement} */ (
         page.doc.querySelector("#audio1_html5_white")
       ).muted,
     ).toBe(false);
   });
-  it("waits for media duration after playback starts", async () => {
+  it("waits for media duration after playback starts without seeking", async () => {
     const page = setup({ duration: NaN });
     const run = handleAudio(page.doc);
     await vi.advanceTimersByTimeAsync(1000);
@@ -81,7 +81,7 @@ describe("standalone audio playback", () => {
     page.setDuration(406);
     await vi.advanceTimersByTimeAsync(250);
     await run;
-    expect(page.seek).toHaveBeenCalledExactlyOnceWith(405);
+    expect(page.seek).not.toHaveBeenCalled();
   });
   it("reports duration timeout through the existing error path", async () => {
     const page = setup({ duration: Infinity });
@@ -96,6 +96,6 @@ describe("standalone audio playback", () => {
     const run = handleAudio(page.doc);
     await vi.advanceTimersByTimeAsync(1000);
     await run;
-    expect(page.seek).toHaveBeenCalledExactlyOnceWith(0);
+    expect(page.seek).not.toHaveBeenCalled();
   });
 });

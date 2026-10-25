@@ -1,12 +1,11 @@
 use super::*;
 
 #[test]
-fn test_api_key_display_has_fixed_length_and_preserves_edges() {
+fn test_api_key_display_redacts_entire_value() {
     let key = ApiKey::new("sk-1234567890abcdef".to_string()).unwrap();
 
-    assert_eq!(key.to_string(), "sk-1****cdef");
-    assert_eq!(key.to_string().chars().count(), 12);
-    assert_eq!(format!("{:?}", key), "ApiKey(sk-1****cdef)");
+    assert_eq!(key.to_string(), "***REDACTED***");
+    assert_eq!(format!("{:?}", key), "ApiKey(***REDACTED***)");
 }
 
 #[test]
@@ -18,14 +17,33 @@ fn test_api_key_rejects_too_short_value() {
 }
 
 #[test]
-fn test_api_key_serialization_remains_transparent() {
+fn test_api_key_serialization_encrypts_and_roundtrips() {
     let key = ApiKey::new("secret-value".to_string()).unwrap();
+    let serialized = serde_json::to_string(&key).unwrap();
 
-    assert_eq!(serde_json::to_string(&key).unwrap(), "\"secret-value\"");
+    assert!(!serialized.contains("secret-value"));
+    assert!(serialized.starts_with("\"dpapi:v1:"));
     assert_eq!(
-        serde_json::from_str::<ApiKey>("\"secret-value\"").unwrap(),
+        serde_json::from_str::<ApiKey>(&serialized).unwrap(),
         key
     );
+}
+
+#[test]
+fn test_provider_view_never_contains_the_key() {
+    let mut provider = LLMConfig::default()
+        .providers
+        .lock()
+        .get("bigmodel")
+        .cloned()
+        .unwrap();
+    provider.api_key = Some(ApiKey::new("secret-value".to_string()).unwrap());
+    let view = ProviderView::from(&provider);
+    let json = serde_json::to_string(&view).unwrap();
+
+    assert!(view.has_key);
+    assert!(!json.contains("secret-value"));
+    assert!(!json.contains("apiKey"));
 }
 
 #[test]
@@ -56,7 +74,7 @@ fn test_llm_default_config_preset_providers() {
     for (id, expected_name, expected_protocol) in expected_online_providers {
         let provider = providers
             .get(id)
-            .unwrap_or_else(|| panic!("默认预设必须包含提供商: {}", id));
+            .unwrap_or_else(|| panic!("默认预设必须包含提供商 {}", id));
         assert_eq!(provider.name, expected_name);
         assert_eq!(provider.protocol, expected_protocol);
         assert!(

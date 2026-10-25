@@ -41,9 +41,21 @@ async fn notify_exit_animation(window: &Window) {
     }
 }
 
+/// 防止重复 CloseRequested 触发并行清理。
+static CLOSING: AtomicBool = AtomicBool::new(false);
+
 async fn close(window: Window) {
+    if CLOSING.swap(true, Ordering::SeqCst) {
+        log::debug!("关闭流程已在进行，忽略重复请求");
+        return;
+    }
     log::debug!("执行程序收尾工作，即将关闭应用");
-    prepare_exit(&window).await;
+    if tokio::time::timeout(Duration::from_millis(2000), prepare_exit(&window))
+        .await
+        .is_err()
+    {
+        log::warn!("关闭收尾超时，强制销毁窗口");
+    }
     window.destroy().ok();
 }
 

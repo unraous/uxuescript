@@ -5,7 +5,11 @@ import {
   totalChapterList,
   handleCourse,
 } from "@injected/chaoxing/course/chapters.js";
-import { preserveFocusState } from "@injected/chaoxing/focus.js";
+import {
+  AutomationStopped,
+  TaskState,
+  controller,
+} from "@injected/chaoxing/safety.js";
 
 /**
  * 加载配置并确认启动，依次处理课程章节，最后报告完成。
@@ -29,7 +33,7 @@ export const main = async () => {
 [操作说明]
 • 点击“确定”：立即启动自动化流程。
 • 点击“取消”：放弃并退出脚本运行。
-• 紧急停止：运行过程中按 F5 刷新页面即可终止脚本。
+• 运行中可使用页面左下角的“暂停/恢复/停止”控制条。
 
 是否确认开始运行？`,
   );
@@ -38,9 +42,21 @@ export const main = async () => {
     await emit.cancelled();
     return;
   }
-  preserveFocusState();
 
   await emit.started();
-  await safeRun(() => handleCourse(totalChapterList()), "课程处理失败");
-  await emit.finished();
+  controller.start();
+  try {
+    await safeRun(() => handleCourse(totalChapterList()), "课程处理失败");
+    controller.finish();
+    await emit.finished();
+  } catch (error) {
+    if (error instanceof AutomationStopped) {
+      console.info(error.message);
+      controller.finish();
+      await emit.cancelled();
+      return;
+    }
+    controller.setState(TaskState.FAILED);
+    throw error;
+  }
 };

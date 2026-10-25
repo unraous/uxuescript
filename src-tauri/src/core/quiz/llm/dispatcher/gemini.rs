@@ -38,9 +38,8 @@ pub(super) async fn solve(
 
     if !response.status().is_success() {
         anyhow::bail!(
-            "Google API 错误 ({}): {}",
-            response.status(),
-            response.text().await?
+            "Google API 错误 ({}); 响应体已隐藏",
+            response.status()
         );
     }
 
@@ -48,7 +47,7 @@ pub(super) async fn solve(
     let content = data
         .pointer("/candidates/0/content/parts/0/text")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("无法从 Google 响应提取文本。原始响应: {}", data))?;
+        .ok_or_else(|| anyhow::anyhow!("无法从 Google 响应提取文本"))?;
 
     parse(content, questions)
 }

@@ -1,4 +1,5 @@
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
+import { controller } from "@injected/chaoxing/safety.js";
 import { waitForTimeline } from "./timeline.js";
 
 /**
@@ -28,6 +29,7 @@ export const handleVideoAnnotations = async (
         ),
     );
     if (!button) break;
+    await controller.checkpoint();
     button.click();
     console.info(
       `视频批注已点击继续学习（${index + 1}/${annotationDatas.length}）`,

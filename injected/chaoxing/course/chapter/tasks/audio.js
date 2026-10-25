@@ -3,9 +3,10 @@ import { confirm } from "@injected/utils/backend.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
 import { muteVideo, applySpeed } from "./media.js";
 import { wait, assert } from "@injected/utils/async.js";
+import { controller } from "@injected/chaoxing/safety.js";
 
 /**
- * 启动音频并等待时长就绪，再跳到末尾前一秒；完成标记由任务调度等待。
+ * 启动音频并等待时长就绪；不跳转结尾，完成标记由任务调度等待。
  * @param {Document} taskDoc 音频任务点文档。
  * @returns {Promise<void>}
  */
@@ -21,6 +22,7 @@ export const handleAudio = async (taskDoc) => {
     await wait.element(null, SELECTORS.audio.tag, taskDoc, "未找到音频播放控件")
   );
   if (config.muteVideo) muteVideo(audioEl);
+  controller.setMedia(audioEl);
 
   const isStarted = await wait.until(() => {
     if (audioEl.currentTime > 0 && !audioEl.paused) return true;
@@ -37,7 +39,6 @@ export const handleAudio = async (taskDoc) => {
       : null,
   );
   assert(duration != null, "等待音频时长超时");
-  audioEl.currentTime = Math.max(0, duration - 1);
   console.info("Audio任务点处理完成，等待平台完成标记");
 
   if (config.debugTaskTypes.includes("Audio")) {

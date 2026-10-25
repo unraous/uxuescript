@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import VInput from "@/components/base/VInput.vue";
 import VSelector from "@/components/base/VSelector.vue";
 import VButton from "@/components/base/VButton.vue";
@@ -29,16 +29,46 @@ const endpoint = computed({
     selectedProvider.value!.baseUrl = String(value);
   },
 });
-const apiKey = computed({
-  get: () => selectedProvider.value?.apiKey ?? "",
-  set: (value: string | number) => {
-    selectedProvider.value!.apiKey = String(value) || null;
-  },
+
+/** 只保存用户本次输入的新 Key；已保存 Key 永不从后端回显。 */
+const newApiKey = ref("");
+watch(selectedProvider, () => {
+  newApiKey.value = "";
 });
-const saveApiKey = () =>
-  commands
-    .setKey(apiKey.value)
-    .catch((cause) => showError("配置命令执行失败:", cause));
+const hasKey = computed(() => selectedProvider.value?.hasKey === true);
+const keyAnnotation = computed(() =>
+  hasKey.value
+    ? `${label("keyStored")} ${label("keyEnter")}`
+    : label("keyMissing"),
+);
+
+const saveApiKey = async () => {
+  if (!newApiKey.value.trim()) {
+    await commands.confirm(label("keyRequired"));
+    return;
+  }
+  try {
+    await commands.setKey(newApiKey.value);
+    await commands.saveConfig();
+    newApiKey.value = "";
+    if (selectedProvider.value) selectedProvider.value.hasKey = true;
+  } catch (cause) {
+    showError("配置命令执行失败:", cause);
+  }
+};
+
+const clearApiKey = async () => {
+  if (!hasKey.value) return;
+  if (!(await commands.confirm(label("clearKeyConfirm")))) return;
+  try {
+    await commands.clearKey();
+    await commands.saveConfig();
+    newApiKey.value = "";
+    if (selectedProvider.value) selectedProvider.value.hasKey = false;
+  } catch (cause) {
+    showError("配置命令执行失败:", cause);
+  }
+};
 
 const testing = ref(false);
 const testConnection = async () => {
@@ -87,15 +117,29 @@ const testConnection = async () => {
         @change="saveSelectedProvider"
       />
       <VInput
-        v-model="apiKey"
+        v-model="newApiKey"
         :label="label('apiKey')"
-        annotation="粘贴服务商控制台生成的 API Key，密钥需至少 12 个 ASCII 字符。"
+        :annotation="keyAnnotation"
         :disabled="!selectedProvider"
-        placeholder="Enter API key"
+        :placeholder="hasKey ? '••••••••（已保存，不回显）' : 'Enter API key'"
         mask-on-blur
         class="element"
         @change="saveApiKey"
       />
+      <div class="element key-actions">
+        <VButton
+          :label="label('saveKey')"
+          :disabled="!selectedProvider || !newApiKey.trim()"
+          class="button-text"
+          @click="saveApiKey"
+        />
+        <VButton
+          :label="label('clearKey')"
+          :disabled="!selectedProvider || !hasKey"
+          class="button-text"
+          @click="clearApiKey"
+        />
+      </div>
       <div class="element test-button">
         <VButton
           :label="label(testing ? 'testing' : 'testConnection')"
@@ -131,6 +175,17 @@ const testConnection = async () => {
   flex: 0 0 auto;
   height: 17.5%;
   width: 100%;
+}
+
+.key-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5%;
+}
+
+.key-actions > * {
+  flex: 1;
 }
 
 .test-button {

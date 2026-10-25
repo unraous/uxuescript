@@ -1,3 +1,5 @@
+import { controller } from "@injected/chaoxing/safety.js";
+
 /**
  * 等待指定毫秒数，可在给定百分比范围内随机浮动。
  * @param {number} ms 基准等待时间，单位毫秒。
@@ -57,6 +59,7 @@ export const wait = {
   until: async (getter, timeout = 5000, interval = 250) => {
     const start = performance.now();
     while (performance.now() - start < timeout) {
+      await controller.checkpoint();
       const value = await getter();
       if (value) return value;
       await sleep(interval);

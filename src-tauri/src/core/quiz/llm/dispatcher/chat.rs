@@ -55,10 +55,9 @@ pub(super) async fn solve(
 
     if !response.status().is_success() {
         anyhow::bail!(
-            "{} API 错误 ({}): {}",
+            "{} API 错误 ({}); 响应体已隐藏",
             provider.name,
-            response.status(),
-            response.text().await?
+            response.status()
         );
     }
 
@@ -67,9 +66,7 @@ pub(super) async fn solve(
         .pointer("/choices/0/message/content")
         .or_else(|| data.pointer("/message/content"))
         .and_then(|v| v.as_str())
-        .ok_or_else(|| {
-            anyhow::anyhow!("无法从 {} 响应提取文本。原始响应: {}", provider.name, data)
-        })?;
+        .ok_or_else(|| anyhow::anyhow!("无法从 {} 响应提取文本", provider.name))?;
 
     parse(content, questions)
 }

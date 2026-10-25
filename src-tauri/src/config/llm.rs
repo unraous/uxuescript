@@ -2,20 +2,42 @@ pub(crate) mod ollama;
 
 use anyhow::{bail, Result};
 use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use specta::Type;
 use std::collections::HashMap;
 use std::fmt;
 
 /// API 密钥。
 ///
-/// 序列化时保持原始字符串格式，以兼容现有配置文件；格式化输出始终脱敏，
-/// 防止在日志中直接打印密钥明文。
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
-#[serde(transparent)]
+/// 落盘时使用 Windows DPAPI（当前用户）加密；旧明文可读取一次并在下次保存迁移。
+/// Display/Debug 始终完全脱敏。
+#[derive(Clone, PartialEq, Eq, Type)]
 pub struct ApiKey(String);
 
 const MIN_API_KEY_LENGTH: usize = 12;
+
+impl Serialize for ApiKey {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let protected =
+            crate::secret_store::protect(&self.0).map_err(serde::ser::Error::custom)?;
+        serializer.serialize_str(&protected)
+    }
+}
+
+impl<'de> Deserialize<'de> for ApiKey {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        let plain =
+            crate::secret_store::unprotect(&value).map_err(serde::de::Error::custom)?;
+        Ok(Self(plain))
+    }
+}
 
 impl ApiKey {
     pub fn new(value: String) -> Result<Self> {
@@ -38,18 +60,13 @@ impl ApiKey {
 
 impl fmt::Display for ApiKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let buffer = if self.0.len() < 12 {
-            String::from("************")
-        } else {
-            format!("{}****{}", &self.0[..4], &self.0[self.0.len() - 4..])
-        };
-        write!(f, "{}", buffer)
+        write!(f, "***REDACTED***")
     }
 }
 
 impl fmt::Debug for ApiKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ApiKey({})", self)
+        write!(f, "ApiKey(***REDACTED***)")
     }
 }
 
@@ -76,6 +93,33 @@ pub struct LLMProvider {
     #[serde(default)]
     #[specta(skip)]
     pub extra_body: Option<serde_json::Value>, // 协议特定额外 Body 参数 (如 temperature, stream)
+}
+
+#[derive(Serialize, Debug, Clone, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderView {
+    pub name: String,
+    pub is_custom: bool,
+    pub protocol: LLMProtocol,
+    pub base_url: String,
+    pub models: Vec<String>,
+    #[specta(type = Option<u32>)]
+    pub chosen_model: Option<usize>,
+    pub has_key: bool,
+}
+
+impl From<&LLMProvider> for ProviderView {
+    fn from(provider: &LLMProvider) -> Self {
+        Self {
+            name: provider.name.clone(),
+            is_custom: provider.is_custom,
+            protocol: provider.protocol.clone(),
+            base_url: provider.base_url.clone(),
+            models: provider.models.clone(),
+            chosen_model: provider.chosen_model,
+            has_key: provider.api_key.is_some(),
+        }
+    }
 }
 
 /// 应用全局大语言模型配置

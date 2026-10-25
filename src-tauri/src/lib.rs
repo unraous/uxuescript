@@ -2,6 +2,7 @@ pub mod app;
 pub mod commands;
 pub mod config;
 pub mod core;
+pub mod secret_store;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,16 +16,9 @@ pub fn run() {
     use commands::updater::DownloadState;
 
     #[cfg(target_os = "windows")]
-    // Set before Tauri starts its worker threads, so no other thread can access the environment concurrently.
+    // 仅设置界面语言；不关闭后台节流，也不修改页面的焦点/可见性。
     unsafe {
-        std::env::set_var(
-            "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-            "--disable-background-timer-throttling \
-             --disable-renderer-backgrounding \
-             --disable-backgrounding-occluded-windows \
-             --disable-background-media-suspend \
-             --lang=zh-CN --accept-lang=zh-CN,zh",
-        );
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--lang=zh-CN --accept-lang=zh-CN,zh");
     }
 
     tauri::Builder::default()

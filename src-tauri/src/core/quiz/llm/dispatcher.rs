@@ -12,8 +12,10 @@ use anyhow::{Context, Result};
 use pool::{MAX_CONCURRENCY, RequestPool};
 use reqwest::header::{ACCEPT, HeaderMap, HeaderValue};
 use std::sync::Arc;
+use std::time::Duration;
 
 const CHUNK_SIZE: usize = 5;
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// LLM 求解入口分发器
 pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<Vec<AnswerItem>> {
@@ -37,6 +39,7 @@ pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<V
 
     let client = reqwest::Client::builder()
         .user_agent(concat!("uXueScript/", env!("CARGO_PKG_VERSION")))
+        .timeout(REQUEST_TIMEOUT)
         .default_headers(HeaderMap::from_iter([(
             ACCEPT,
             HeaderValue::from_static("application/json"),
@@ -49,35 +52,57 @@ pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<V
         let client = client.clone();
         let provider = provider.clone();
         let model = chosen_model.to_string();
+        let question_ids = chunk.iter().map(|question| question.id.clone()).collect::<Vec<_>>();
         let chunk = chunk.to_vec();
         let pool = pool.clone();
 
-        handles.push(tokio::spawn(async move {
-            solve_batch(&client, &provider, &model, &chunk, &pool)
-                .await
-                .with_context(|| {
-                    format!(
-                        "题号 {}–{} 求解失败，未提交答案",
-                        chunk[0].id,
-                        chunk[chunk.len() - 1].id
-                    )
-                })
-        }));
+        handles.push((
+            question_ids,
+            tokio::spawn(async move {
+                solve_batch(&client, &provider, &model, &chunk, &pool)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "题号 {}–{} 求解失败，未提交答案",
+                            chunk[0].id,
+                            chunk[chunk.len() - 1].id
+                        )
+                    })
+            }),
+        ));
     }
 
     let mut all_answers = Vec::with_capacity(questions.len());
     let mut failures = Vec::new();
-    for handle in handles {
+    let mut succeeded_batches = 0usize;
+    for (question_ids, handle) in handles {
         match handle.await? {
-            Ok(answers) => all_answers.extend(answers),
-            Err(error) => failures.push(format!("{error:#}")),
+            Ok(answers) if !answers.is_empty() => {
+                succeeded_batches += 1;
+                all_answers.extend(answers);
+            }
+            Ok(_) => {
+                failures.push("模型未返回有效答案".to_owned());
+                all_answers.extend(question_ids.into_iter().map(|id| AnswerItem {
+                    index: id,
+                    explanation: "该题生成失败；未提交。请重试或人工处理。".to_owned(),
+                    content: String::new(),
+                }));
+            }
+            Err(error) => {
+                failures.push(format!("{error:#}"));
+                all_answers.extend(question_ids.into_iter().map(|id| AnswerItem {
+                    index: id,
+                    explanation: "该题生成失败；未提交。请重试或人工处理。".to_owned(),
+                    content: String::new(),
+                }));
+            }
         }
     }
-    if !failures.is_empty() {
+
+    if succeeded_batches == 0 {
         anyhow::bail!(
-            "成功求解 {} 题，失败 {} 批；本次未回填或提交。{}",
-            all_answers.len(),
-            failures.len(),
+            "所有批次均失败，本次未回填或提交。{}",
             failures.join("；")
         );
     }

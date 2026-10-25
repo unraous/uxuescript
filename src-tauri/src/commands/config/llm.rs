@@ -4,17 +4,30 @@ use super::CommandsResult;
 
 use crate::config::{CONFIG, llm::LLMProvider};
 
-/// 获取当前可用的全部大语言模型提供商列表。
+/// 获取当前可用的全部大语言模型提供商列表（不包含 API Key）。
 #[uxs_commands::command]
-pub fn providers() -> Vec<LLMProvider> {
+pub fn providers() -> Vec<crate::config::llm::ProviderView> {
     log::debug!("正在获取可用 AI Provider 列表...");
-    let mut providers: Vec<LLMProvider> = CONFIG.llm.providers.lock().values().cloned().collect();
+    let mut providers: Vec<crate::config::llm::ProviderView> = CONFIG
+        .llm
+        .providers
+        .lock()
+        .values()
+        .map(crate::config::llm::ProviderView::from)
+        .collect();
     providers.sort_by(|left, right| {
         left.is_custom
             .cmp(&right.is_custom)
             .then_with(|| left.name.cmp(&right.name))
     });
-    log::info!("成功获取 AI Provider 列表: {:?}", providers);
+    log::info!(
+        "成功获取 AI Provider 列表: {}",
+        providers
+            .iter()
+            .map(|provider| format!("{}(hasKey={})", provider.name, provider.has_key))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     providers
 }
 
@@ -38,6 +51,9 @@ fn find_provider_id(
 }
 
 /// 新增或更新一个自定义大语言模型提供商。
+///
+/// `api_key` 为空时保留已有密钥，避免前端只编辑名称/地址时把密钥清空；
+/// 清空密钥必须走独立的 `clear_key`。
 #[uxs_commands::command]
 pub fn upsert_provider(mut provider: LLMProvider) -> CommandsResult<()> {
     provider.name = provider.name.trim().to_owned();
@@ -59,6 +75,11 @@ pub fn upsert_provider(mut provider: LLMProvider) -> CommandsResult<()> {
         && !existing.is_custom
     {
         return Err(anyhow::anyhow!("内置 AI Provider [{}] 不允许覆盖", name).into());
+    }
+    if provider.api_key.is_none()
+        && let Some(existing) = providers.get(&name)
+    {
+        provider.api_key = existing.api_key.clone();
     }
 
     let was_updated = providers.insert(name.clone(), provider).is_some();
@@ -138,15 +159,29 @@ pub fn switch_model(index: u32) {
 #[uxs_commands::command]
 pub fn set_key(key: String) -> CommandsResult<()> {
     log::debug!("正在设置 API 密钥...");
-    let active_id = CONFIG.llm.active_provider.lock();
+    let active_id = CONFIG.llm.active_provider.lock().clone();
     let mut providers = CONFIG.llm.providers.lock();
-    if let Some(p) = providers.get_mut(&*active_id) {
-        p.api_key = if key.trim().is_empty() {
-            None
-        } else {
-            Some(crate::config::llm::ApiKey::new(key)?)
-        };
-    }
-    log::info!("成功设置 API 密钥");
+    let provider = providers
+        .get_mut(&active_id)
+        .ok_or_else(|| anyhow::anyhow!("当前 AI Provider [{}] 不存在", active_id))?;
+    provider.api_key = if key.trim().is_empty() {
+        None
+    } else {
+        Some(crate::config::llm::ApiKey::new(key)?)
+    };
+    log::info!("成功更新 API 密钥状态");
+    Ok(())
+}
+
+/// 清除当前提供商的 API 密钥；不读取、不回显旧值。
+#[uxs_commands::command]
+pub fn clear_key() -> CommandsResult<()> {
+    let active_id = CONFIG.llm.active_provider.lock().clone();
+    let mut providers = CONFIG.llm.providers.lock();
+    let provider = providers
+        .get_mut(&active_id)
+        .ok_or_else(|| anyhow::anyhow!("当前 AI Provider [{}] 不存在", active_id))?;
+    provider.api_key = None;
+    log::info!("成功清除 API 密钥");
     Ok(())
 }

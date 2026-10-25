@@ -149,7 +149,7 @@ async fn probes_all_protocols_with_the_selected_model_and_fixed_question() {
 }
 
 #[tokio::test]
-async fn preserves_http_status_and_upstream_error_details() {
+async fn preserves_http_status_without_leaking_upstream_body() {
     for (status, message) in [
         (401, "invalid_api_key"),
         (404, "model_not_found"),
@@ -161,7 +161,8 @@ async fn preserves_http_status_and_upstream_error_details() {
             .unwrap_err()
             .to_string();
         assert!(error.contains(&status.to_string()), "{error}");
-        assert!(error.contains(message), "{error}");
+        assert!(!error.contains(message), "leaked upstream body: {error}");
+        assert!(error.contains("响应体已隐藏"), "{error}");
         request.await.unwrap();
     }
 }

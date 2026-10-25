@@ -1,6 +1,7 @@
 import { config } from "@injected/chaoxing/runtime.js";
 import { invoke, confirm } from "@injected/utils/backend.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
+import { AutomationStopped } from "@injected/chaoxing/safety.js";
 import { chapterNodeStatus } from "./chapters.js";
 
 /**
@@ -67,6 +68,7 @@ export const safeRun = async (action, errorMessage) => {
   try {
     await action();
   } catch (e) {
+    if (e instanceof AutomationStopped) throw e;
     console.error(errorMessage, e);
     if (config.debugTaskTypes.length) {
       const msg = `[DEBUG 异常]\n提示: ${errorMessage}\n详情: ${e instanceof Error ? e.message : String(e)}\n\n确定：忽略并继续；取消：终止。`;

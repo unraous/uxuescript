@@ -37,9 +37,8 @@ pub(super) async fn solve(
 
     if !response.status().is_success() {
         anyhow::bail!(
-            "OpenAI API 错误 ({}): {}",
-            response.status(),
-            response.text().await?
+            "OpenAI API 错误 ({}); 响应体已隐藏",
+            response.status()
         );
     }
 
@@ -55,7 +54,7 @@ pub(super) async fn solve(
                 .pointer("/content/0/text")?
                 .as_str()
         })
-        .ok_or_else(|| anyhow::anyhow!("无法从 OpenAI 响应提取文本。原始响应: {}", data))?;
+        .ok_or_else(|| anyhow::anyhow!("无法从 OpenAI 响应提取文本"))?;
 
     parse(content, questions)
 }

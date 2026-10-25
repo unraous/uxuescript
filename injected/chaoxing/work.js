@@ -3,6 +3,10 @@ import { wait } from "@injected/utils/async.js";
 import { invoke, confirm } from "@injected/utils/backend.js";
 import { answerPage } from "@injected/chaoxing/questions/page.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
+import {
+  resolveFillPolicy,
+  showManualReviewPanel,
+} from "@injected/chaoxing/safety.js";
 const page =
   /** @type {Window & typeof globalThis & {saveWork(options: {silentSuccess: boolean, success(): void, failure(data: {msg: string}): void}): void}} */ (
     window
@@ -29,11 +33,16 @@ export const main = async () => {
   /** @type {string[]} */
   let skipped;
   try {
-    config.switchingCd = (await invoke("options")).switchingCd ?? null;
-    if (
-      !(await confirm("是否开始作业答题？答案填写完成后将暂存，不会自动提交。"))
-    )
+    const policy = await resolveFillPolicy(document, "作业", confirm);
+    if (!policy.allowFill) {
+      await showManualReviewPanel(
+        "作业未自动填写",
+        `策略：${policy.kind}（${policy.reason}）。请在平台原生界面人工完成；本工具不会自动提交。`,
+        [],
+      );
       return;
+    }
+    config.switchingCd = (await invoke("options")).switchingCd ?? null;
     const form = await wait.element(null, SELECTORS.workExam.form, document);
     skipped = await answerPage(form, SELECTORS.workExam);
     await saveWork();

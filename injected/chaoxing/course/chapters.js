@@ -3,6 +3,7 @@ import { emit, safeRun } from "./runtime.js";
 import { wait } from "@injected/utils/async.js";
 import { handleChapter } from "@injected/chaoxing/course/chapter.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
+import { TaskState, controller } from "@injected/chaoxing/safety.js";
 /**
  * 获取课程目录中的章节节点，保持页面顺序。
  * @param {Document} document 课程主文档。
@@ -85,10 +86,25 @@ const unlockedChapters = (blocking) => {
   };
   return new Promise((resolve) => {
     const observer = new MutationObserver(onChange);
+    const timer = setInterval(() => {
+      if (controller.state === TaskState.STOPPED) {
+        cleanup();
+        resolve([]);
+      }
+    }, 250);
+    function cleanup() {
+      clearInterval(timer);
+      observer.disconnect();
+    }
     function onChange() {
+      if (controller.state === TaskState.STOPPED) {
+        cleanup();
+        resolve([]);
+        return;
+      }
       const unlocked = check();
       if (unlocked.length || blocking.length === 0) {
-        observer.disconnect();
+        cleanup();
         resolve(unlocked);
       }
     }
@@ -114,14 +130,18 @@ export const handleCourse = async (chapterList) => {
   );
 
   for (const [index, original] of pending.entries()) {
+    await controller.checkpoint();
     const node = await wait.element(null, `#${original.id}`, document);
     await emit.chapterProgress(index, node, totalChapterList());
     if (shouldHandleChapter(node)) {
       await safeRun(() => handleChapter(node), "章节处理失败，自动跳过该章节");
     }
+    await controller.checkpoint();
     if (index === pending.length - 1 && blocking.length > 0) {
       console.info("等待锁定章节解锁");
-      pending.push(...(await unlockedChapters(blocking)));
+      const unlocked = await unlockedChapters(blocking);
+      await controller.checkpoint();
+      pending.push(...unlocked);
     }
   }
 };

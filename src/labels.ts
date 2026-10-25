@@ -14,6 +14,28 @@ const labels = {
   model: { en: "Model", zh: "模型" },
   endpoint: { en: "Endpoint", zh: "请求地址" },
   apiKey: { en: "API Key", zh: "API 密钥" },
+  saveKey: { en: "Save key", zh: "保存密钥" },
+  clearKey: { en: "Clear key", zh: "清除密钥" },
+  clearKeyConfirm: {
+    en: "Clear the saved API key for this provider?",
+    zh: "确定清除当前服务商已保存的 API 密钥吗？",
+  },
+  keyStored: {
+    en: "A key is already saved. It is never returned to the page.",
+    zh: "已保存密钥，页面不会回显旧值。",
+  },
+  keyMissing: {
+    en: "No key saved for this provider.",
+    zh: "当前服务商尚未保存密钥。",
+  },
+  keyEnter: {
+    en: "Enter a new key to replace the saved one.",
+    zh: "输入新密钥以替换已保存的密钥。",
+  },
+  keyRequired: {
+    en: "Enter a new API key first.",
+    zh: "请先输入新的 API Key。",
+  },
   labelLanguage: { en: "Language", zh: "语言" },
   tabApi: { en: "API", zh: "模型" },
   tabCourse: { en: "Course", zh: "课程" },

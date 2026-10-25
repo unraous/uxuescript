@@ -1,9 +1,17 @@
-import { config, cooldown } from "@injected/chaoxing/runtime.js";
-import { wait, sleep, assert } from "@injected/utils/async.js";
+import { cooldown } from "@injected/chaoxing/runtime.js";
+import { wait, assert } from "@injected/utils/async.js";
 import { invoke, confirm } from "@injected/utils/backend.js";
 import { fillAnswer } from "@injected/chaoxing/questions/fill.js";
 import { extractPayload } from "@injected/chaoxing/questions/extract.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
+import {
+  ManualReviewRequired,
+  assertSubmitAllowed,
+  controller,
+  resolveQuizPolicy,
+  showManualReviewPanel,
+} from "@injected/chaoxing/safety.js";
+
 /**
  * @param {Element[]} quizList
  * @param {import("../../../../../src/services/cmds").AnswerItem[]} answersList
@@ -14,14 +22,28 @@ const applyAnswers = async (quizList, answersList) => {
     `AI 返回答案数 (${answersList.length}) 与题目数 (${quizList.length}) 不匹配，拒绝提交`,
   );
   for (const [index, quizDiv] of quizList.entries()) {
+    await controller.checkpoint();
     await cooldown();
     await fillAnswer(quizDiv, answersList[index].content, SELECTORS.quiz);
   }
 };
 
 /**
- * 提取章节测验题目与字体交给后端求解，填写后按配置核验并提交。
- * @param {Document} taskDoc 包含答题框架的测验任务点文档。
+ * @param {Element[]} quizList
+ * @param {import("../../../../../src/services/cmds").AnswerItem[]} answersList
+ */
+const reviewItems = (quizList, answersList) =>
+  answersList.map((answer, index) => ({
+    question:
+      quizList[index]?.textContent?.trim().slice(0, 300) ||
+      `第 ${index + 1} 题`,
+    answer: answer.content,
+    explanation: answer.explanation,
+  }));
+
+/**
+ * 章节测验：先分类授权，再求解/填写，最后独立审核提交。
+ * @param {Document} taskDoc
  * @returns {Promise<void>}
  */
 export const handleQuiz = async (taskDoc) => {
@@ -32,37 +54,76 @@ export const handleQuiz = async (taskDoc) => {
     taskDoc,
     "获取答题框架文档超时",
   );
-  const quizList = await wait.elements(null, SELECTORS.quiz.question, quizDoc);
 
-  const answersList = await invoke("solve_questions", {
-    payload: extractPayload(quizDoc, quizList, SELECTORS.quiz),
-  });
-  await applyAnswers(quizList, answersList);
-
-  if (config.debugTaskTypes.includes("Quiz")) {
-    assert(
-      await confirm(
-        "[DEBUG] 答案已自动填充完成。点击[确定]继续提交，点击[取消]中断提交。",
-      ),
-      "调试中断：用户取消了 Quiz 提交",
+  const policy = await resolveQuizPolicy(quizDoc, "章节测验", confirm);
+  if (!policy.allowFill) {
+    await showManualReviewPanel(
+      "参考答案（未自动填写/提交）",
+      `策略：${policy.kind}（${policy.reason}）。请人工核对题目并在平台原生界面完成。`,
+      [],
     );
+    throw new ManualReviewRequired("策略不允许自动填写章节测验");
   }
 
+  const quizList = await wait.elements(null, SELECTORS.quiz.question, quizDoc);
+  let answersList;
+  try {
+    answersList = await invoke("solve_questions", {
+      payload: extractPayload(quizDoc, quizList, SELECTORS.quiz),
+    });
+  } catch (error) {
+    await showManualReviewPanel(
+      "AI 求解失败",
+      `未生成可用答案，未填写、未提交。${error instanceof Error ? error.message : String(error)}`,
+      [],
+    );
+    throw new ManualReviewRequired("AI 求解失败，停止当前测验");
+  }
+  assert(Array.isArray(answersList), "AI 未返回答案数组");
+  if (answersList.some((answer) => !String(answer.content ?? "").trim())) {
+    await showManualReviewPanel(
+      "答案不完整，未自动填写或提交",
+      "部分题目生成失败；已保留成功结果供人工参考。请检查后在平台原生界面处理。",
+      reviewItems(quizList, answersList),
+    );
+    throw new ManualReviewRequired("答案不完整，停止当前测验");
+  }
+  await applyAnswers(quizList, answersList);
+
+  if (!policy.allowSubmit) {
+    await showManualReviewPanel(
+      "答案已填写，未自动提交",
+      `策略：${policy.kind}（${policy.reason}）。请检查后在平台原生界面手动提交。`,
+      reviewItems(quizList, answersList),
+    );
+    throw new ManualReviewRequired("策略未授权自动提交章节测验");
+  }
+
+  // 提交授权之后仍需独立最终审核；不因 quizReview=false 而跳过。
+  {
+    const accepted = await confirm(
+      `答案已填写，请人工核验。\n\nYes：提交当前测验。\nNo：不提交并停止自动化。\n\n如非明确授权的非计分练习，请选择 No。`,
+    );
+    if (!accepted) {
+      await showManualReviewPanel(
+        "已取消提交",
+        "最终审核未通过，任务已停止；平台原生界面仍可手动处理。",
+        reviewItems(quizList, answersList),
+      );
+      throw new ManualReviewRequired("用户拒绝自动提交章节测验");
+    }
+  }
+
+  await controller.checkpoint();
+  assertSubmitAllowed(policy);
   const submitBtn = await wait.element(
     null,
     SELECTORS.quiz.btnSubmitClass,
     quizDoc,
     "未找到题目提交按钮",
   );
-  if (config.quizReview) {
-    while (
-      !(await confirm(
-        "答案已填写完成，请人工核验后确认是否提交。\n\nYes：立即提交当前答案。\nNo：暂不提交，留出 30 秒检查或修改答案，之后再次弹出本提示。\n\n如需停止脚本，请点击左上角的刷新按钮或 Home。",
-      ))
-    ) {
-      await sleep(30000);
-    }
-  }
+  await controller.checkpoint();
+  assertSubmitAllowed(policy);
   submitBtn.click();
 
   const modal = await wait.element(
@@ -77,6 +138,8 @@ export const handleQuiz = async (taskDoc) => {
     modal,
     "未找到弹窗确认按钮",
   );
+  await controller.checkpoint();
+  assertSubmitAllowed(policy);
   let hasOpened = false;
   await wait.until(() => {
     const isVisible = getComputedStyle(modal).display !== "none";
@@ -88,5 +151,5 @@ export const handleQuiz = async (taskDoc) => {
     return hasOpened ? true : null;
   });
 
-  console.info("已自动填充AI生成的答案并确认提交");
+  console.info("已按授权策略填写并提交章节测验");
 };
