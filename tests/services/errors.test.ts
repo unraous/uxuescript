@@ -1,6 +1,11 @@
 import type { commands } from "@/services/cmds";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { showError } from "@/services/errors";
+import { z } from "zod";
+import {
+  nonZeroU32,
+  optionalPositiveNumber,
+} from "@/composables/useConfig/schemas";
 
 const commandMocks = vi.hoisted(() => ({
   confirm: vi.fn<typeof commands.confirm>(),
@@ -22,6 +27,55 @@ describe("showError", () => {
     expect(console.error).toHaveBeenCalledWith("保存失败:", cause);
     expect(commandMocks.confirm).toHaveBeenCalledWith(
       "保存失败:\npermission denied",
+    );
+  });
+
+  it.each(["", "0", "1.5", "4294967296", "abc"])(
+    "explains positive integers for %j without displaying Zod metadata",
+    async (input) => {
+      const result = nonZeroU32.safeParse(input);
+      if (result.success) throw new Error("Expected validation to fail");
+
+      await showError("通用配置操作失败:", result.error);
+
+      expect(commandMocks.confirm).toHaveBeenCalledWith(
+        "通用配置操作失败:\n请输入大于 0 的整数。",
+      );
+      expect(console.error).toHaveBeenCalledWith(
+        "通用配置操作失败:",
+        result.error,
+      );
+    },
+  );
+
+  it.each(["0", ".", "Infinity"])(
+    "explains positive numbers and the empty option for %j",
+    async (input) => {
+      const result = optionalPositiveNumber.safeParse(input);
+      if (result.success) throw new Error("Expected validation to fail");
+
+      await showError("课程配置操作失败:", result.error);
+
+      expect(commandMocks.confirm).toHaveBeenCalledWith(
+        "课程配置操作失败:\n请输入大于 0 的数字，或留空关闭。",
+      );
+    },
+  );
+
+  it("shows distinct validation instructions once each", async () => {
+    const result = z
+      .object({
+        concurrency: nonZeroU32,
+        batchSize: nonZeroU32,
+        lockSpeed: optionalPositiveNumber,
+      })
+      .safeParse({ concurrency: "0", batchSize: "0", lockSpeed: "." });
+    if (result.success) throw new Error("Expected validation to fail");
+
+    await showError("配置无效:", result.error);
+
+    expect(commandMocks.confirm).toHaveBeenCalledWith(
+      "配置无效:\n请输入大于 0 的整数。\n请输入大于 0 的数字，或留空关闭。",
     );
   });
 
