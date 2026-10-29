@@ -5,9 +5,9 @@ import VRollTransition from "./VRollTransition.vue";
 
 defineOptions({ inheritAttrs: false });
 
-const { label, for: htmlFor, annotation } = defineProps<{
+const { label, for: htmlFor = undefined, annotation = undefined } = defineProps<{
   label: string;
-  for: string;
+  for?: string;
   annotation?: string;
 }>();
 
@@ -53,7 +53,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <label
+  <component
+    :is="htmlFor ? 'label' : 'span'"
     v-bind="attrs"
     class="label-text"
     :for="htmlFor"
@@ -70,17 +71,17 @@ onUnmounted(() => {
       @pointerenter="show"
       @pointerleave="scheduleHide"
     >
-      <VRollTransition :value="label" class="label-roll" v-slot="{ value }">
+      <VRollTransition v-slot="{ value }" :value="label" class="label-roll">
         {{ value }}
       </VRollTransition>
     </span>
-  </label>
+  </component>
 
   <VAnnotation
     v-if="annotation"
+    :id="id"
     :anchor="textElement"
     :anchor-y="anchorY"
-    :id="id"
     :text="annotation"
     :visible="isVisible"
     @pointerenter="keepVisible"

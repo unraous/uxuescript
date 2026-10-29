@@ -36,7 +36,7 @@ const openDataDirectory = async () => {
       @pointerup="scaleFeedback.handlePointerUp"
     >
       <FolderCodeIcon class="directory-icon" />
-      <VRollTransition :value="label('dataDirectory')" class="directory-text" aria-hidden="true" v-slot="{ value }">
+      <VRollTransition v-slot="{ value }" :value="label('dataDirectory')" class="directory-text" aria-hidden="true">
         {{ value }}
       </VRollTransition>
     </button>

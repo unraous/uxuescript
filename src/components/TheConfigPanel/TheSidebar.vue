@@ -52,8 +52,8 @@ const handleTabKeydown = (event: KeyboardEvent, index: number) => {
       >
         <button
           v-for="(item, index) in items"
-          :key="index"
           :id="tabId(index)"
+          :key="index"
           type="button"
           role="tab"
           :aria-label="item.name"
@@ -70,10 +70,10 @@ const handleTabKeydown = (event: KeyboardEvent, index: number) => {
           @pointerup="handlePointerUp"
         >
           <VRollTransition
+            v-slot="{ value }"
             :value="item.name"
             class="menu-text"
             aria-hidden="true"
-            v-slot="{ value }"
           >
             {{ value }}
           </VRollTransition>

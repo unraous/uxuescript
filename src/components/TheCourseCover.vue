@@ -36,7 +36,7 @@ defineProps<{
         key="placeholder"
         class="cover-placeholder"
       >
-        <VRollTransition :value="label('coursePending')" class="placeholder-text" v-slot="{ value }">
+        <VRollTransition v-slot="{ value }" :value="label('coursePending')" class="placeholder-text">
           {{ value }}
         </VRollTransition>
       </div>

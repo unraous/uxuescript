@@ -190,7 +190,7 @@ onUnmounted(() => {
       />
     </div>
     <div class="title">
-      <VRollTransition :value="label('coursePage')" class="page-title" v-slot="{ value }">
+      <VRollTransition v-slot="{ value }" :value="label('coursePage')" class="page-title">
         {{ value }}
       </VRollTransition>
     </div>

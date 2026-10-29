@@ -6,7 +6,7 @@ import VLabel from "./VLabel.vue";
 const {
   modelValue,
   label,
-  annotation,
+  annotation = undefined,
   placeholder = "",
   pattern = ".*",
   maskOnBlur,

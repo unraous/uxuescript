@@ -22,7 +22,7 @@ const openIssues = async () => {
       id="guide-title"
       class="title"
     >
-      <VRollTransition :value="label('userGuide')" class="title-text" v-slot="{ value }">
+      <VRollTransition v-slot="{ value }" :value="label('userGuide')" class="title-text">
         {{ value }}
       </VRollTransition>
     </h1>

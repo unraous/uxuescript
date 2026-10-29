@@ -77,10 +77,10 @@ const buttonStyle = computed(() => ({
         />
         <VRollTransition
           v-else-if="label"
+          v-slot="{ value }"
           :value="label"
           class="label-text"
           aria-hidden="true"
-          v-slot="{ value }"
         >
           {{ value }}
         </VRollTransition>

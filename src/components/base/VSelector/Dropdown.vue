@@ -7,6 +7,8 @@ import type { SelectorItem } from "./types";
 import VRollTransition from "@/components/base/VRollTransition.vue";
 import { label } from "@/labels";
 
+defineOptions({ name: "VSelectorDropdown" });
+
 const { data, methods } = defineProps<{
   data: {
     items: SelectorItem[];
@@ -87,7 +89,7 @@ const scaleFeedback = useScaleFeedback({ hoverScale: 1.25 });
             class="action-icon create-icon"
             aria-hidden="true"
           />
-          <VRollTransition :value="label('create')" class="create-text" aria-hidden="true" v-slot="{ value }">
+          <VRollTransition v-slot="{ value }" :value="label('create')" class="create-text" aria-hidden="true">
             {{ value }}
           </VRollTransition>
         </button>

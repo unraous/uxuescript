@@ -6,7 +6,7 @@ import { useScaleFeedback } from "@/composables/useScaleFeedback";
 
 const {
   label,
-  annotation,
+  annotation = undefined,
   modelValue = false,
   id = useId(),
 } = defineProps<{

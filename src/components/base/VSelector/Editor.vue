@@ -6,6 +6,8 @@ import { useScaleFeedback } from "@/composables/useScaleFeedback";
 import VTextBox from "@/components/base/VTextBox.vue";
 import { label } from "@/labels";
 
+defineOptions({ name: "VSelectorEditor" });
+
 const { data, methods } = defineProps<{
   data: { active: boolean; draft: string; id: string };
   methods: {

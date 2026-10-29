@@ -33,9 +33,9 @@ watch(
   <div class="panel">
     <h1 class="title">
       <VRollTransition
+        v-slot="{ value }"
         :value="label('configuration')"
         class="title-text"
-        v-slot="{ value }"
       >
         {{ value }}
       </VRollTransition>
@@ -49,34 +49,34 @@ watch(
       <div class="container">
         <Transition :name="transitionName"
           ><TheAPIPanel
+            v-show="configPanel.activeIndex === 0"
             id="config-panel-0"
             role="tabpanel"
             aria-labelledby="config-tab-0"
-            v-show="configPanel.activeIndex === 0"
             class="config-panel-content"
         /></Transition>
         <Transition :name="transitionName"
           ><TheCourseConfigPanel
+            v-show="configPanel.activeIndex === 1"
             id="config-panel-1"
             role="tabpanel"
             aria-labelledby="config-tab-1"
-            v-show="configPanel.activeIndex === 1"
             class="config-panel-content"
         /></Transition>
         <Transition :name="transitionName"
           ><TheThemePanel
+            v-show="configPanel.activeIndex === 2"
             id="config-panel-2"
             role="tabpanel"
             aria-labelledby="config-tab-2"
-            v-show="configPanel.activeIndex === 2"
             class="config-panel-content"
         /></Transition>
         <Transition :name="transitionName"
           ><TheGeneralPanel
+            v-show="configPanel.activeIndex === 3"
             id="config-panel-3"
             role="tabpanel"
             aria-labelledby="config-tab-3"
-            v-show="configPanel.activeIndex === 3"
             class="config-panel-content"
         /></Transition>
       </div>
