@@ -107,6 +107,8 @@ export type CourseStatus = { kind: "waiting"; payload: null } | { kind: "start";
 
 export type GeneralConfig = {
 	labelLanguage?: LabelLanguage,
+	concurrency?: number,
+	batchSize?: number,
 };
 
 /**  支持的大模型 API 发包协议族 */

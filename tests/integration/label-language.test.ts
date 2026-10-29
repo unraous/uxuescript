@@ -1,5 +1,5 @@
 import type { showError } from "@/services/errors";
-import type { commands } from "@/services/cmds";
+import type { commands, GeneralConfig } from "@/services/cmds";
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TheGeneralPanel from "@/components/TheConfigPanel/TheGeneralPanel.vue";
@@ -20,8 +20,11 @@ vi.mock("@/services/cmds", () => ({ commands: mocks }));
 vi.mock("@/services/errors", () => ({ showError: mocks.error }));
 
 beforeEach(async () => {
-  mocks.general.mockResolvedValue({ labelLanguage: "en" });
-  mocks.setGeneral.mockResolvedValue(undefined);
+  let config: GeneralConfig = { labelLanguage: "en" };
+  mocks.general.mockImplementation(async () => ({ ...config }));
+  mocks.setGeneral.mockImplementation(async (next) => {
+    config = { ...next };
+  });
   mocks.options.mockResolvedValue({
     muteWebview: true,
     quizReview: false,
@@ -92,6 +95,94 @@ describe("label language", () => {
     expect(label("lockPlayspeed")).toBe("Speed Lock");
     general.unmount();
     course.unmount();
+  });
+
+  it("keeps request settings when changing language and preserves language when editing settings", async () => {
+    let config = {
+      labelLanguage: "en" as "en" | "zh",
+      concurrency: 3,
+      batchSize: 4,
+    };
+    mocks.general.mockImplementation(async () => ({ ...config }));
+    mocks.setGeneral.mockImplementation(async (next) => {
+      config = {
+        labelLanguage: next.labelLanguage ?? "en",
+        concurrency: next.concurrency ?? 10,
+        batchSize: next.batchSize ?? 5,
+      };
+    });
+    const general = mount(TheGeneralPanel);
+    await flushPromises();
+    expect(
+      general.get<HTMLInputElement>("#model-concurrency").element.value,
+    ).toBe("3");
+    expect(
+      general.get<HTMLInputElement>("#model-batch-size").element.value,
+    ).toBe("4");
+    await setLabelLanguage("zh");
+    expect(config).toEqual({
+      labelLanguage: "zh",
+      concurrency: 3,
+      batchSize: 4,
+    });
+    await general.get("#model-concurrency").setValue("2");
+    await flushPromises();
+    await general.get("#model-batch-size").setValue("6");
+    await flushPromises();
+    expect(config).toEqual({
+      labelLanguage: "zh",
+      concurrency: 2,
+      batchSize: 6,
+    });
+    mocks.setGeneral.mockClear();
+    for (const [id, savedValue] of [
+      ["model-concurrency", "2"],
+      ["model-batch-size", "6"],
+    ]) {
+      const input = general.get<HTMLInputElement>(`#${id}`);
+      for (const value of ["", "0", "4294967296"]) {
+        await input.setValue(value);
+        await flushPromises();
+        expect(input.element.value).toBe(savedValue);
+      }
+    }
+    expect(mocks.setGeneral).not.toHaveBeenCalled();
+    expect(mocks.error).toHaveBeenCalled();
+    await general.get("#model-concurrency").setValue("4294967295");
+    await flushPromises();
+    expect(config.concurrency).toBe(4294967295);
+    mocks.setGeneral.mockRejectedValueOnce(new Error("failed"));
+    await general.get("#model-batch-size").setValue("7");
+    await flushPromises();
+    expect(
+      general.get<HTMLInputElement>("#model-batch-size").element.value,
+    ).toBe("6");
+    general.unmount();
+  });
+
+  it("filters non-integer text while typing and permits clearing before replacement", async () => {
+    const wrapper = mount(TheGeneralPanel);
+    await flushPromises();
+    for (const [id, initial] of [
+      ["model-concurrency", "10"],
+      ["model-batch-size", "5"],
+    ]) {
+      const input = wrapper.get<HTMLInputElement>(`#${id}`);
+      for (const value of [" ", "-1", "1.5", "abc", "Infinity"]) {
+        input.element.value = value;
+        await input.trigger("input");
+        expect(input.element.value).toBe(initial);
+      }
+      input.element.value = "";
+      await input.trigger("input");
+      expect(input.element.value).toBe("");
+      input.element.value = "12";
+      await input.trigger("input");
+      expect(input.element.value).toBe("12");
+    }
+    expect(mocks.setGeneral).not.toHaveBeenCalled();
+    expect(mocks.error).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 
   it("keeps the current language when saving fails", async () => {

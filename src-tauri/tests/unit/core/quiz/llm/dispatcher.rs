@@ -4,6 +4,13 @@ use crate::test_support::http::{response, serve};
 use serde_json::json;
 use tokio::time::{Duration, Instant};
 
+async fn solve(
+    provider: &LLMProvider,
+    questions: Vec<Question>,
+) -> anyhow::Result<Vec<AnswerItem>> {
+    super::solve(provider, questions, Default::default()).await
+}
+
 fn questions(count: usize) -> Vec<Question> {
     (1..=count)
         .map(|index| Question {
@@ -116,7 +123,7 @@ async fn rate_limit_retries_then_accepts_valid_answers() {
         .remove("bigmodel")
         .unwrap();
     provider.base_url = url;
-    let pool = RequestPool::new();
+    let pool = RequestPool::new(10);
     let started = Instant::now();
     assert_eq!(
         solve_batch(
@@ -302,7 +309,7 @@ async fn sends_images_in_each_protocol_native_format() {
             mime: "image/png".into(),
             data: "AQID".into(),
         }];
-        let pool = RequestPool::new();
+        let pool = RequestPool::new(10);
         match protocol {
             LLMProtocol::OpenAIChatCompletions => {
                 chat::solve(
@@ -361,4 +368,42 @@ async fn sends_images_in_each_protocol_native_format() {
             }
         }
     }
+}
+
+#[tokio::test]
+async fn general_config_controls_batch_size() {
+    use crate::test_support::http::serve_sequence;
+    let replies = [vec![1, 2], vec![3]].into_iter().map(|ids| {
+        (200, response(&LLMProtocol::OpenAIChatCompletions,
+            json!({"answers": ids.iter().map(|id| json!({"index":id.to_string(),"explanation":"mock","content":"A"})).collect::<Vec<_>>()})))
+    }).collect();
+    let (url, requests) = serve_sequence(replies).await;
+    let mut provider = crate::config::llm::LLMConfig::default()
+        .providers
+        .into_inner()
+        .remove("bigmodel")
+        .unwrap();
+    provider.base_url = url;
+    let settings = crate::config::general::GeneralConfig {
+        concurrency: std::num::NonZeroU32::new(1).unwrap(),
+        batch_size: std::num::NonZeroU32::new(2).unwrap(),
+        ..Default::default()
+    };
+    let answers = super::solve(&provider, questions(3), settings)
+        .await
+        .unwrap();
+    assert_eq!(answers.len(), 3);
+    let sizes: Vec<usize> = requests
+        .await
+        .unwrap()
+        .iter()
+        .map(|request| {
+            serde_json::from_str::<Vec<Question>>(
+                request.body["messages"][1]["content"].as_str().unwrap(),
+            )
+            .unwrap()
+            .len()
+        })
+        .collect();
+    assert_eq!(sizes, vec![2, 1]);
 }

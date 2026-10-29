@@ -12,9 +12,11 @@ const commandMocks = vi.hoisted(() => ({
   switchProvider: vi.fn<typeof commands.switchProvider>(),
   removeProvider: vi.fn<typeof commands.removeProvider>(),
   switchModel: vi.fn<typeof commands.switchModel>(),
+  error: vi.fn(),
 }));
 
 vi.mock("@/services/cmds", () => ({ commands: commandMocks }));
+vi.mock("@/services/errors", () => ({ showError: commandMocks.error }));
 
 function makeProvider(overrides: Partial<LLMProvider> = {}): LLMProvider {
   return {
@@ -47,13 +49,38 @@ async function mountComposable() {
   return state;
 }
 
+let storedProviders: LLMProvider[];
+let activeProvider: string;
+
 beforeEach(() => {
-  commandMocks.providers.mockResolvedValue([]);
-  commandMocks.currentProvider.mockResolvedValue("");
-  commandMocks.upsertProvider.mockResolvedValue(null);
-  commandMocks.switchProvider.mockResolvedValue(null);
-  commandMocks.removeProvider.mockResolvedValue(null);
-  commandMocks.switchModel.mockResolvedValue(undefined);
+  storedProviders = [];
+  activeProvider = "";
+  commandMocks.providers.mockImplementation(async () =>
+    structuredClone(storedProviders),
+  );
+  commandMocks.currentProvider.mockImplementation(async () => activeProvider);
+  commandMocks.upsertProvider.mockImplementation(async (provider) => {
+    storedProviders = [
+      ...storedProviders.filter((item) => item.name !== provider.name),
+      { ...provider, models: [...provider.models] },
+    ];
+    return null;
+  });
+  commandMocks.switchProvider.mockImplementation(async (name) => {
+    activeProvider = name;
+    return null;
+  });
+  commandMocks.removeProvider.mockImplementation(async (name) => {
+    storedProviders = storedProviders.filter(
+      (provider) => provider.name !== name,
+    );
+    return null;
+  });
+  commandMocks.switchModel.mockImplementation(async (index) => {
+    storedProviders.find(
+      (provider) => provider.name === activeProvider,
+    )!.chosenModel = index;
+  });
 });
 
 describe("useLLMProviders", () => {
@@ -64,8 +91,8 @@ describe("useLLMProviders", () => {
       isCustom: true,
       models: ["custom-model"],
     });
-    commandMocks.providers.mockResolvedValue([defaultProvider, customProvider]);
-    commandMocks.currentProvider.mockResolvedValue("Custom");
+    storedProviders = [defaultProvider, customProvider];
+    activeProvider = "Custom";
 
     const state = await mountComposable();
 
@@ -84,11 +111,8 @@ describe("useLLMProviders", () => {
   it("restores a built-in provider when the stored ID differs only by case", async () => {
     const defaultProvider = makeProvider({ name: "BigModel" });
     const deepSeekProvider = makeProvider({ name: "DeepSeek" });
-    commandMocks.providers.mockResolvedValue([
-      defaultProvider,
-      deepSeekProvider,
-    ]);
-    commandMocks.currentProvider.mockResolvedValue("deepseek");
+    storedProviders = [defaultProvider, deepSeekProvider];
+    activeProvider = "deepseek";
 
     const state = await mountComposable();
 
@@ -97,8 +121,8 @@ describe("useLLMProviders", () => {
 
   it("trims and persists a new provider before selecting it", async () => {
     const defaultProvider = makeProvider();
-    commandMocks.providers.mockResolvedValue([defaultProvider]);
-    commandMocks.currentProvider.mockResolvedValue("Default");
+    storedProviders = [defaultProvider];
+    activeProvider = "Default";
 
     const state = await mountComposable();
 
@@ -124,8 +148,8 @@ describe("useLLMProviders", () => {
       models: ["first", "second", "third"],
       chosenModel: 2,
     });
-    commandMocks.providers.mockResolvedValue([provider]);
-    commandMocks.currentProvider.mockResolvedValue("Custom");
+    storedProviders = [provider];
+    activeProvider = "Custom";
 
     const state = await mountComposable();
 
@@ -140,5 +164,23 @@ describe("useLLMProviders", () => {
         chosenModel: 1,
       }),
     );
+  });
+
+  it("keeps the saved selection and stops dependent commands after a failure", async () => {
+    storedProviders = [
+      makeProvider(),
+      makeProvider({ name: "Custom", isCustom: true }),
+    ];
+    activeProvider = "Default";
+    const state = await mountComposable();
+    commandMocks.switchProvider.mockRejectedValueOnce(new Error("failed"));
+    await state.selectProvider(1);
+    expect(state.selectedProvider.value.name).toBe("Default");
+    commandMocks.switchProvider.mockClear();
+    commandMocks.upsertProvider.mockRejectedValueOnce(new Error("failed"));
+    await state.addProvider("New");
+    expect(commandMocks.switchProvider).not.toHaveBeenCalled();
+    expect(state.providers).toHaveLength(2);
+    expect(commandMocks.error).toHaveBeenCalledTimes(2);
   });
 });

@@ -12,6 +12,8 @@ const labels = {
   quizReview: { en: "Review Answers", zh: "人工核验" },
   provider: { en: "Provider", zh: "模型供应商" },
   model: { en: "Model", zh: "模型" },
+  modelConcurrency: { en: "Concurrency", zh: "请求并发数" },
+  modelBatchSize: { en: "Batch Size", zh: "每批题数" },
   endpoint: { en: "Endpoint", zh: "请求地址" },
   apiKey: { en: "API Key", zh: "API 密钥" },
   labelLanguage: { en: "Language", zh: "语言" },
@@ -80,10 +82,13 @@ export function label(key: keyof typeof labels): string {
 }
 
 export async function loadLabelLanguage() {
-  language.value = (await commands.general()).labelLanguage ?? "en";
+  const general = await commands.general();
+  language.value = general.labelLanguage ?? "en";
+  return general;
 }
 
 export async function setLabelLanguage(value: LabelLanguage) {
-  await commands.setGeneral({ labelLanguage: value });
+  const general = await commands.general();
+  await commands.setGeneral({ ...general, labelLanguage: value });
   language.value = value;
 }

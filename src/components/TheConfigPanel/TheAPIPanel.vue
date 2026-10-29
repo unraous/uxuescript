@@ -21,6 +21,7 @@ const {
   renameModel,
   deleteModel,
   saveSelectedProvider,
+  saveApiKey,
 } = useLLMProviders();
 
 const endpoint = computed({
@@ -35,11 +36,6 @@ const apiKey = computed({
     selectedProvider.value!.apiKey = String(value) || null;
   },
 });
-const saveApiKey = () =>
-  commands
-    .setKey(apiKey.value)
-    .catch((cause) => showError("配置命令执行失败:", cause));
-
 const testing = ref(false);
 const testConnection = async () => {
   testing.value = true;
@@ -94,7 +90,7 @@ const testConnection = async () => {
         placeholder="Enter API key"
         mask-on-blur
         class="element"
-        @change="saveApiKey"
+        @change="saveApiKey(apiKey)"
       />
       <div class="element test-button">
         <VButton

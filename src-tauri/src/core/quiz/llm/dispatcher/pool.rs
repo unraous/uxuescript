@@ -3,8 +3,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::{Mutex, Semaphore, SemaphorePermit};
 use tokio::time::{Duration, Instant};
 
-pub(super) const MAX_CONCURRENCY: usize = 10;
-
 /// 同一次求解共用请求许可、限流冷却和串行恢复状态。
 pub(super) struct RequestPool {
     slots: Semaphore,
@@ -14,9 +12,9 @@ pub(super) struct RequestPool {
 }
 
 impl RequestPool {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(concurrency: usize) -> Self {
         Self {
-            slots: Semaphore::new(MAX_CONCURRENCY),
+            slots: Semaphore::new(concurrency),
             serial_slot: Semaphore::new(1),
             serial: AtomicBool::new(false),
             cooldown: Cooldown::default(),

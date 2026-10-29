@@ -6,18 +6,23 @@ mod pool;
 mod responses;
 
 use super::AnswerItem;
-use crate::config::llm::{LLMProtocol, LLMProvider};
+use crate::config::{
+    general::GeneralConfig,
+    llm::{LLMProtocol, LLMProvider},
+};
 use crate::core::quiz::Question;
 use answers::AnswerError;
 use anyhow::{Context, Result};
-use pool::{MAX_CONCURRENCY, RequestPool};
+use pool::RequestPool;
 use reqwest::header::{ACCEPT, HeaderMap, HeaderValue};
 use std::sync::Arc;
 
-const CHUNK_SIZE: usize = 5;
-
 /// LLM 求解入口分发器
-pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<Vec<AnswerItem>> {
+pub async fn solve(
+    provider: &LLMProvider,
+    questions: Vec<Question>,
+    settings: GeneralConfig,
+) -> Result<Vec<AnswerItem>> {
     let chosen_model = provider
         .chosen_model
         .and_then(|idx| provider.models.get(idx))
@@ -28,8 +33,8 @@ pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<V
         provider.name,
         chosen_model,
         questions.len(),
-        CHUNK_SIZE,
-        MAX_CONCURRENCY
+        settings.batch_size,
+        settings.concurrency
     );
 
     if questions.is_empty() {
@@ -43,10 +48,10 @@ pub async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> Result<V
             HeaderValue::from_static("application/json"),
         )]))
         .build()?;
-    let pool = Arc::new(RequestPool::new());
+    let pool = Arc::new(RequestPool::new(settings.concurrency.get() as usize));
     let mut handles = Vec::new();
 
-    for chunk in questions.chunks(CHUNK_SIZE) {
+    for chunk in questions.chunks(settings.batch_size.get() as usize) {
         let client = client.clone();
         let provider = provider.clone();
         let model = chosen_model.to_string();

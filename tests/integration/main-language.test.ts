@@ -5,12 +5,15 @@ import TheInfoPanel from "@/components/TheInfoPanel.vue";
 import TheCourseDashboard from "@/components/TheCourseDashboard.vue";
 import TheThemePanel from "@/components/TheConfigPanel/TheThemePanel.vue";
 import { label, loadLabelLanguage, setLabelLanguage } from "@/labels";
-import type { CourseStatus } from "@/services/cmds";
+import type { CourseStatus, ThemeName } from "@/services/cmds";
+import { initializeTheme } from "@/theme";
 
 const mocks = vi.hoisted(() => ({
   listen: vi.fn(),
   emitTo: vi.fn(),
   setTheme: vi.fn<typeof commands.setTheme>(),
+  currentTheme: vi.fn<typeof commands.currentTheme>(),
+  error: vi.fn(),
   currentUrl: vi.fn<typeof commands.currentUrl>(),
   queryCourseMeta: vi.fn<typeof commands.queryCourseMeta>(),
   general: vi.fn<typeof commands.general>(),
@@ -21,6 +24,7 @@ vi.mock("@tauri-apps/api/event", () => ({
   emitTo: mocks.emitTo,
 }));
 vi.mock("@/services/cmds", () => ({ commands: mocks }));
+vi.mock("@/services/errors", () => ({ showError: mocks.error }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 
 let statusHandler: (event: { payload: CourseStatus }) => void;
@@ -35,7 +39,12 @@ beforeEach(async () => {
     return vi.fn();
   });
   mocks.emitTo.mockResolvedValue(undefined);
-  mocks.setTheme.mockResolvedValue(undefined);
+  let theme: ThemeName = "gentian";
+  initializeTheme(theme);
+  mocks.currentTheme.mockImplementation(async () => theme);
+  mocks.setTheme.mockImplementation(async (name) => {
+    theme = name;
+  });
   mocks.currentUrl.mockResolvedValue("https://example.com/?courseId=123");
   mocks.queryCourseMeta.mockResolvedValue({ title: "原始课程名", cover: "" });
 });
@@ -75,6 +84,16 @@ describe("main interface language", () => {
     await wrapper.get("#theme-option-lotus").trigger("click");
     await flushPromises();
     expect(mocks.setTheme).toHaveBeenLastCalledWith("lotus");
+    expect(wrapper.get("#theme-option-lotus").attributes("aria-checked")).toBe(
+      "true",
+    );
+    mocks.setTheme.mockRejectedValueOnce(new Error("failed"));
+    await wrapper.get("#theme-option-poppy").trigger("click");
+    await flushPromises();
+    expect(wrapper.get("#theme-option-lotus").attributes("aria-checked")).toBe(
+      "true",
+    );
+    expect(mocks.error).toHaveBeenCalled();
     wrapper.unmount();
   });
 

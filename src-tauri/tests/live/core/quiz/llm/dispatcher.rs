@@ -3,6 +3,10 @@ use crate::config::llm::{ApiKey, LLMConfig};
 use std::fs;
 use std::path::PathBuf;
 
+async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> anyhow::Result<Vec<AnswerItem>> {
+    super::solve(provider, questions, Default::default()).await
+}
+
 fn load_questions_file(filename: &str) -> Vec<Question> {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests/assets/course-page");

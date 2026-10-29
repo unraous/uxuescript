@@ -2,7 +2,7 @@
 import { nextTick } from "vue";
 import { useScaleFeedback } from "@/composables/useScaleFeedback";
 import { commands } from "@/services/cmds";
-import { showError } from "@/services/errors";
+import { useConfig } from "@/composables/useConfig";
 import { activeTheme, setTheme, themeNames, themes } from "@/theme";
 import type { CSSProperties } from "vue";
 import type { ThemeName } from "@/theme";
@@ -23,14 +23,12 @@ const themeStyle = (name: ThemeName): CSSProperties => {
   } as CSSProperties;
 };
 
-const selectTheme = async (name: ThemeName) => {
-  void setTheme(name).catch((cause) =>
-    console.error("Failed to broadcast color theme:", cause),
-  );
-  await commands
-    .setTheme(name)
-    .catch((cause) => showError("Failed to update theme:", cause));
-};
+const { save } = useConfig(
+  commands.currentTheme,
+  setTheme,
+  "Failed to update theme:",
+);
+const selectTheme = (name: ThemeName) => save(() => commands.setTheme(name));
 
 const handleThemeKeydown = (event: KeyboardEvent, index: number) => {
   if (themeNames.length === 0) return;
@@ -78,10 +76,10 @@ const handleThemeKeydown = (event: KeyboardEvent, index: number) => {
         @pointerup="scaleFeedback.handlePointerUp"
       >
         <VRollTransition
+          v-slot="{ value }"
           :value="themeLabel(name)"
           class="theme-name"
           aria-hidden="true"
-          v-slot="{ value }"
         >
           {{ value }}
         </VRollTransition>

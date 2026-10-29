@@ -3,34 +3,23 @@ import { onMounted, ref } from "vue";
 import VInput from "@/components/base/VInput.vue";
 import VToggle from "@/components/base/VToggle.vue";
 import { commands, type OptionsConfig } from "@/services/cmds";
-import { showError } from "@/services/errors";
+import { useConfig } from "@/composables/useConfig";
+import { boolean, optionalPositiveNumber } from "@/composables/useConfig/schemas";
 import { label } from "@/labels";
 
 const options = ref<OptionsConfig>();
 const lockSpeed = ref("");
 const switchingCd = ref("");
-const saveNumber = (key: "lockSpeed" | "switchingCd", input: string) => {
-  const value = input.trim() === "" ? null : Number(input);
-  if (value !== null && (!Number.isFinite(value) || value <= 0)) {
-    showError(
-      "保存课程配置失败:",
-      new Error("请输入大于零的数字，或留空关闭。"),
-    );
-    return;
-  }
-  options.value![key] = value;
-  saveOptions();
-};
-const saveOptions = () =>
-  commands
-    .setOptions(options.value!)
-    .catch((cause) => showError("保存课程配置失败:", cause));
-
-onMounted(async () => {
-  options.value = await commands.options();
-  lockSpeed.value = String(options.value.lockSpeed ?? "");
-  switchingCd.value = String(options.value.switchingCd ?? "");
-});
+const { load, saveField } = useConfig(
+  commands.options,
+  (config) => {
+    options.value = config;
+    lockSpeed.value = String(config.lockSpeed ?? "");
+    switchingCd.value = String(config.switchingCd ?? "");
+  },
+  "课程配置操作失败:",
+);
+onMounted(load);
 </script>
 
 <template>
@@ -45,8 +34,7 @@ onMounted(async () => {
         annotation="开启后，课程视频会自动静音；关闭后，视频声音由课程页面控制。"
         class="option"
         @update:model-value="
-          options.muteWebview = $event;
-          saveOptions();
+          saveField(commands.setOptions, 'muteWebview', $event, boolean)
         "
       />
       <VToggle
@@ -56,27 +44,42 @@ onMounted(async () => {
         annotation="提交测验前先人工核验答案。点击 Yes 立即提交；点击 No 会留出 30 秒检查或修改答案，再次询问。如需停止脚本，请点击左上角的刷新或 Home。"
         class="option"
         @update:model-value="
-          options.quizReview = $event;
-          saveOptions();
+          saveField(commands.setOptions, 'quizReview', $event, boolean)
         "
       />
       <VInput
         id="playing-speed-input"
         v-model="lockSpeed"
+        pattern="[0-9]*([.][0-9]*)?"
         placeholder="例如 2 表示两倍速，留空不调整"
         :label="label('lockPlayspeed')"
         annotation="填写想要的视频播放倍速，例如填 2 就按两倍速播放。播放时会保持这个倍速，不让课程页面改回去。留空则不调整视频倍速。"
         class="option speed-input"
-        @change="saveNumber('lockSpeed', lockSpeed)"
+        @change="
+          saveField(
+            commands.setOptions,
+            'lockSpeed',
+            lockSpeed,
+            optionalPositiveNumber,
+          )
+        "
       />
       <VInput
         id="switching-cd-input"
         v-model="switchingCd"
+        pattern="[0-9]*([.][0-9]*)?"
         placeholder="单位：秒，留空不额外等待"
         :label="label('switchingCd')"
         annotation="每次填题、开始任务或发送互动题的答案验证请求前，先等待这里设置的秒数。例如填 2，每次会随机等待 1.5～2.5 秒。留空则不额外等待。"
         class="option speed-input"
-        @change="saveNumber('switchingCd', switchingCd)"
+        @change="
+          saveField(
+            commands.setOptions,
+            'switchingCd',
+            switchingCd,
+            optionalPositiveNumber,
+          )
+        "
       />
     </div>
   </div>

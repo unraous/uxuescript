@@ -25,7 +25,7 @@ async fn test_solve_payload_integration() {
     provider.api_key = Some(crate::config::llm::ApiKey::new(api_key).unwrap());
 
     println!("正在使用内存局部配置变量调用 BigModel 求解器...");
-    match llm::solve(&provider, decrypted).await {
+    match llm::solve(&provider, decrypted, Default::default()).await {
         Ok(answers) => {
             assert!(!answers.is_empty(), "返回的答案列表不应为空");
             for (i, item) in answers.iter().enumerate() {

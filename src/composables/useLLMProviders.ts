@@ -1,7 +1,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import type { SelectorData } from "@/components/base/VSelector/types";
 import { commands, type LLMProvider } from "@/services/cmds";
-import { showError } from "@/services/errors";
+import { useConfig } from "@/composables/useConfig";
 import { label } from "@/labels";
 
 export function useLLMProviders() {
@@ -12,7 +12,8 @@ export function useLLMProviders() {
   );
   const providerData = computed<SelectorData>(() => ({
     label: label("provider"),
-    annotation: "从列表选择用于 AI 答题的服务商。点击“New”可添加自定义服务；自定义接口需兼容 OpenAI Chat Completions 格式，并在 Model 中添加该服务支持的模型。",
+    annotation:
+      "从列表选择用于 AI 答题的服务商。点击“New”可添加自定义服务；自定义接口需兼容 OpenAI Chat Completions 格式，并在 Model 中添加该服务支持的模型。",
     selectedIndex: selectedProviderIndex.value,
     mutable: true,
     items: providers.map((provider) => ({
@@ -25,7 +26,8 @@ export function useLLMProviders() {
 
     return {
       label: label("model"),
-      annotation: "选择服务商提供的模型。添加自定义模型时，点击“New”并填写服务商控制台中的模型 ID，名称需完全一致，例如 glm-4.7-flash。",
+      annotation:
+        "选择服务商提供的模型。添加自定义模型时，点击“New”并填写服务商控制台中的模型 ID，名称需完全一致，例如 glm-4.7-flash。",
       selectedIndex: provider?.chosenModel ?? 0,
       mutable: provider?.isCustom ?? false,
       items:
@@ -35,90 +37,93 @@ export function useLLMProviders() {
         })) ?? [],
     };
   });
-  const logCommandError = (cause: unknown) =>
-    showError("配置命令执行失败:", cause);
+  const { load, save } = useConfig(
+    () => Promise.all([commands.providers(), commands.currentProvider()]),
+    ([loadedProviders, activeProvider]) => {
+      providers.splice(0, providers.length, ...loadedProviders);
+      const normalizedActiveProvider = activeProvider.toLowerCase();
+      selectedProviderIndex.value = Math.max(
+        0,
+        loadedProviders.findIndex(
+          (provider) =>
+            provider.name.toLowerCase() === normalizedActiveProvider,
+        ),
+      );
+    },
+    "配置命令执行失败:",
+  );
   const saveSelectedProvider = () =>
-    commands.upsertProvider(selectedProvider.value!).catch(logCommandError);
+    save(() => commands.upsertProvider(selectedProvider.value!));
+  const saveApiKey = (key: string) => save(() => commands.setKey(key));
 
-  const selectProvider = async (index: number) => {
-    selectedProviderIndex.value = index;
-    await commands
-      .switchProvider(selectedProvider.value!.name)
-      .catch(logCommandError);
-  };
-  const addProvider = async (name: string) => {
-    const provider: LLMProvider = {
-      name: name.trim(),
-      isCustom: true,
-      protocol: "OpenAIChatCompletions",
-      baseUrl: "https://api.example.com/v1",
-      apiKey: null,
-      models: [],
-      chosenModel: null,
-    };
-    await commands.upsertProvider(provider).catch(logCommandError);
-    providers.push(provider);
-    await selectProvider(providers.length - 1);
-  };
-  const renameProvider = async (index: number, name: string) => {
-    const previous = providers[index];
-    const provider = { ...previous, name: name.trim() };
-    await commands.upsertProvider(provider).catch(logCommandError);
-    if (index === selectedProviderIndex.value)
-      await commands.switchProvider(provider.name).catch(logCommandError);
-    await commands.removeProvider(previous.name).catch(logCommandError);
-    providers[index] = provider;
-  };
-  const deleteProvider = async (index: number) => {
-    const provider = providers[index];
-    if (index === selectedProviderIndex.value) {
-      await commands.switchProvider(providers[0].name).catch(logCommandError);
-    }
-    await commands.removeProvider(provider.name).catch(logCommandError);
-    providers.splice(index, 1);
-    selectedProviderIndex.value =
-      index === selectedProviderIndex.value
-        ? 0
-        : index < selectedProviderIndex.value
-          ? selectedProviderIndex.value - 1
-          : selectedProviderIndex.value;
-  };
+  const selectProvider = (index: number) =>
+    save(() => commands.switchProvider(providers[index].name));
+  const addProvider = (name: string) =>
+    save(async () => {
+      const provider: LLMProvider = {
+        name: name.trim(),
+        isCustom: true,
+        protocol: "OpenAIChatCompletions",
+        baseUrl: "https://api.example.com/v1",
+        apiKey: null,
+        models: [],
+        chosenModel: null,
+      };
+      await commands.upsertProvider(provider);
+      await commands.switchProvider(provider.name);
+    });
+  const renameProvider = (index: number, name: string) =>
+    save(async () => {
+      const previous = providers[index];
+      const provider = { ...previous, name: name.trim() };
+      await commands.upsertProvider(provider);
+      if (index === selectedProviderIndex.value)
+        await commands.switchProvider(provider.name);
+      await commands.removeProvider(previous.name);
+    });
+  const deleteProvider = (index: number) =>
+    save(async () => {
+      const provider = providers[index];
+      if (index === selectedProviderIndex.value) {
+        await commands.switchProvider(providers[0].name);
+      }
+      await commands.removeProvider(provider.name);
+    });
 
-  const selectModel = async (index: number) => {
-    selectedProvider.value!.chosenModel = index;
-    await commands.switchModel(index);
-  };
-  const addModel = async (name: string) => {
-    const provider = selectedProvider.value!;
-    provider.models.push(name.trim());
-    await saveSelectedProvider();
-    await selectModel(provider.models.length - 1);
-  };
-  const renameModel = async (index: number, name: string) => {
-    selectedProvider.value!.models[index] = name.trim();
-    await saveSelectedProvider();
-  };
-  const deleteModel = async (index: number) => {
-    const provider = selectedProvider.value!;
-    provider.models.splice(index, 1);
-    if (provider.chosenModel === index) provider.chosenModel = null;
-    else if ((provider.chosenModel ?? -1) > index) provider.chosenModel! -= 1;
-    await saveSelectedProvider();
-  };
-  onMounted(async () => {
-    const [loadedProviders, activeProvider] = await Promise.all([
-      commands.providers(),
-      commands.currentProvider(),
-    ]);
-    providers.push(...loadedProviders);
-    const normalizedActiveProvider = activeProvider.toLowerCase();
-    selectedProviderIndex.value = Math.max(
-      0,
-      loadedProviders.findIndex(
-        (provider) => provider.name.toLowerCase() === normalizedActiveProvider,
-      ),
-    );
-  });
+  const selectModel = (index: number) =>
+    save(() => commands.switchModel(index));
+  const addModel = (name: string) =>
+    save(async () => {
+      const provider = selectedProvider.value!;
+      await commands.upsertProvider({
+        ...provider,
+        models: [...provider.models, name.trim()],
+      });
+      await commands.switchModel(provider.models.length);
+    });
+  const renameModel = (index: number, name: string) =>
+    save(async () => {
+      const provider = selectedProvider.value!;
+      await commands.upsertProvider({
+        ...provider,
+        models: provider.models.map((model, modelIndex) =>
+          modelIndex === index ? name.trim() : model,
+        ),
+      });
+    });
+  const deleteModel = (index: number) =>
+    save(async () => {
+      const provider = selectedProvider.value!;
+      let chosenModel = provider.chosenModel;
+      if (chosenModel === index) chosenModel = null;
+      else if (chosenModel !== null && chosenModel > index) chosenModel -= 1;
+      await commands.upsertProvider({
+        ...provider,
+        models: provider.models.filter((_, modelIndex) => modelIndex !== index),
+        chosenModel,
+      });
+    });
+  onMounted(load);
 
   return {
     providers,
@@ -135,5 +140,6 @@ export function useLLMProviders() {
     renameModel,
     deleteModel,
     saveSelectedProvider,
+    saveApiKey,
   };
 }

@@ -26,6 +26,7 @@ pub async fn healthy() -> CommandsResult<String> {
         .get(&active_id)
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("大模型提供商 [{}] 不存在", active_id))?;
+    let general = *CONFIG.general.lock();
     let answers = llm::solve(
         &provider,
         vec![Question {
@@ -35,6 +36,7 @@ pub async fn healthy() -> CommandsResult<String> {
             options: Vec::new(),
             images: Vec::new(),
         }],
+        general,
     )
     .await
     .map_err(|error| anyhow::anyhow!("{error:#}"))?;

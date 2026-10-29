@@ -26,7 +26,8 @@ pub async fn solve(payload: QuestionPayload) -> Result<Vec<AnswerItem>> {
         .get(&active_id)
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("大模型提供商 [{}] 不存在", active_id))?;
-    llm::solve(&provider, decrypted).await
+    let general = *CONFIG.general.lock();
+    llm::solve(&provider, decrypted, general).await
 }
 
 #[cfg(test)]
