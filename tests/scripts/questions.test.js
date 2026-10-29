@@ -3,10 +3,8 @@ import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import matchingHtml from "../fixtures/chaoxing/exam-matching.html?raw";
 import singleHtml from "../fixtures/chaoxing/exam-single.html?raw";
-import {
-  extractQuestion,
-  extractPayload,
-} from "@injected/chaoxing/questions/extract.js";
+import { extractQuestion } from "@injected/chaoxing/questions/extract.js";
+import { parseFolio, questions } from "@injected/chaoxing/questions/folio.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
 import { fillAnswer } from "@injected/chaoxing/questions/fill.js";
 import { fillMatching } from "@injected/chaoxing/questions/matching.js";
@@ -157,10 +155,11 @@ describe.each([
 describe("user-provided Chaoxing exam HTML", () => {
   it("returns the same payload shape without a font for the real exam page", () => {
     const node = load(singleHtml);
-    expect(extractPayload(document, [node], SELECTORS.workExam)).toEqual({
-      questions: [extractQuestion(node, SELECTORS.workExam)],
-      font: null,
-    });
+    const { folio } = parseFolio(document, SELECTORS.workExam);
+    expect(questions(folio.entries)).toEqual([
+      extractQuestion(node, SELECTORS.workExam),
+    ]);
+    expect(folio.font).toBeNull();
   });
 
   it("uses selector configuration to extract the archived quiz questions and exact font bytes", () => {
@@ -169,11 +168,7 @@ describe("user-provided Chaoxing exam HTML", () => {
       readFileSync(`${directory}/webpage.html.gz`),
     ).toString("utf8");
     const doc = new DOMParser().parseFromString(html, "text/html");
-    const payload = extractPayload(
-      doc,
-      doc.querySelectorAll(SELECTORS.quiz.question),
-      SELECTORS.quiz,
-    );
+    const { folio: payload } = parseFolio(doc, SELECTORS.quiz);
     const expected = JSON.parse(
       readFileSync(`${directory}/questions.json`, "utf8"),
     );
@@ -181,7 +176,7 @@ describe("user-provided Chaoxing exam HTML", () => {
       question.kind = question.kind.replace(/[【】]/g, "");
       question.images = [];
     }
-    expect(payload.questions).toEqual(expected);
+    expect(questions(payload.entries)).toEqual(expected);
     expect(payload.font).toEqual(
       Array.from(readFileSync(`${directory}/cxs-font.ttf`)),
     );

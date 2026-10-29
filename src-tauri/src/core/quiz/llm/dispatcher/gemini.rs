@@ -1,9 +1,11 @@
-use super::{answers::parse, media::Image, pool::RequestPool};
-use crate::config::llm::LLMProvider;
-use crate::core::quiz::{
-    Question,
-    llm::{AnswerItem, SYSTEM_PROMPT},
+use super::{
+    answers::parse,
+    batch::Batch,
+    pool::RequestPool,
+    prompt::{Part, Prompt},
 };
+use crate::config::llm::LLMProvider;
+use crate::core::quiz::llm::AnswerItem;
 use anyhow::Result;
 
 /// Google Gemini :generateContent 接口处理
@@ -11,24 +13,25 @@ pub(super) async fn solve(
     client: &reqwest::Client,
     provider: &LLMProvider,
     model: &str,
-    questions: &[Question],
-    images: &[Image],
+    batch: &Batch,
+    prompt: &Prompt,
     pool: &RequestPool,
 ) -> Result<Vec<AnswerItem>> {
     let mut body: serde_json::Value =
         serde_json::from_str(include_str!("../req_body/google.json"))?;
-    let mut parts = vec![serde_json::json!({ "text": serde_json::to_string(questions)? })];
-    for image in images {
-        parts.push(serde_json::json!({
-            "text": format!("题号 {} 的 [{}]", image.question_id, image.marker)
-        }));
-        parts.push(serde_json::json!({
-            "inline_data": { "mime_type": image.mime, "data": image.data }
-        }));
-    }
+    let parts: Vec<_> = prompt
+        .parts
+        .iter()
+        .map(|part| match part {
+            Part::Text(text) => serde_json::json!({"text": text}),
+            Part::Image(image) => {
+                serde_json::json!({"inline_data": {"mime_type": image.mime, "data": image.data}})
+            }
+        })
+        .collect();
     body["contents"] = serde_json::json!([{ "parts": parts }]);
     body["systemInstruction"] = serde_json::json!({
-        "parts": [{ "text": SYSTEM_PROMPT }]
+        "parts": [{ "text": prompt.system }]
     });
 
     let url = format!("{}/{}:generateContent", provider.base_url, model);
@@ -58,5 +61,5 @@ pub(super) async fn solve(
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow::anyhow!("无法从 Google 响应提取文本。原始响应: {}", data))?;
 
-    parse(content, questions)
+    parse(content, batch.questions.iter().map(|item| &item.question))
 }

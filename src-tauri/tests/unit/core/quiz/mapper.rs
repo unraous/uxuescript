@@ -19,43 +19,49 @@ fn test_map_unmapped_chars_unchanged() {
 }
 
 #[test]
-fn test_decrypt_no_font_returns_same_questions() {
-    let q1 = Question {
-        id: "1".into(),
-        kind: "single".into(),
-        stem: "What is 1+1?".into(),
-        options: vec!["A. 1".into(), "B. 2".into()],
-        images: Vec::new(),
+fn decrypts_questions_and_nested_material_with_the_same_font() {
+    use crate::core::quiz::{
+        Question,
+        folio::{Passage, Section},
     };
-    let q2 = Question {
-        id: "2".into(),
-        kind: "multi".into(),
-        stem: "Choose colors".into(),
-        options: vec!["Red".into(), "Blue".into()],
-        images: Vec::new(),
-    };
-
-    let questions = vec![q1.clone(), q2.clone()];
-    let payload = QuestionPayload {
-        questions: questions.clone(),
-        font: None,
-    };
-    let decrypted = decrypt(payload);
-
-    let expected = to_value(&questions).expect("serialize expected failed");
-    let actual = to_value(&decrypted).expect("serialize actual failed");
-    assert_eq!(expected, actual);
-}
-
-#[test]
-fn decrypts_course_page_to_expected_questions() {
-    let raw = QuestionPayload {
-        questions: serde_json::from_str(include_str!("../../../assets/course-page/questions.json"))
-            .unwrap(),
+    let questions: Vec<Question> =
+        serde_json::from_str(include_str!("../../../assets/course-page/questions.json")).unwrap();
+    let expected: Vec<Question> =
+        serde_json::from_str(include_str!("../../../assets/course-page/decrypted.json")).unwrap();
+    let raw = Folio {
+        entries: vec![Entry::Section(Section {
+            title: questions[0].stem.clone(),
+            passage: Some(Passage {
+                text: questions[0].stem.clone(),
+                images: vec![],
+            }),
+            entries: questions.into_iter().map(Entry::Question).collect(),
+        })],
         font: Some(include_bytes!("../../../assets/course-page/cxs-font.ttf").to_vec()),
+        ..Default::default()
     };
     let decrypted = decrypt(raw);
-    let expected: serde_json::Value =
-        serde_json::from_str(include_str!("../../../assets/course-page/decrypted.json")).unwrap();
-    assert_eq!(to_value(decrypted).unwrap(), expected);
+    assert!(decrypted.font.is_none());
+    let Entry::Section(section) = &decrypted.entries[0] else {
+        panic!()
+    };
+    assert_eq!(section.title, expected[0].stem);
+    assert_eq!(section.passage.as_ref().unwrap().text, expected[0].stem);
+    let actual: Vec<_> = section
+        .entries
+        .iter()
+        .map(|entry| match entry {
+            Entry::Question(q) => q,
+            _ => panic!(),
+        })
+        .collect();
+    assert_eq!(to_value(actual).unwrap(), to_value(expected).unwrap());
+    let unchanged = decrypt(decrypted.clone());
+    let Entry::Section(unchanged_section) = &unchanged.entries[0] else {
+        panic!()
+    };
+    assert_eq!(
+        unchanged_section.passage.as_ref().unwrap().text,
+        section.passage.as_ref().unwrap().text
+    );
 }

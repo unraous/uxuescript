@@ -90,3 +90,20 @@ pub fn response(protocol: &LLMProtocol, answers: Value) -> String {
     }
     .to_string()
 }
+
+/// 从三种协议的有序内容块中取出本批题目，用于核对真实请求。
+pub fn input_questions(body: &Value) -> Value {
+    let parts = body
+        .pointer("/messages/1/content")
+        .or_else(|| body.pointer("/input/0/content"))
+        .or_else(|| body.pointer("/contents/0/parts"))
+        .unwrap()
+        .as_array()
+        .unwrap();
+    parts
+        .iter()
+        .filter_map(|part| part["text"].as_str())
+        .filter_map(|text| serde_json::from_str::<Value>(text).ok())
+        .find_map(|mut block| block.get_mut("questions").map(Value::take))
+        .expect("questions content block")
+}

@@ -15,7 +15,25 @@ const workExam = {
   },
   clearSelectedClass: ".stem_answer span:is(.check_answer, .check_answer_dx)",
   textInputs: ".stem_answer textarea, .stem_answer input[type='text']",
+  blanks: ".stem_answer .Answer",
   fontStyles: "style",
+  folio: {
+    section: ".type_tit",
+    titleEnd: ".clear, input, .stem_answer, .readComprehensionQues",
+    // 阅读题结构已验证作业样本；考试暂沿用，待材料题样本确认。
+    reading: ".readComprehensionQues",
+    items: ":scope > .reading_answer",
+    item: {
+      number: ".reader_answer_tit",
+      kind: ".read_type",
+      title: ".reader_answer_tit",
+      titleMeta: ".read_type",
+      choice: {
+        options: ".stem_answer > .hoverDiv",
+        text: ".answer_p",
+      },
+    },
+  },
   matching: {
     groups: [
       ".stem_answer .line_wid_half.fl .lineCt",
@@ -32,6 +50,7 @@ const workExam = {
 
 export const SELECTORS = {
   workExam,
+  context: { title: ".mark_title", courseId: "input#courseId" },
   examPreview: {
     ...workExam,
     question: ".questionLi",
@@ -78,6 +97,24 @@ export const SELECTORS = {
     titleClass: ".newZy_TItle",
     clearSelectedClass: "span:is(.check_answer, .check_answer_dx)",
     textInputs: 'textarea[id^="answer"], textarea',
+    blanks: ".blankItemDiv",
+    // 暂保留既有结构规则；当前 Quiz 样本只有普通题，分区及材料题待验证。
+    folio: {
+      section: ".type_tit",
+      titleEnd: ".clear, input, .stem_answer, .readComprehensionQues",
+      reading: ".readComprehensionQues",
+      items: ":scope > .reading_answer",
+      item: {
+        number: ".reader_answer_tit",
+        kind: ".read_type",
+        title: ".reader_answer_tit",
+        titleMeta: ".read_type",
+        choice: {
+          options: ".stem_answer > .hoverDiv",
+          text: ".answer_p",
+        },
+      },
+    },
     ueditorIframe: 'iframe[id^="ueditor_"]',
     frameContentId: "#frame_content",
     btnSubmitClass: "a.btnSubmit",

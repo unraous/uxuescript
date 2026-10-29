@@ -5,8 +5,9 @@
  * @typedef {(command: "confirm", args: {message: string}) => Promise<boolean>} ConfirmInvoke
  * @typedef {(command: "send_status", args: {status: Parameters<Commands["sendStatus"]>[0]}) => ReturnType<Commands["sendStatus"]>} StatusInvoke
  * @typedef {(command: "insert_course_meta_map", args: {courseId: string, metadata: Parameters<Commands["insertCourseMetaMap"]>[1]}) => Promise<void>} MetadataInvoke
+ * @typedef {(command: "query_course_meta", args: {courseId: string}) => ReturnType<Commands["queryCourseMeta"]>} QueryMetadataInvoke
  * @typedef {(command: "plugin:log|log", args: {level: number, message: string, location?: string}) => Promise<void>} LogInvoke
- * @typedef {OptionsInvoke & SolveInvoke & ConfirmInvoke & StatusInvoke & MetadataInvoke & LogInvoke} InjectedInvoke
+ * @typedef {OptionsInvoke & SolveInvoke & ConfirmInvoke & StatusInvoke & MetadataInvoke & QueryMetadataInvoke & LogInvoke} InjectedInvoke
  */
 
 /** 当前 WebView 的 IPC 入口；普通浏览器中为 undefined。 */

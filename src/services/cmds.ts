@@ -6,7 +6,7 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 export const commands = {
 	/**  用固定简答题检查当前 API 和模型，成功返回 ok，失败返回具体错误字符串。 */
 	healthy: () => __TAURI_INVOKE<string>("healthy"),
-	solveQuestions: (payload: QuestionPayload_Deserialize) => __TAURI_INVOKE<AnswerItem[]>("solve_questions", { payload }),
+	solveQuestions: (payload: Folio_Deserialize) => __TAURI_INVOKE<AnswerItem[]>("solve_questions", { payload }),
 	insertCourseMetaMap: (courseId: string, metadata: CourseMetadata) => __TAURI_INVOKE<void>("insert_course_meta_map", { courseId, metadata }),
 	queryCourseMeta: (courseId: string) => __TAURI_INVOKE<{
 	title: string,
@@ -105,6 +105,49 @@ export type CourseMetadata = {
 
 export type CourseStatus = { kind: "waiting"; payload: null } | { kind: "start"; payload: null } | { kind: "chapter"; payload: ChapterProgressPayload } | { kind: "tab"; payload: TabProgressPayload } | { kind: "task"; payload: TaskProgressPayload } | { kind: "cancel"; payload: null } | { kind: "finish"; payload: null };
 
+/**  条目：篇负责组织关系，题负责表达需要作答的内容。 */
+export type Entry = Entry_Serialize | Entry_Deserialize;
+
+/**  条目：篇负责组织关系，题负责表达需要作答的内容。 */
+export type Entry_Deserialize = { type: "section"; data: Section_Deserialize } | { type: "question"; data: Question_Deserialize };
+
+/**  条目：篇负责组织关系，题负责表达需要作答的内容。 */
+export type Entry_Serialize = { type: "section"; data: Section_Serialize } | { type: "question"; data: Question_Serialize };
+
+/**  卷：保留页面题目层级及用于文字还原的字体。 */
+export type Folio = Folio_Serialize | Folio_Deserialize;
+
+/**  卷面所属课业背景；只保留页面或课程缓存中真实存在的信息。 */
+export type FolioContext = FolioContext_Serialize | FolioContext_Deserialize;
+
+/**  卷面所属课业背景；只保留页面或课程缓存中真实存在的信息。 */
+export type FolioContext_Deserialize = {
+	course?: string | null,
+	chapter?: string | null,
+	title?: string | null,
+};
+
+/**  卷面所属课业背景；只保留页面或课程缓存中真实存在的信息。 */
+export type FolioContext_Serialize = {
+	course?: string | null,
+	chapter?: string | null,
+	title?: string | null,
+};
+
+/**  卷：保留页面题目层级及用于文字还原的字体。 */
+export type Folio_Deserialize = {
+	entries: Entry_Deserialize[],
+	font: number[] | null,
+	context?: FolioContext_Deserialize,
+};
+
+/**  卷：保留页面题目层级及用于文字还原的字体。 */
+export type Folio_Serialize = {
+	entries: Entry_Serialize[],
+	font: number[] | null,
+	context: FolioContext_Serialize,
+};
+
 export type GeneralConfig = {
 	labelLanguage?: LabelLanguage,
 	concurrency?: number,
@@ -134,6 +177,12 @@ export type OptionsConfig = {
 	quizReview?: boolean,
 };
 
+/**  文：属于本篇的公共材料，不在解析阶段复制到子题。 */
+export type Passage = {
+	text: string,
+	images: QuestionImage[],
+};
+
 export type PathsConfig = {
 	dirs?: { [key in string]: string },
 	files?: { [key in string]: string },
@@ -146,27 +195,14 @@ export type QuestionImage = {
 	url: string,
 };
 
-/**  前端采集的题目与可选字体；分页方式和平台内部 ID 不进入求解协议。 */
-export type QuestionPayload = QuestionPayload_Serialize | QuestionPayload_Deserialize;
-
-/**  前端采集的题目与可选字体；分页方式和平台内部 ID 不进入求解协议。 */
-export type QuestionPayload_Deserialize = {
-	questions: Question_Deserialize[],
-	font: number[] | null,
-};
-
-/**  前端采集的题目与可选字体；分页方式和平台内部 ID 不进入求解协议。 */
-export type QuestionPayload_Serialize = {
-	questions: Question_Serialize[],
-	font: number[] | null,
-};
-
 export type Question_Deserialize = {
 	/**  页面显示题号，不是平台内部题目 ID。 */
 	id: string,
 	kind: string,
 	stem: string,
 	options: string[],
+	/**  填空题实际填写位置数；其他题型不提供。 */
+	blank_count?: number | null,
 	/**  图片地址只用于后端加载媒体；模型文本通过题干中的占位符引用图片。 */
 	images?: QuestionImage[],
 };
@@ -177,6 +213,25 @@ export type Question_Serialize = {
 	kind: string,
 	stem: string,
 	options: string[],
+	/**  填空题实际填写位置数；其他题型不提供。 */
+	blank_count?: number | null,
+};
+
+/**  篇：题型分区或材料题组；子篇可以拥有自己的材料。 */
+export type Section = Section_Serialize | Section_Deserialize;
+
+/**  篇：题型分区或材料题组；子篇可以拥有自己的材料。 */
+export type Section_Deserialize = {
+	title: string,
+	passage: Passage | null,
+	entries: Entry_Deserialize[],
+};
+
+/**  篇：题型分区或材料题组；子篇可以拥有自己的材料。 */
+export type Section_Serialize = {
+	title: string,
+	passage: Passage | null,
+	entries: Entry_Serialize[],
 };
 
 export type TabProgressPayload = {

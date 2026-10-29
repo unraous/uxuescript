@@ -1,5 +1,6 @@
 use super::*;
 use crate::config::llm::{LLMProtocol, LLMProvider};
+use crate::test_support::http::input_questions;
 use crate::test_support::http::{response, serve, serve_sequence};
 use serde_json::{Value, json};
 
@@ -59,12 +60,12 @@ async fn sends_question_payload_to_the_selected_model_without_a_font() {
         {"id": "406063268", "kind": "多选题", "stem": "多选题干", "options": ["A 甲", "B 乙", "C 丙"]},
         {"id": "406063270", "kind": "简答题", "stem": "简答题干", "options": []}
     ]);
-    let questions = serde_json::from_value(input.clone()).unwrap();
+    let questions: Vec<Question> = serde_json::from_value(input.clone()).unwrap();
     let result = probe_with(
         &provider(protocol, url),
-        super::solve_questions(QuestionPayload {
-            questions,
-            font: None,
+        super::solve_questions(Folio {
+            entries: questions.into_iter().map(Entry::Question).collect(),
+            ..Default::default()
         }),
     )
     .await
@@ -74,15 +75,14 @@ async fn sends_question_payload_to_the_selected_model_without_a_font() {
     assert_eq!(result[2].content, "新时代的重大意义。");
     let request = request.await.unwrap();
     assert_eq!(request.body["model"], "probe-model");
-    let sent: Value =
-        serde_json::from_str(request.body["messages"][1]["content"].as_str().unwrap()).unwrap();
+    let sent: Value = input_questions(&request.body);
     assert_eq!(sent, input);
 }
 
 #[tokio::test]
 async fn decrypts_question_payload_before_sending_it_to_the_model() {
     let protocol = LLMProtocol::OpenAIChatCompletions;
-    let questions =
+    let questions: Vec<Question> =
         serde_json::from_str(include_str!("../../assets/course-page/questions.json")).unwrap();
     let expected: Vec<Question> =
         serde_json::from_str(include_str!("../../assets/course-page/decrypted.json")).unwrap();
@@ -94,17 +94,17 @@ async fn decrypts_question_payload_before_sending_it_to_the_model() {
         })
         .collect();
     let (url, request) = serve(200, response(&protocol, json!(answers))).await;
-    let payload = QuestionPayload {
-        questions,
+    let payload = Folio {
+        entries: questions.into_iter().map(Entry::Question).collect(),
         font: Some(include_bytes!("../../assets/course-page/cxs-font.ttf").to_vec()),
+        ..Default::default()
     };
     let result = probe_with(&provider(protocol, url), super::solve_questions(payload))
         .await
         .unwrap();
     assert_eq!(result.len(), 5);
     let request = request.await.unwrap();
-    let sent: Value =
-        serde_json::from_str(request.body["messages"][1]["content"].as_str().unwrap()).unwrap();
+    let sent: Value = input_questions(&request.body);
     assert_eq!(sent, serde_json::to_value(expected).unwrap());
 }
 
@@ -124,14 +124,14 @@ async fn probes_all_protocols_with_the_selected_model_and_fixed_question() {
         assert_eq!(probe(&provider).await.unwrap(), "ok");
         let request = request.await.unwrap();
         let body = request.body;
-        let question = match provider.protocol {
+        match provider.protocol {
             LLMProtocol::OpenAIChatCompletions => {
                 assert_eq!(body["model"], "probe-model");
-                body["messages"][1]["content"].as_str().unwrap()
+                assert!(body["messages"][1]["content"].is_array());
             }
             LLMProtocol::OpenAIResponses => {
                 assert_eq!(body["model"], "probe-model");
-                body["input"].as_str().unwrap()
+                assert!(body["input"].is_array());
             }
             LLMProtocol::GoogleGemini => {
                 assert!(
@@ -139,10 +139,10 @@ async fn probes_all_protocols_with_the_selected_model_and_fixed_question() {
                         .head
                         .starts_with("POST /probe-model:generateContent ")
                 );
-                body["contents"][0]["parts"][0]["text"].as_str().unwrap()
+                assert!(body["contents"][0]["parts"].is_array());
             }
         };
-        let questions: Value = serde_json::from_str(question).unwrap();
+        let questions = input_questions(&body);
         assert_eq!(questions.as_array().unwrap().len(), 1);
         assert_eq!(questions[0]["stem"], "天空为什么是蓝色的？请用一句话回答。");
     }

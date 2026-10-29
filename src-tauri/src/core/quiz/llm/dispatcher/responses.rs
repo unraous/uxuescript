@@ -1,9 +1,11 @@
-use super::{answers::parse, media::Image, pool::RequestPool};
-use crate::config::llm::LLMProvider;
-use crate::core::quiz::{
-    Question,
-    llm::{AnswerItem, SYSTEM_PROMPT},
+use super::{
+    answers::parse,
+    batch::Batch,
+    pool::RequestPool,
+    prompt::{Part, Prompt},
 };
+use crate::config::llm::LLMProvider;
+use crate::core::quiz::llm::AnswerItem;
 use anyhow::Result;
 
 /// OpenAI /v1/responses 接口处理
@@ -11,33 +13,28 @@ pub(super) async fn solve(
     client: &reqwest::Client,
     provider: &LLMProvider,
     model: &str,
-    questions: &[Question],
-    images: &[Image],
+    batch: &Batch,
+    prompt: &Prompt,
     pool: &RequestPool,
 ) -> Result<Vec<AnswerItem>> {
     let mut request_body: serde_json::Value =
         serde_json::from_str(include_str!("../req_body/openai.json"))?;
     request_body["model"] = serde_json::json!(model);
     request_body["instructions"] = serde_json::json!(format!(
-        "{SYSTEM_PROMPT}\n本次输出遵循 JSON Schema，将答案数组放在 answers 字段中。"
+        "{}\n本次输出遵循 JSON Schema，将答案数组放在 answers 字段中。",
+        prompt.system
     ));
-    let question_text = serde_json::to_string(questions)?;
-    request_body["input"] = if images.is_empty() {
-        serde_json::json!(question_text)
-    } else {
-        let mut content = vec![serde_json::json!({ "type": "input_text", "text": question_text })];
-        for image in images {
-            content.push(serde_json::json!({
-                "type": "input_text",
-                "text": format!("题号 {} 的 [{}]", image.question_id, image.marker)
-            }));
-            content.push(serde_json::json!({
-                "type": "input_image",
-                "image_url": image.data_url()
-            }));
-        }
-        serde_json::json!([{ "role": "user", "content": content }])
-    };
+    let content: Vec<_> = prompt
+        .parts
+        .iter()
+        .map(|part| match part {
+            Part::Text(text) => serde_json::json!({"type": "input_text", "text": text}),
+            Part::Image(image) => {
+                serde_json::json!({"type": "input_image", "image_url": image.data_url()})
+            }
+        })
+        .collect();
+    request_body["input"] = serde_json::json!([{ "role": "user", "content": content }]);
 
     let response = pool
         .send(|| {
@@ -74,5 +71,5 @@ pub(super) async fn solve(
         })
         .ok_or_else(|| anyhow::anyhow!("无法从 OpenAI 响应提取文本。原始响应: {}", data))?;
 
-    parse(content, questions)
+    parse(content, batch.questions.iter().map(|item| &item.question))
 }

@@ -133,7 +133,11 @@ describe("homework takeover", () => {
     const call = page.invoke.mock.calls.find(
       ([command]) => command === "solve_questions",
     );
-    const { questions, font } = call[1].payload;
+    const { entries, font } =
+      /** @type {import("@injected/chaoxing/questions/folio.js").Folio} */ (
+        call[1].payload
+      );
+    const questions = entries.map((entry) => entry.data);
     expect(font).toBeNull();
     expect(questions).toHaveLength(11);
     expect(questions[0]).toEqual({

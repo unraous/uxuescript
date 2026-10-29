@@ -7,13 +7,19 @@ async fn test_solve_payload_integration() {
     let api_key =
         std::env::var("BIGMODEL_API_KEY").expect("请在 .env 文件或环境变量中设置 BIGMODEL_API_KEY");
 
-    let payload = QuestionPayload {
-        questions: serde_json::from_str(include_str!("../../assets/course-page/questions.json"))
-            .unwrap(),
+    let payload = Folio {
+        entries: serde_json::from_str::<Vec<Question>>(include_str!(
+            "../../assets/course-page/questions.json"
+        ))
+        .unwrap()
+        .into_iter()
+        .map(Entry::Question)
+        .collect(),
         font: Some(include_bytes!("../../assets/course-page/cxs-font.ttf").to_vec()),
+        ..Default::default()
     };
     let decrypted = decrypt(payload);
-    assert!(!decrypted.is_empty(), "解密后的题目列表不应为空");
+    assert!(!decrypted.entries.is_empty(), "解密后的题目列表不应为空");
 
     let mut provider = CONFIG
         .llm

@@ -1,24 +1,8 @@
-import { config, cooldown } from "@injected/chaoxing/runtime.js";
+import { config } from "@injected/chaoxing/runtime.js";
 import { wait, sleep, assert } from "@injected/utils/async.js";
-import { invoke, confirm } from "@injected/utils/backend.js";
-import { fillAnswer } from "@injected/chaoxing/questions/fill.js";
-import { extractPayload } from "@injected/chaoxing/questions/extract.js";
+import { confirm } from "@injected/utils/backend.js";
+import { answerPage } from "@injected/chaoxing/questions/page.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
-/**
- * @param {Element[]} quizList
- * @param {import("../../../../../src/services/cmds").AnswerItem[]} answersList
- */
-const applyAnswers = async (quizList, answersList) => {
-  assert(
-    quizList.length === answersList.length,
-    `AI 返回答案数 (${answersList.length}) 与题目数 (${quizList.length}) 不匹配，拒绝提交`,
-  );
-  for (const [index, quizDiv] of quizList.entries()) {
-    await cooldown();
-    await fillAnswer(quizDiv, answersList[index].content, SELECTORS.quiz);
-  }
-};
-
 /**
  * 提取章节测验题目与字体交给后端求解，填写后按配置核验并提交。
  * @param {Document} taskDoc 包含答题框架的测验任务点文档。
@@ -32,12 +16,11 @@ export const handleQuiz = async (taskDoc) => {
     taskDoc,
     "获取答题框架文档超时",
   );
-  const quizList = await wait.elements(null, SELECTORS.quiz.question, quizDoc);
-
-  const answersList = await invoke("solve_questions", {
-    payload: extractPayload(quizDoc, quizList, SELECTORS.quiz),
-  });
-  await applyAnswers(quizList, answersList);
+  const skipped = await answerPage(quizDoc, SELECTORS.quiz);
+  assert(
+    skipped.length === 0,
+    `存在未支持题型，停止提交：${skipped.join("、")}`,
+  );
 
   if (config.debugTaskTypes.includes("Quiz")) {
     assert(

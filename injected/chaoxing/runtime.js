@@ -42,6 +42,10 @@ class AppConfig {
 /** 当前脚本上下文共享的运行配置。 */
 export const config = new AppConfig();
 
+/** 当前课程流程已经确认的课业背景。独立作业、考试有各自的脚本上下文。 */
+export const studyContext =
+  /** @type {import("../../src/services/cmds").FolioContext} */ ({});
+
 /**
  * 按共享配置等待操作间隔；null 表示关闭，等待时间上下浮动 25%。
  * @returns {Promise<void>}

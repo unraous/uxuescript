@@ -79,7 +79,7 @@ it("solves the full page once, fills by displayed number and reports unsupported
   expect(answerPaged).not.toHaveBeenCalled();
   expect(backend.invoke).toHaveBeenLastCalledWith("solve_questions", {
     payload: {
-      questions: [
+      entries: [
         {
           id: "1",
           kind: "单选题",
@@ -94,8 +94,9 @@ it("solves the full page once, fills by displayed number and reports unsupported
           options: ["A 选项"],
           images: [],
         },
-      ],
+      ].map((data) => ({ type: "question", data })),
       font: null,
+      context: {},
     },
   });
   const nodes = document.querySelectorAll(".questionLi");

@@ -12,7 +12,7 @@ vi.mock("@injected/chaoxing/questions/fill.js", () => ({
   fillAnswer: vi.fn(),
 }));
 
-const key = "uxs:exam:paper:user";
+const key = "uxs:exam:folio:paper:user";
 const entries = [
   { id: "q1", start: 0 },
   { id: "q2", start: 1 },
@@ -24,6 +24,22 @@ const questions = entries.map((_entry, index) => ({
   options: ["A 选项"],
   images: /** @type {{marker: string, url: string}[]} */ ([]),
 }));
+/** @type {import("@injected/chaoxing/questions/folio.js").Folio[]} */
+const pages = questions.map(
+  /** @returns {import("@injected/chaoxing/questions/folio.js").Folio} */ (
+    question,
+  ) => ({
+    entries: [{ type: /** @type {const} */ ("question"), data: question }],
+    font: null,
+    context: {},
+  }),
+);
+/** @type {import("@injected/chaoxing/questions/folio.js").Folio} */
+const payload = {
+  entries: pages.flatMap((page) => page.entries),
+  font: null,
+  context: {},
+};
 const answers = [
   { index: "1", content: "A", explanation: "" },
   { index: "2", content: "B", explanation: "" },
@@ -99,8 +115,7 @@ it("reports manual navigation instead of correcting the stored position", async 
     index: 1,
     config: { switchingCd: null },
     entries,
-    questions,
-    font: null,
+    pages,
     answers,
   });
   await answerPaged();
@@ -119,7 +134,7 @@ it("collects the first question and advances without solving", async () => {
   expect(storedRun()).toMatchObject({
     phase: "collect",
     index: 1,
-    questions: [questions[0]],
+    pages: [pages[0]],
   });
   expect(navigate).toHaveBeenCalledExactlyOnceWith(1, "0");
   expect(backend.invoke).toHaveBeenCalledExactlyOnceWith("options");
@@ -131,18 +146,17 @@ it("solves the collected paper at the last question and returns to the first", a
     index: 1,
     config: { switchingCd: null },
     entries,
-    questions: [questions[0]],
-    font: null,
+    pages: [pages[0]],
     answers: [],
   });
   await answerPaged();
   expect(backend.invoke).toHaveBeenLastCalledWith("solve_questions", {
-    payload: { questions, font: null },
+    payload,
   });
   expect(storedRun()).toMatchObject({
     phase: "answer",
     index: 0,
-    questions,
+    pages,
     answers,
   });
   expect(navigate).toHaveBeenCalledExactlyOnceWith(0, "0");
@@ -156,8 +170,7 @@ it("fills an answer by displayed number and advances", async () => {
     index: 0,
     config: { switchingCd: null },
     entries,
-    questions,
-    font: null,
+    pages,
     answers,
   });
   await answerPaged();
@@ -179,8 +192,7 @@ it("saves the last answer and clears progress without submitting or navigating",
     index: 1,
     config: { switchingCd: null },
     entries,
-    questions,
-    font: null,
+    pages,
     answers,
   });
   await answerPaged();
@@ -204,8 +216,7 @@ it("awaits answers before switching strategy or navigating", async () => {
     index: 1,
     config: { switchingCd: null },
     entries,
-    questions: [questions[0]],
-    font: null,
+    pages: [pages[0]],
     answers: [],
   });
   /** @type {(answers: import("../../src/services/cmds").AnswerItem[]) => void} */
@@ -217,13 +228,13 @@ it("awaits answers before switching strategy or navigating", async () => {
   const processing = answerPaged();
   await vi.waitFor(() =>
     expect(backend.invoke).toHaveBeenCalledWith("solve_questions", {
-      payload: { questions, font: null },
+      payload,
     }),
   );
   expect(storedRun()).toMatchObject({
     phase: "collect",
     index: 1,
-    questions,
+    pages,
     answers: [],
   });
   expect(navigate).not.toHaveBeenCalled();

@@ -1,12 +1,10 @@
 import { config, cooldown } from "@injected/chaoxing/runtime.js";
 import { assert, wait } from "@injected/utils/async.js";
-import { invoke, confirm } from "@injected/utils/backend.js";
-import {
-  extractPayload,
-  classifyQuestion,
-} from "@injected/chaoxing/questions/extract.js";
-import { fillAnswer } from "@injected/chaoxing/questions/fill.js";
-import { fillMatching } from "@injected/chaoxing/questions/matching.js";
+import { confirm } from "@injected/utils/backend.js";
+import { parseFolio, questions } from "@injected/chaoxing/questions/folio.js";
+import { solveFolio, applyAnswers } from "@injected/chaoxing/questions/page.js";
+import { readContext } from "@injected/chaoxing/questions/context.js";
+import { classifyQuestion } from "@injected/chaoxing/questions/extract.js";
 import { QuestionType } from "@injected/chaoxing/questions/types.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
 const ANSWER_CARD_ENTRIES = ".topicNumber_list li[data-asq]";
@@ -21,8 +19,7 @@ const page =
  * @property {number} index 当前待处理题目在答题卡中的位置，从 0 开始。
  * @property {{switchingCd: number|null}} config 本次运行使用的配置快照。
  * @property {{id: string, start: number}[]} entries
- * @property {import("@injected/chaoxing/questions/extract.js").Question[]} questions
- * @property {number[] | null} font
+ * @property {import("@injected/chaoxing/questions/folio.js").Folio[]} pages
  * @property {import("../../../src/services/cmds").AnswerItem[]} answers
  */
 
@@ -105,8 +102,7 @@ const startRun = async () => {
     index: 0,
     config: { switchingCd: config.switchingCd },
     entries,
-    questions: [],
-    font: null,
+    pages: [],
     answers: [],
   };
 };
@@ -141,14 +137,11 @@ const navigateTo = async (entry) => {
  * @returns {Promise<void>}
  */
 const solveExam = async (run) => {
-  const questions = run.questions.filter(
-    (question) => classifyQuestion(question.kind) !== QuestionType.Other,
-  );
-  run.answers = questions.length
-    ? await invoke("solve_questions", {
-        payload: { questions, font: run.font },
-      })
-    : [];
+  run.answers = await solveFolio({
+    entries: run.pages.flatMap((folio) => folio.entries),
+    font: run.pages.find((folio) => folio.font)?.font ?? null,
+    context: run.pages[0].context,
+  });
 };
 
 /**
@@ -158,13 +151,13 @@ const solveExam = async (run) => {
  * @returns {Promise<void>}
  */
 const answerQuestion = async (node, run) => {
-  const question = run.questions[run.index];
-  if (classifyQuestion(question.kind) !== QuestionType.Other) {
-    const answer = run.answers.find((item) => item.index === question.id);
-    if (classifyQuestion(question.kind) === QuestionType.Matching)
-      fillMatching(node, question.options, answer.content);
-    else await fillAnswer(node, answer.content, SELECTORS.workExam);
-  }
+  const { folio, anchors } = parseFolio(node.ownerDocument, SELECTORS.workExam);
+  const ids = new Set(questions(folio.entries).map((question) => question.id));
+  await applyAnswers(
+    folio,
+    anchors,
+    run.answers.filter((answer) => ids.has(answer.index)),
+  );
 };
 
 /**
@@ -176,11 +169,13 @@ const answerQuestion = async (node, run) => {
 const finishExam = async (run, key) => {
   await save();
   window.sessionStorage.removeItem(key);
-  const skipped = run.questions.flatMap((item) =>
-    classifyQuestion(item.kind) !== QuestionType.Other
-      ? []
-      : [`${item.id}（${item.kind}）`],
-  );
+  const skipped = run.pages
+    .flatMap((folio) => questions(folio.entries))
+    .flatMap((item) =>
+      classifyQuestion(item.kind) !== QuestionType.Other
+        ? []
+        : [`${item.id}（${item.kind}）`],
+    );
   await confirm(
     `答案已填写并暂存，请核对答案后自行交卷；如有图片题，请确认当前模型具备视觉能力！！${skipped.length ? `\n需人工处理的题号：${skipped.join("、")}` : ""}`,
   );
@@ -191,10 +186,11 @@ const finishExam = async (run, key) => {
  * @param {Element} node 当前题目容器。
  * @param {ExamRun} run 考试进度。
  */
-const collectQuestion = (node, run) => {
-  const payload = extractPayload(document, [node], SELECTORS.workExam);
-  run.questions[run.index] = payload.questions[0];
-  run.font ??= payload.font;
+const collectQuestion = async (node, run) => {
+  const { folio } = parseFolio(node.ownerDocument, SELECTORS.workExam);
+  folio.context =
+    run.pages[0]?.context ?? (await readContext(node.ownerDocument));
+  run.pages[run.index] = folio;
 };
 
 /**
@@ -205,7 +201,7 @@ const collectQuestion = (node, run) => {
  */
 const execute = async (node, run) => {
   if (run.phase === "collect") {
-    collectQuestion(node, run);
+    await collectQuestion(node, run);
   } else {
     await answerQuestion(node, run);
   }
@@ -250,7 +246,7 @@ export const answerPaged = async () => {
       "等待考试题目超时",
     );
     const current = node.getAttribute("data");
-    key = `uxs:exam:${value("testPaperId")}:${value("testUserRelationId")}`;
+    key = `uxs:exam:folio:${value("testPaperId")}:${value("testUserRelationId")}`;
     run = await initialize(key);
     if (!run) return;
     assert(

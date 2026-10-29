@@ -8,6 +8,7 @@
           "insert_course_meta_map",
           "options",
           "platform",
+          "query_course_meta",
           "send_status",
           "solve_questions"
         ],

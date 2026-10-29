@@ -6,7 +6,7 @@ use reqwest::{
     redirect::Policy,
 };
 
-use crate::core::quiz::Question;
+use crate::core::quiz::QuestionImage;
 
 const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
 // Base64 还会膨胀约三分之一，为 Gemini 的 20 MB 请求上限预留正文空间。
@@ -21,7 +21,7 @@ const TRUSTED_DOMAINS: &[&str] = &[
 ];
 
 pub(super) struct Image {
-    pub question_id: String,
+    pub owner: String,
     pub marker: String,
     pub mime: String,
     pub data: String,
@@ -77,8 +77,8 @@ async fn download(client: &reqwest::Client, url: &str) -> Result<(String, Vec<u8
     Ok((mime, bytes))
 }
 
-pub(super) async fn load(questions: &[Question]) -> Result<Vec<Image>> {
-    if questions.iter().all(|question| question.images.is_empty()) {
+pub(super) async fn load(sources: &[(String, &[QuestionImage])]) -> Result<Vec<Image>> {
+    if sources.iter().all(|(_, images)| images.is_empty()) {
         return Ok(Vec::new());
     }
     let client = reqwest::Client::builder()
@@ -96,17 +96,17 @@ pub(super) async fn load(questions: &[Question]) -> Result<Vec<Image>> {
         .build()?;
     let mut total = 0;
     let mut result = Vec::new();
-    for question in questions {
-        for image in &question.images {
+    for (owner, images) in sources {
+        for image in *images {
             let (mime, bytes) = download(&client, &image.url)
                 .await
-                .with_context(|| format!("题号 {} 的 [{}] 无法读取", question.id, image.marker))?;
+                .with_context(|| format!("{} 的 [{}] 无法读取", owner, image.marker))?;
             total += bytes.len();
             if total > MAX_BATCH_BYTES {
                 bail!("当前批次图片总大小超过 14 MiB");
             }
             result.push(Image {
-                question_id: question.id.clone(),
+                owner: owner.clone(),
                 marker: image.marker.clone(),
                 mime,
                 data: STANDARD.encode(bytes),

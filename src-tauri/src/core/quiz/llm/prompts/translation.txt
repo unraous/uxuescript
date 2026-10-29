@@ -1,0 +1,5 @@
+【翻译题】
+输入：kind 可能是“句子翻译题”；stem 给出待译文本及翻译方向或其他要求，options 通常为空。
+输出：content 仅含完整译文，保留原意、必要术语、语气及段落结构；遵守题目指定的目标语言，不省略句子。没有明确方向时根据原文语言和题目要求判断；解释放在 explanation，不在译文中夹入分析、原文或“译文：”前缀。
+示例输入：{"questions":[{"id":"7","kind":"句子翻译题","stem":"译成英语：社区图书馆方便居民借阅图书。","options":[]}]}
+示例输出：[{"index":"7","explanation":"保留社区图书馆的便利作用。","content":"Community libraries make it convenient for residents to borrow books."}]

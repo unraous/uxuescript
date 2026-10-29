@@ -8,7 +8,7 @@ use super::CommandsResult;
 
 use crate::config::CONFIG;
 use crate::core::quiz::{
-    Question, QuestionPayload,
+    Entry, Folio, Question,
     llm::{self, AnswerItem},
     solve,
 };
@@ -29,13 +29,17 @@ pub async fn healthy() -> CommandsResult<String> {
     let general = *CONFIG.general.lock();
     let answers = llm::solve(
         &provider,
-        vec![Question {
-            id: "1".into(),
-            kind: "简答题".into(),
-            stem: "天空为什么是蓝色的？请用一句话回答。".into(),
-            options: Vec::new(),
-            images: Vec::new(),
-        }],
+        Folio {
+            entries: vec![Entry::Question(Question {
+                id: "1".into(),
+                kind: "简答题".into(),
+                stem: "天空为什么是蓝色的？请用一句话回答。".into(),
+                options: Vec::new(),
+                images: Vec::new(),
+                blank_count: None,
+            })],
+            ..Default::default()
+        },
         general,
     )
     .await
@@ -56,7 +60,7 @@ pub async fn healthy() -> CommandsResult<String> {
 mod tests;
 
 #[uxs_commands::command(webview = "chaoxing")]
-pub async fn solve_questions(payload: QuestionPayload) -> CommandsResult<Vec<AnswerItem>> {
+pub async fn solve_questions(payload: Folio) -> CommandsResult<Vec<AnswerItem>> {
     match solve(payload).await {
         Ok(answers) => {
             log::info!("solve_questions 答题成功，获得答案数量: {}", answers.len());
@@ -79,7 +83,7 @@ pub fn insert_course_meta_map(
     state.insert(course_id, metadata);
 }
 
-#[uxs_commands::command]
+#[uxs_commands::command(webview = "chaoxing")]
 pub fn query_course_meta(
     state: tauri::State<CourseMetaMap>,
     course_id: String,
@@ -88,7 +92,8 @@ pub fn query_course_meta(
     if let Some(ref meta) = metadata {
         log::debug!("成功查询到课程元数据: {:?}，ID: {}", meta, course_id);
     } else {
-        log::warn!("未查询到课程元数据，课程 ID: {}", course_id);
+        // 直接打开作业或考试时，课程列表可能尚未提供元数据。
+        log::debug!("未查询到课程元数据，课程 ID: {}", course_id);
     }
     metadata
 }

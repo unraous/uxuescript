@@ -43,7 +43,11 @@ cargo test -p uxuescript test_solve_bigmodel -- --ignored --nocapture
 
 `tests/fixtures/chaoxing/` 保存用户提供的真实单选、连线题 HTML 节选，去除身份信息及无关页面区域。`tests/scripts/questions.test.js` 检查题目提取和选项点击，尤其覆盖连线题显示编号与内部 `data` 标识不同，以及公式元数据解码和普通图片占位的情况。样本未包含下拉框处理脚本，因此这些用例不验证页面脚本更新隐藏答案或服务端暂存。
 
-同一 JS 用例还读取 `src-tauri/tests/assets/course-page/webpage.html.gz`，用章节测验选择器核对题目列表与字体原始字节。Rust 命令测试分别覆盖 `QuestionPayload` 无字体直传和有字体解密后求解；解密测试及求解联测直接读取题目 JSON 与字体样本，不再解析 HTML。
+同一 JS 用例还读取 `src-tauri/tests/assets/course-page/webpage.html.gz`，用章节测验选择器核对题目列表与字体原始字节。Rust 命令测试分别覆盖 `Folio` 无字体直传和有字体解密后求解；解密测试及求解联测直接读取题目 JSON 与字体样本，不再解析 HTML。
+
+`tests/scripts/folio.test.js` 验证结构化卷面解析。`webpage3.html.gz` 保存用户提供的完整作业 DOM 和页面脚本，账号及签名值已脱敏；测试以静态文档读取，不执行其中脚本。对应的 `folio.json` 同时作为 JS 解析期望与 Rust `Folio` 反序列化样本，覆盖三个分区、两篇阅读材料、十个单选子题、十空填空及翻译题。旧章节和考试样本用于验证题干、选项、字体及分区归属；章节结果页通过保留的空位容器读取空数。附加图片用例检查材料和子题的图片分别保存。
+
+`tests/scripts/folio-flow.test.js` 使用完整作业样本和模拟 IPC、UEditor，验证卷面与课业背景发送、乱序答案按题号定位、十空逐项写入、阅读子题选项隔离以及翻译填写；填空答案少项、多项或空项时不写入任何答案。Rust 批处理和 prompt 用例验证嵌套材料、拆批保留全文、按题型去重及固定排列。三种模型协议的本地 HTTP mock 使用同一卷面样本核对实际请求，并验证错误空数触发批次重试。这些测试不调用真实模型，也不验证平台保存或服务器评分。
 
 测试沿被测职责组织，场景专属数据、mock 和断言留在用例附近。公共支持只收拢真实复用的机制：Rust 的 `src-tauri/tests/unit/support.rs` 与 `support/` 提供 HTTP 模拟，固定样本在 `src-tauri/tests/assets/`。
 

@@ -1,0 +1,228 @@
+{
+  "entries": [
+    {
+      "type": "section",
+      "data": {
+        "title": "一. 填空题（共1题）",
+        "passage": null,
+        "entries": [
+          {
+            "type": "question",
+            "data": {
+              "id": "1",
+              "kind": "填空题",
+              "stem": "Directions: In this section, you are going to read a passage with ten statements attached to it. Each statement contains information given in one of the paragraphs. Identify the paragraph from which the information is derived. You may choose a paragraph more than once. Each paragraph is marked with a letter. How Urban Community Gardens Benefit City Residents A) Over the past two decades, community gardens have sprung up in many big cities across the world. Empty lots, unused rooftop space and neglected roadside land are being transformed into small growing areas where local citizens can plant vegetables, flowers and herbs. Participants do not need rich gardening experience. Anyone living nearby can take part, regardless of age or income level. These gardens are more than simple places to grow plants; they have become multi‑functional public spaces for city dwellers. B) One obvious advantage of community gardens is that they supply fresh, affordable produce for participants. Many low‑income city neighbourhoods are “food deserts”, where fresh fruit and vegetables are hard to buy at reasonable prices. In shared garden plots, people can grow tomatoes, leafy greens and other vegetables by themselves. For some families, home‑grown vegetables cut their weekly food spending noticeably. They also get access to pesticide‑free food that they cannot easily get in local supermarkets. C) Besides food gains, community gardening brings physical health benefits. Gardening counts as moderate physical exercise. Digging soil, sowing seeds and watering plants give people regular light exercise, especially for office workers who spend most of their day sitting indoors. Studies also suggest that spending time among green plants can reduce stress levels and help people ease anxiety caused by busy urban lifestyles. Mental pressure tends to drop after people spend just a few hours working in garden land. D) However, community garden projects are not without challenges. Limited land is the biggest barrier in crowded downtown areas. Suitable empty land is rare, and land owners may sell the lot for commercial development at any time. Some gardens have been closed down suddenly because urban construction plans changed. In addition, lack of money is another common trouble: tools, water supply and soil improvement all require continuous funding that local communities may fail to afford. E) Community gardens also play a vital social role in city life. Neighbours who barely spoke to each other before start cooperating when they share garden space. New friendships are built while people take care of plants together. Immigrant groups can grow traditional plants from their home countries, which helps them keep their cultural customs and fit into local society. Many garden organizers hold small seasonal events, further strengthening connections within the neighbourhood. F) Some city governments used to hold a doubtful attitude toward community gardens. Officials worried that unregulated gardens might create rubbish problems or attract conflicts over land use. Some local departments refused to offer support and regarded these gardens as unofficial temporary activities. In the past, many garden groups had to fight for legal rights to keep their growing areas. G) Attitudes among city officials have slowly shifted in recent years. More local governments now recognize the social and environmental value of urban gardening. Some cities have passed new rules to protect community garden sites from being replaced by real‑estate projects. Public funds are provided to buy basic gardening equipment and improve water conditions for volunteer garden groups. H) Even so, official support is still far from enough. Successful community gardens cannot rely only on government investment. They need active volunteer management systems. Experienced gardeners share skills with new participants, and clear rules are set for tool use and plot allocation. Without self‑management, conflicts over plot space or shared resources are likely to appear and ruin the whole project. I) Environmental gains should also not be ignored. Patches of urban green land ease the “heat‑island effect”, in which city built‑up areas keep higher temperatures than rural regions. Garden plants take in carbon dioxide and filter some pollutants from city air. Rainwater can be absorbed by garden soil instead of flowing quickly into city drainage systems, easing pressure on urban public facilities during heavy rain seasons. J) Looking ahead, community gardens will not solve all social or environmental problems in modern cities. But well‑managed projects deliver food, health, social and environmental rewards with relatively low costs. For city planners, ignoring the potential of community gardens means missing a simple but powerful way to build more human‑centred living environments. Questions： ____ 1. Growing vegetables in community gardens helps some poor city residents cut their expenditure on food. ____ 2. Good self‑management is essential for community gardens apart from support from authorities. ____ 3. Working in community gardens offers city people physical exercise and relief from mental stress. ____ 4. Community gardens offer chances for neighbours to build closer social bonds with one another. ____ 5. A shortage of available land and finance creates difficulties for running city community gardens. ____ 6. City officials’ views on community gardens have turned better and some official support is now available. ____ 7. Community green spaces can relieve the heat‑island effect and improve urban environmental conditions. ____ 8. City authorities once viewed community gardens with suspicion and gave little official backing. ____ 9. Community gardens are not a complete solution to city problems but can bring multiple benefits at low cost. ____ 10. People of different backgrounds can take part in community gardens located in formerly unused city land.",
+              "options": [],
+              "images": [],
+              "blank_count": 10
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "section",
+      "data": {
+        "title": "二. 阅读理解（共2题）",
+        "passage": null,
+        "entries": [
+          {
+            "type": "section",
+            "data": {
+              "title": "2. 阅读理解",
+              "passage": {
+                "text": "Passage One Why Urban Wildlife Is on the Rise Cities are usually seen as enemy places for wild animals. Concrete buildings, heavy traffic and human activities destroy natural habitats. Yet over the past decades, many species have learned to survive and even grow in modern cities. Foxes live in European residential areas; wild birds nest on high‑rise buildings; some small animals make homes in city parks and green belts. One major reason for this phenomenon is the abundant food supply in cities. Garbage bins, leftover human food and deliberately‑fed bird food provide steady food sources. Besides, city parks, community gardens and roadside trees create small‑scale green habitats. Compared with rural areas, cities also have fewer large natural predators, so some small animals face less threat of being hunted. However, coexistence between humans and urban wildlife brings obvious troubles. Some animals damage public gardens, spread waste, and carry potential diseases. Occasionally foxes or raccoons break into houses in search of food. Many citizens hold mixed feelings: they enjoy seeing wild creatures nearby, but get annoyed when those animals cause troubles for daily life. Biologists point out that simply driving wildlife away is not a wise choice. Urban wildlife is a sign of urban ecological health. Instead of blindly removing animals, cities need reasonable management rules. Local governments can design waste bin systems to reduce accessible food for wild animals, build suitable green spaces, and offer public science education to teach citizens how to interact properly with city wildlife. The author stresses that perfect human‑wildlife separation can hardly be achieved in modern cities. The goal is not to get rid of urban wildlife, but to build balanced coexistence, so both humans and animals can live relatively safely within city boundaries.",
+                "images": []
+              },
+              "entries": [
+                {
+                  "type": "question",
+                  "data": {
+                    "id": "2.1",
+                    "kind": "单选题",
+                    "stem": "What leads to the increase of urban wildlife according to the passage?",
+                    "options": [
+                      "A Large‑scale forest migration of wild species",
+                      "B Rich food resources and less natural enemies in cities",
+                      "C Citizens’ widespread raising of wild animals",
+                      "D Rapid reduction of human population in downtown areas"
+                    ],
+                    "images": []
+                  }
+                },
+                {
+                  "type": "question",
+                  "data": {
+                    "id": "2.2",
+                    "kind": "单选题",
+                    "stem": "What problem is caused by urban wildlife?",
+                    "options": [
+                      "A They greatly slow down city construction progress",
+                      "B They may bring troubles and potential health risks",
+                      "C They consume too much food reserved for citizens",
+                      "D They destroy most high‑rise buildings in cities"
+                    ],
+                    "images": []
+                  }
+                },
+                {
+                  "type": "question",
+                  "data": {
+                    "id": "2.3",
+                    "kind": "单选题",
+                    "stem": "What is biologists’ suggestion for dealing with urban wildlife?",
+                    "options": [
+                      "A To force all wild animals out of city districts",
+                      "B To build more zoos to hold city wild creatures",
+                      "C To carry out proper management and public education",
+                      "D To forbid citizens from entering urban green belts"
+                    ],
+                    "images": []
+                  }
+                },
+                {
+                  "type": "question",
+                  "data": {
+                    "id": "2.4",
+                    "kind": "单选题",
+                    "stem": "What is the main idea of the passage?",
+                    "options": [
+                      "A How to achieve balanced coexistence between city people and wild animals",
+                      "B The best ways to increase green areas in big modern cities",
+                      "C Reasons for the disappearance of wildlife in rural regions",
+                      "D Potential risks brought by city park construction"
+                    ],
+                    "images": []
+                  }
+                },
+                {
+                  "type": "question",
+                  "data": {
+                    "id": "2.5",
+                    "kind": "单选题",
+                    "stem": "What is the author’s attitude toward urban wildlife?",
+                    "options": [
+                      "A Critical: wildlife should be completely kept outside cities",
+                      "B Objective: admit its value while noticing existing problems",
+                      "C Doubtful: urban wildlife does no good to city ecology",
+                      "D Unconcerned: it is merely an unimportant social phenomenon"
+                    ],
+                    "images": []
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "section",
+            "data": {
+              "title": "3. 阅读理解",
+              "passage": {
+                "text": "Passage Two The Downside of Short‑video Learning Nowadays short‑video platforms have become popular learning channels. Millions of people turn to short videos for knowledge: language tips, historical stories, science explanations and practical life skills. Short‑video learning has obvious strengths: short pieces fit fragmented spare time; vivid pictures and simple explanations make knowledge easy to understand. Nevertheless, educational experts warn of hidden drawbacks of short‑video‑based learning. First of all, most short videos are designed to catch viewers’ attention within seconds. To win clicks, content creators often simplify complex knowledge. Important logical chains, background details and different viewpoints get cut off. Viewers may get simplified, one‑sided information instead of complete knowledge systems. Another problem lies in audience’s reading and thinking habits. Constant short‑video viewing trains people to accept brief, fast‑input information. Many users gradually lose patience for long articles and in‑depth texts. Research shows that frequent short‑video learners are more likely to accept ideas without careful thinking. They get used to ready‑made conclusions rather than forming independent judgments. This does not mean short‑video learning should be totally rejected. Short videos work well as learning supplements. They can arouse public interest in certain subjects. But they cannot replace systematic reading, formal courses and deep thinking. Learners need to realize the limits of short‑video content. When facing knowledge from short clips, they should check information sources and think critically instead of accepting everything blindly. In the final analysis, short‑video tools themselves are neutral. The key lies in how learners use them. One cannot build solid knowledge merely by watching short videos in one’s spare time.",
+                "images": []
+              },
+              "entries": [
+                {
+                  "type": "question",
+                  "data": {
+                    "id": "3.1",
+                    "kind": "单选题",
+                    "stem": "What is one advantage of short‑video learning?",
+                    "options": [
+                      "A It helps learners form complete knowledge systems quickly",
+                      "B It suits people’s scattered free time for knowledge acquisition",
+                      "C It provides thorough background information for complex topics",
+                      "D It improves people’s patience for long‑time reading greatly"
+                    ],
+                    "images": []
+                  }
+                },
+                {
+                  "type": "question",
+                  "data": {
+                    "id": "3.2",
+                    "kind": "单选题",
+                    "stem": "Why do short‑video creators simplify complex knowledge?",
+                    "options": [
+                      "A To satisfy the requirement of academic organizations",
+                      "B To reduce the production cost of video equipment",
+                      "C To attract audience attention and gain more clicks",
+                      "D To encourage people to give up traditional textbook study"
+                    ],
+                    "images": []
+                  }
+                },
+                {
+                  "type": "question",
+                  "data": {
+                    "id": "3.3",
+                    "kind": "单选题",
+                    "stem": "According to the passage, what negative influence may short‑video learning bring?",
+                    "options": [
+                      "A It makes some people less willing to do deep reading and thinking",
+                      "B It directly causes the drop of young people’s physical health",
+                      "C It prevents new educational resources from appearing online",
+                      "D It destroys the normal operation of traditional schools"
+                    ],
+                    "images": []
+                  }
+                },
+                {
+                  "type": "question",
+                  "data": {
+                    "id": "3.4",
+                    "kind": "单选题",
+                    "stem": "What is the experts’ advice on short‑video learning?",
+                    "options": [
+                      "A Stop watching short videos for knowledge completely",
+                      "B Treat short videos as auxiliary learning resources instead of main sources",
+                      "C Rely mainly on short‑video clips to finish all course study",
+                      "D Prohibit platforms from releasing any educational short‑video content"
+                    ],
+                    "images": []
+                  }
+                },
+                {
+                  "type": "question",
+                  "data": {
+                    "id": "3.5",
+                    "kind": "单选题",
+                    "stem": "Which of the following best describes the author’s tone in this passage?",
+                    "options": [
+                      "A Supportive: short‑video learning can solve all learning difficulties",
+                      "B Negative: short videos have no value for knowledge learning",
+                      "C Objective: recognize its merits and remind readers of its limitations",
+                      "D Confused: the author cannot judge whether short‑video learning is good"
+                    ],
+                    "images": []
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "section",
+      "data": {
+        "title": "三. 句子翻译题（共1题）",
+        "passage": null,
+        "entries": [
+          {
+            "type": "question",
+            "data": {
+              "id": "4",
+              "kind": "句子翻译题",
+              "stem": "Translation: 社区图书馆是城市公共文化服务的重要组成部分。不同于大型市级图书馆，社区图书馆一般规模不大，大多设立在居民小区附近，方便周边居民借阅图书。近年来，许多社区图书馆不断创新服务模式，除了提供书籍借阅，还定期举办读书会、科普讲座等活动。这些图书馆不仅丰富了市民的业余生活，也拉近了邻里之间的距离。地方政府意识到社区图书馆的价值，持续投入资金，改善设施，希望更多居民能够享受阅读带来的乐趣。",
+              "options": [],
+              "images": []
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "font": null,
+  "context": {}
+}

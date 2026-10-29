@@ -2,19 +2,21 @@ mod mapper;
 mod payload;
 mod typr;
 
+pub mod folio;
 pub mod llm;
 
+pub use folio::{Entry, Folio};
 use llm::AnswerItem;
 use mapper::decrypt;
-pub use payload::{Question, QuestionImage, QuestionPayload};
+pub use payload::{Question, QuestionImage};
 
 use crate::config::CONFIG;
 use anyhow::Result;
 
 /// 使用字体哈希字典解密混淆题目，并结合当前全局配置的大语言模型自动生成测验答案。
-pub async fn solve(payload: QuestionPayload) -> Result<Vec<AnswerItem>> {
+pub async fn solve(payload: Folio) -> Result<Vec<AnswerItem>> {
     let decrypted = decrypt(payload);
-    if decrypted.is_empty() {
+    if decrypted.entries.is_empty() {
         anyhow::bail!("题目解析失败");
     }
 

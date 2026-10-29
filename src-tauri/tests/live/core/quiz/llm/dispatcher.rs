@@ -1,10 +1,22 @@
 use super::*;
 use crate::config::llm::{ApiKey, LLMConfig};
+use crate::core::quiz::{Entry, Question};
 use std::fs;
 use std::path::PathBuf;
 
-async fn solve(provider: &LLMProvider, questions: Vec<Question>) -> anyhow::Result<Vec<AnswerItem>> {
-    super::solve(provider, questions, Default::default()).await
+async fn solve(
+    provider: &LLMProvider,
+    questions: Vec<Question>,
+) -> anyhow::Result<Vec<AnswerItem>> {
+    super::solve(
+        provider,
+        Folio {
+            entries: questions.into_iter().map(Entry::Question).collect(),
+            ..Default::default()
+        },
+        Default::default(),
+    )
+    .await
 }
 
 fn load_questions_file(filename: &str) -> Vec<Question> {

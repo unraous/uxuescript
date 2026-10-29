@@ -10,4 +10,5 @@ export const QuestionType = {
   ShortAnswer: 4,
   Matching: 5,
   Other: 6,
+  Translation: 7,
 };

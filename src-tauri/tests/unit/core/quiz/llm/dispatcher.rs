@@ -1,24 +1,37 @@
 use super::*;
 use crate::config::llm::ApiKey;
+use crate::core::quiz::{Entry, Question};
+use crate::test_support::http::input_questions;
 use crate::test_support::http::{response, serve};
 use serde_json::json;
 use tokio::time::{Duration, Instant};
+
+#[path = "dispatcher/folio.rs"]
+mod folio_flow;
 
 async fn solve(
     provider: &LLMProvider,
     questions: Vec<Question>,
 ) -> anyhow::Result<Vec<AnswerItem>> {
-    super::solve(provider, questions, Default::default()).await
+    super::solve(provider, folio(questions), Default::default()).await
+}
+
+fn folio(questions: Vec<Question>) -> Folio {
+    Folio {
+        entries: questions.into_iter().map(Entry::Question).collect(),
+        ..Default::default()
+    }
 }
 
 fn questions(count: usize) -> Vec<Question> {
     (1..=count)
         .map(|index| Question {
             id: index.to_string(),
-            kind: "single".into(),
+            kind: "单选题".into(),
             stem: "Choose A".into(),
             options: vec!["A".into()],
             images: Vec::new(),
+            blank_count: None,
         })
         .collect()
 }
@@ -59,13 +72,11 @@ async fn retries_only_invalid_batches_and_preserves_successes() {
                     .unwrap()
                     .contains("answers")
             );
-            serde_json::from_str::<Vec<Question>>(
-                request.body["messages"][1]["content"].as_str().unwrap(),
-            )
-            .unwrap()
-            .into_iter()
-            .map(|question| question.id)
-            .collect()
+            serde_json::from_value::<Vec<Question>>(input_questions(&request.body))
+                .unwrap()
+                .into_iter()
+                .map(|question| question.id)
+                .collect()
         })
         .collect();
     assert_eq!(
@@ -130,7 +141,7 @@ async fn rate_limit_retries_then_accepts_valid_answers() {
             &reqwest::Client::new(),
             &provider,
             &provider.models[0],
-            &questions(1),
+            &batch::prepare(folio(questions(1)), 5).unwrap()[0],
             &pool
         )
         .await
@@ -179,10 +190,11 @@ async fn preset_chat_requests_preserve_options_and_read_answer_arrays() {
             &provider,
             vec![Question {
                 id: "1".into(),
-                kind: "single".into(),
+                kind: "单选题".into(),
                 stem: "Choose A".into(),
                 options: vec!["A".into()],
                 images: Vec::new(),
+                blank_count: None,
             }],
         )
         .await
@@ -236,10 +248,11 @@ async fn sends_protocol_requests_with_application_headers() {
             &provider,
             vec![Question {
                 id: "1".into(),
-                kind: "???".into(),
+                kind: "单选题".into(),
                 stem: "?? A".into(),
                 options: vec!["A".into()],
                 images: Vec::new(),
+                blank_count: None,
             }],
         )
         .await
@@ -266,7 +279,7 @@ async fn sends_protocol_requests_with_application_headers() {
                 assert!(head.starts_with("POST /v1/responses "));
                 assert_eq!(headers["authorization"], "Bearer mock-api-key");
                 assert_eq!(body["model"], "mock-model");
-                assert!(body["input"].is_string());
+                assert!(body["input"].is_array());
             }
             LLMProtocol::GoogleGemini => {
                 assert!(head.starts_with("POST /models/mock-model:generateContent "));
@@ -302,13 +315,14 @@ async fn sends_images_in_each_protocol_native_format() {
             chosen_model: Some(0),
             extra_body: None,
         };
-        let input = questions(1);
+        let input = batch::prepare(folio(questions(1)), 5).unwrap().remove(0);
         let images = vec![media::Image {
-            question_id: "1".into(),
+            owner: "题号 1".into(),
             marker: "图片1".into(),
             mime: "image/png".into(),
             data: "AQID".into(),
         }];
+        let prompt = prompt::assemble(&input, images).unwrap();
         let pool = RequestPool::new(10);
         match protocol {
             LLMProtocol::OpenAIChatCompletions => {
@@ -317,7 +331,7 @@ async fn sends_images_in_each_protocol_native_format() {
                     &provider,
                     "vision-model",
                     &input,
-                    &images,
+                    &prompt,
                     &pool,
                 )
                 .await
@@ -329,7 +343,7 @@ async fn sends_images_in_each_protocol_native_format() {
                     &provider,
                     "vision-model",
                     &input,
-                    &images,
+                    &prompt,
                     &pool,
                 )
                 .await
@@ -341,7 +355,7 @@ async fn sends_images_in_each_protocol_native_format() {
                     &provider,
                     "vision-model",
                     &input,
-                    &images,
+                    &prompt,
                     &pool,
                 )
                 .await
@@ -389,7 +403,7 @@ async fn general_config_controls_batch_size() {
         batch_size: std::num::NonZeroU32::new(2).unwrap(),
         ..Default::default()
     };
-    let answers = super::solve(&provider, questions(3), settings)
+    let answers = super::solve(&provider, folio(questions(3)), settings)
         .await
         .unwrap();
     assert_eq!(answers.len(), 3);
@@ -398,11 +412,9 @@ async fn general_config_controls_batch_size() {
         .unwrap()
         .iter()
         .map(|request| {
-            serde_json::from_str::<Vec<Question>>(
-                request.body["messages"][1]["content"].as_str().unwrap(),
-            )
-            .unwrap()
-            .len()
+            serde_json::from_value::<Vec<Question>>(input_questions(&request.body))
+                .unwrap()
+                .len()
         })
         .collect();
     assert_eq!(sizes, vec![2, 1]);

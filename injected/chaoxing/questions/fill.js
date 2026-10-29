@@ -94,9 +94,11 @@ const fillCompletion = async (quizDiv, content, selector) => {
   const inputs = /** @type {(HTMLInputElement | HTMLTextAreaElement)[]} */ (
     await wait.elements(null, selector, quizDiv)
   );
-
+  assert(
+    ansArr.length === inputs.length && ansArr.every(Boolean),
+    `填空题需要 ${inputs.length} 个非空答案，收到 ${ansArr.length} 项，拒绝填写`,
+  );
   for (const [index, input] of inputs.entries()) {
-    assert(ansArr[index], `填空题缺少第 ${index + 1} 空的对应答案，拒绝提交`);
     await setTextContent(input, ansArr[index]);
   }
 };
@@ -135,6 +137,7 @@ export const fillAnswer = async (node, content, selectors) => {
     case QuestionType.Completion:
       return fillCompletion(node, content, selectors.textInputs);
     case QuestionType.ShortAnswer:
+    case QuestionType.Translation:
       return fillShort(node, content, selectors.textInputs);
     default:
       throw new Error(`未支持的题目类型: ${kind}`);
