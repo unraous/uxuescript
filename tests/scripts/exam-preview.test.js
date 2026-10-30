@@ -199,6 +199,8 @@ async function setup(
   vi.resetModules();
   vi.stubGlobal("__TAURI_INTERNALS__", { invoke });
   const { answerPage } = await import("@injected/chaoxing/questions/page.js");
+  const { config } = await import("@injected/chaoxing/runtime.js");
+  config.switchingCd = null;
   return { doc, editors, invoke, answerPage, operations };
 }
 

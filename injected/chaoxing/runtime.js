@@ -9,7 +9,7 @@ class AppConfig {
   lockSpeed = null;
 
   /** @type {number | null} */
-  switchingCd = null;
+  switchingCd = 1;
 
   quizReview = false;
 

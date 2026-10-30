@@ -18,7 +18,8 @@ export const main = async () => {
     if (window.location.pathname.endsWith("/mooc2/exam/preview")) {
       if (
         !(await confirm(
-          "是否开始整卷答题？文本题将逐空暂存，填写完成后请检查并自行保存、交卷。\n\n含图片的题目需要当前模型支持视觉输入；否则图片可能被忽略，答案可能不准确。",
+          "是否开始整卷答题？文本题将逐空暂存，填写完成后请检查并自行保存、交卷。\n\n请先选择可用的模型并测试连接。含图片的题目需要当前模型支持视觉输入，否则图片可能被忽略；模型答案可能有误，请人工核对。",
+          { title: "考试开始", readSeconds: 5 },
         ))
       )
         return;
@@ -26,6 +27,7 @@ export const main = async () => {
       const skipped = await answerPage(document, SELECTORS.examPreview);
       await confirm(
         `答案已填写，请核对答案并自行保存、交卷；如有图片题，请确认当前模型具备视觉能力！！${skipped.length ? `\n需人工处理的题号：${skipped.join("、")}` : ""}`,
+        { title: "考试答题已完成", readSeconds: 5 },
       );
     } else if (
       document

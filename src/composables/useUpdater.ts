@@ -20,6 +20,7 @@ export function useUpdater() {
       const manualDownload = platform === "windows" && isMsiInstall === false;
       const accepted = await commands.confirm(
         `发现新版本 v${update.version}（当前版本 v${currentVersion}），${manualDownload ? "前往下载页面吗？" : "现在下载安装吗？"}${update.body ? `\n\n${update.body}` : ""}`,
+        null,
       );
       if (!accepted) return;
       acceptedUpdate = true;

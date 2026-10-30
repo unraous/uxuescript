@@ -5,13 +5,13 @@ fn test_options_config_serde_and_default() {
     let opts = OptionsConfig::default();
     assert!(opts.mute_webview);
     assert_eq!(opts.lock_speed, None);
-    assert_eq!(opts.switching_cd, None);
+    assert_eq!(opts.switching_cd, Some(1.0));
     assert!(!opts.quiz_review);
 
     let json = serde_json::to_string(&opts).unwrap();
     assert!(json.contains("\"muteWebview\":true"));
     assert!(json.contains("\"lockSpeed\":null"));
-    assert!(json.contains("\"switchingCd\":null"));
+    assert!(json.contains("\"switchingCd\":1.0"));
 
     let deserialized: OptionsConfig = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized.lock_speed, None);
@@ -20,6 +20,15 @@ fn test_options_config_serde_and_default() {
     assert_eq!(configured.lock_speed, Some(1.5));
     assert_eq!(configured.switching_cd, Some(2.0));
     assert!(configured.quiz_review);
+    let disabled: OptionsConfig = serde_json::from_str(r#"{"switchingCd":null}"#).unwrap();
+    assert_eq!(disabled.switching_cd, None);
+    let saved = toml::to_string(&disabled).unwrap();
+    assert_eq!(
+        toml::from_str::<OptionsConfig>(&saved)
+            .unwrap()
+            .switching_cd,
+        None
+    );
     for options in [opts, configured] {
         let saved = toml::to_string(&options).unwrap();
         let loaded: OptionsConfig = toml::from_str(&saved).unwrap();

@@ -17,6 +17,10 @@
 - Before concluding that `git cz` is unavailable, check the normal user shell and existing user-level installation paths. An Agent sandbox or PATH failure does not establish that the tool is not installed; use the existing installation through an authorized execution context when available.
 - If `git cz` is unavailable, pause committing and ask the user whether to install it. Do not install it without approval or substitute a manually formatted `git commit`.
 
+## Releases
+
+- When the user specifies a release version without explicitly saying otherwise, it refers to the `v`-prefixed Release tag (for example, `v2.5.3`). Keep package and build configuration versions in their required unprefixed format.
+
 ## Read the Relevant Engineering Guidance
 
 Before changing code, organizing commits, or preparing a release, read the relevant entries in [`LESSONS.md`](LESSONS.md). It records verified AI collaboration mistakes and the rules that would have prevented them; update it when a correction exposes a new recurring risk.

@@ -41,7 +41,7 @@ const testConnection = async () => {
   testing.value = true;
   try {
     await commands.healthy();
-    await commands.confirm(label("connectionSuccess"));
+    await commands.confirm(label("connectionSuccess"), null);
   } catch (cause) {
     await showError(label("connectionFailed"), cause);
   } finally {

@@ -91,7 +91,8 @@ const initialize = async (key) => {
 const startRun = async () => {
   if (
     !(await confirm(
-      "是否开始考试答题？先遍历采集整卷，再回到第一题填写并保存；不自动交卷。\n\n含图片的题目需要当前模型支持视觉输入；否则图片可能被忽略，答案可能不准确。",
+      "是否开始考试答题？先遍历采集整卷，再回到第一题填写并保存；不自动交卷。\n\n请先选择可用的模型并测试连接。含图片的题目需要当前模型支持视觉输入，否则图片可能被忽略；模型答案可能有误，请人工核对。",
+      { title: "考试开始", readSeconds: 5 },
     ))
   )
     return null;
@@ -178,6 +179,7 @@ const finishExam = async (run, key) => {
     );
   await confirm(
     `答案已填写并暂存，请核对答案后自行交卷；如有图片题，请确认当前模型具备视觉能力！！${skipped.length ? `\n需人工处理的题号：${skipped.join("、")}` : ""}`,
+    { title: "考试答题已完成", readSeconds: 5 },
   );
 };
 

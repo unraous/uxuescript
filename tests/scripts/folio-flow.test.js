@@ -67,7 +67,9 @@ async function setup(
   vi.resetModules();
   vi.stubGlobal("__TAURI_INTERNALS__", { invoke });
   const { answerPage } = await import("@injected/chaoxing/questions/page.js");
-  const { studyContext } = await import("@injected/chaoxing/runtime.js");
+  const { config, studyContext } =
+    await import("@injected/chaoxing/runtime.js");
+  config.switchingCd = null;
   studyContext.chapter = "城市与自然";
   return { doc, editors, choices, invoke, answerPage };
 }

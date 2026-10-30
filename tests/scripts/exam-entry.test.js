@@ -110,6 +110,7 @@ it("solves the full page once, fills by displayed number and reports unsupported
   expect(window.sessionStorage.length).toBe(0);
   expect(backend.confirm).toHaveBeenLastCalledWith(
     "答案已填写，请核对答案并自行保存、交卷；如有图片题，请确认当前模型具备视觉能力！！\n需人工处理的题号：3（排序题）",
+    { title: "考试答题已完成", readSeconds: 5 },
   );
 });
 
@@ -119,6 +120,7 @@ it("does not solve or fill when preview confirmation is cancelled", async () => 
   await main();
   expect(backend.confirm).toHaveBeenCalledWith(
     expect.stringContaining("当前模型支持视觉输入"),
+    { title: "考试开始", readSeconds: 5 },
   );
   expect(backend.invoke).not.toHaveBeenCalled();
   expect(fillAnswer).not.toHaveBeenCalled();

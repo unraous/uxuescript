@@ -3,6 +3,7 @@ import { emit, emitTo } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { onMounted, onUnmounted, shallowRef, type Component } from "vue";
 import { commands } from "@/services/cmds";
+import type { ConfirmOptions } from "@/services/cmds";
 import Close from "@/components/animations/TheClose.vue";
 import Confirmation from "@/components/animations/TheConfirmation.vue";
 import Intro from "@/components/animations/TheIntro.vue";
@@ -108,14 +109,24 @@ const finishUpdateDownload = () => {
   }
 };
 
-const showConfirmation = (message: string) => {
+const showConfirmation = ({
+  message,
+  options,
+}: {
+  message: string;
+  options: ConfirmOptions | null;
+}) => {
   const id = nextLayerId++;
   layers.value = [
     ...layers.value,
     {
       id,
       component: Confirmation,
-      props: { message },
+      props: {
+        message,
+        title: options?.title,
+        readSeconds: options?.readSeconds,
+      },
       onFinished: (choice) => {
         removeLayer(id);
         void emitTo(
@@ -137,8 +148,9 @@ const dismissConfirmation = () => {
 onMounted(async () => {
   const webview = getCurrentWebview();
   const listeners = [
-    webview.listen<string>("confirmation-pop-up", (event) =>
-      showConfirmation(event.payload),
+    webview.listen<{ message: string; options: ConfirmOptions | null }>(
+      "confirmation-pop-up",
+      (event) => showConfirmation(event.payload),
     ),
     webview.listen("start-event", startIntro),
     webview.listen("close-event", closeMask),

@@ -355,6 +355,8 @@ describe("tag synchronization", () => {
     run("init", "--bare", remote);
     run("config", "user.name", "test");
     run("config", "user.email", "test@example.invalid");
+    // 临时测试仓库不应执行开发者全局配置的提交钩子。
+    run("config", "core.hooksPath", join(directory, "hooks"));
     run("config", "commit.gpgsign", "false");
     run("config", "tag.gpgsign", "false");
     await writeFile(join(cwd, "file.txt"), "first");

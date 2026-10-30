@@ -1,11 +1,27 @@
 use super::CommandsResult;
 
 use anyhow::anyhow;
+use serde::Serialize;
+use specta::Type;
 use tauri::{Emitter, Listener, Manager, State, Webview, window::Window};
 use tokio::sync::{Mutex, oneshot};
 
 #[derive(Default)]
 pub struct Confirmations(Mutex<()>, Mutex<()>);
+
+#[derive(Clone, serde::Deserialize, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfirmOptions {
+    pub title: Option<String>,
+    pub read_seconds: Option<u32>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Confirmation {
+    message: String,
+    options: Option<ConfirmOptions>,
+}
 
 /// 显示调用方对应的确认遮罩，并在退出动画及隐藏完成后返回选择。
 #[uxs_commands::command(webview = "chaoxing")]
@@ -14,6 +30,7 @@ pub async fn confirm(
     window: Window,
     state: State<'_, Confirmations>,
     message: String,
+    options: Option<ConfirmOptions>,
 ) -> CommandsResult<bool> {
     let (mask_label, active) = match webview.label() {
         "main" => ("mask", &state.0),
@@ -31,10 +48,13 @@ pub async fn confirm(
         let _ = sender.send(serde_json::from_str::<bool>(event.payload()));
     });
 
-    if let Err(error) = mask
-        .show()
-        .and_then(|_| mask.emit_to(mask_label, "confirmation-pop-up", message))
-    {
+    if let Err(error) = mask.show().and_then(|_| {
+        mask.emit_to(
+            mask_label,
+            "confirmation-pop-up",
+            Confirmation { message, options },
+        )
+    }) {
         mask.unlisten(listener);
         return Err(error.into());
     }

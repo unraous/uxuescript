@@ -1,7 +1,7 @@
 {
   "name": "uxuescript",
   "private": true,
-  "version": "2.5.2",
+  "version": "2.5.3",
   "type": "module",
   "scripts": {
     "lint:scripts": "eslint injected tests/scripts scripts/build-scripts.mjs scripts/dev.mjs scripts/script-aliases.mjs",

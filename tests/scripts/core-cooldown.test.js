@@ -24,6 +24,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("course cooldown", () => {
+  it("defaults to a one-second delay in standalone mode", async () => {
+    vi.resetModules();
+    vi.stubGlobal("__TAURI_INTERNALS__", undefined);
+    const runtime = await import("@injected/chaoxing/runtime.js");
+    expect(runtime.config.switchingCd).toBe(1);
+  });
+
   it("does not schedule a timer when disabled", async () => {
     const api = setup();
     await api.cooldown();

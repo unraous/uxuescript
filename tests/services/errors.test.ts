@@ -27,6 +27,7 @@ describe("showError", () => {
     expect(console.error).toHaveBeenCalledWith("保存失败:", cause);
     expect(commandMocks.confirm).toHaveBeenCalledWith(
       "保存失败:\npermission denied",
+      null,
     );
   });
 
@@ -40,6 +41,7 @@ describe("showError", () => {
 
       expect(commandMocks.confirm).toHaveBeenCalledWith(
         "通用配置操作失败:\n请输入大于 0 的整数。",
+        null,
       );
       expect(console.error).toHaveBeenCalledWith(
         "通用配置操作失败:",
@@ -58,6 +60,7 @@ describe("showError", () => {
 
       expect(commandMocks.confirm).toHaveBeenCalledWith(
         "课程配置操作失败:\n请输入大于 0 的数字，或留空关闭。",
+        null,
       );
     },
   );
@@ -76,6 +79,7 @@ describe("showError", () => {
 
     expect(commandMocks.confirm).toHaveBeenCalledWith(
       "配置无效:\n请输入大于 0 的整数。\n请输入大于 0 的数字，或留空关闭。",
+      null,
     );
   });
 
@@ -98,6 +102,7 @@ describe("showError", () => {
     expect(commandMocks.confirm).toHaveBeenNthCalledWith(
       2,
       "第二个错误\nsecond",
+      null,
     );
   });
 
@@ -112,6 +117,7 @@ describe("showError", () => {
     expect(commandMocks.confirm).toHaveBeenCalledTimes(2);
     expect(commandMocks.confirm).toHaveBeenLastCalledWith(
       "导航失败\nnavigation failed",
+      null,
     );
   });
 });

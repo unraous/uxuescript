@@ -6,6 +6,8 @@ use specta::Type;
 pub struct OptionsConfig {
     pub mute_webview: bool,
     pub lock_speed: Option<f32>,
+    // TOML 不保存 None；旧配置中缺失该字段表示用户关闭了等待。
+    #[serde(default)]
     pub switching_cd: Option<f32>,
     pub quiz_review: bool,
 }
@@ -15,7 +17,7 @@ impl Default for OptionsConfig {
         Self {
             mute_webview: true,
             lock_speed: None,
-            switching_cd: None,
+            switching_cd: Some(1.0),
             quiz_review: false,
         }
     }

@@ -61,6 +61,7 @@ describe("useUpdater", () => {
     await useUpdater().checkForUpdates("2.1.4");
     expect(commands.confirm).toHaveBeenCalledWith(
       expect.stringContaining("v2.2.0"),
+      null,
     );
     expect(commands.downloadUpdate).not.toHaveBeenCalled();
     expect(mocks.closeResource).toHaveBeenCalledOnce();

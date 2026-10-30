@@ -57,6 +57,7 @@ describe("API connection test", () => {
     await flushPromises();
     expect(mocks.confirm).toHaveBeenCalledWith(
       "Connection successful.\nThe model answered the test question.",
+      null,
     );
     expect(button.element.disabled).toBe(false);
     expect(button.attributes("aria-label")).toBe(label("testConnection"));

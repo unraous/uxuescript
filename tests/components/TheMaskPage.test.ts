@@ -4,6 +4,7 @@ import { nextTick } from "vue";
 import TheMaskPage from "@/TheMaskPage.vue";
 import TheChaoxingMaskPage from "@/TheChaoxingMaskPage.vue";
 import TheCourseProgressBar from "@/components/TheCourseProgressBar.vue";
+import VRollTransition from "@/components/base/VRollTransition.vue";
 import { commands } from "@/services/cmds";
 import { emit, emitTo } from "@tauri-apps/api/event";
 
@@ -62,13 +63,14 @@ const animations = vi.hoisted(() => ({
     timeline.to.mockImplementation(() => timeline);
     return timeline;
   }),
-  to: vi.fn(() => ({ kill: vi.fn() })),
+  to: vi.fn((_target?: unknown, _vars?: unknown) => ({ kill: vi.fn() })),
   killTweensOf: vi.fn(),
 }));
 
 vi.mock("gsap", () => ({ gsap: animations }));
 
 afterEach(() => {
+  vi.useRealTimers();
   events.clear();
   timelineCompletions.length = 0;
   animationCompletions.length = 0;
@@ -77,6 +79,99 @@ afterEach(() => {
 });
 
 describe("TheMaskPage", () => {
+  it("shows a custom title and enables confirmation after the reading time", async () => {
+    const wrapper = mount(TheChaoxingMaskPage);
+    await flushPromises();
+    vi.useFakeTimers();
+    events.get("confirmation-pop-up")?.({
+      payload: {
+        message: "Read this",
+        options: { title: "Notice", readSeconds: 2 },
+      },
+    });
+    await nextTick();
+    const dialog = wrapper.get('[role="dialog"]');
+    expect(dialog.attributes("aria-label")).toBe("Notice");
+    expect(dialog.get("h1").text()).toBe("Notice");
+    const yes = dialog.findAll("button")[0];
+    const countdown = dialog.get(".countdown");
+    expect(yes.attributes("disabled")).toBeDefined();
+    expect(yes.text()).toBe("Yes");
+    expect(countdown.text()).toBe("2");
+    expect(dialog.get(".message").classes()).toContain("custom-scrollbar");
+    const timelines = animations.timeline.mock.results;
+    const entrance = timelines[timelines.length - 1].value;
+    const calls = entrance.fromTo.mock.calls;
+    const reveal = calls[calls.length - 1] as unknown as [
+      HTMLElement,
+      { xPercent: number; visibility: string },
+      {
+        xPercent: number;
+        duration: number;
+        ease: string;
+        onComplete: () => void;
+      },
+    ];
+    expect(reveal[0]).toBe(countdown.get(".countdown-motion").element);
+    expect(reveal[1].xPercent).toBe(100);
+    expect(reveal[2].xPercent).toBe(0);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(countdown.text()).toBe("2");
+    reveal[2].onComplete();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(countdown.getComponent(VRollTransition).props("value")).toBe(1);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(countdown.text()).toBe("1");
+    await vi.advanceTimersByTimeAsync(700);
+    expect(yes.attributes("disabled")).toBeUndefined();
+    const exits = animations.to.mock.calls;
+    const hide = exits[exits.length - 1][1] as {
+      xPercent: number;
+      duration: number;
+      ease: string;
+      onComplete: () => void;
+    };
+    expect(hide.xPercent).toBe(reveal[1].xPercent);
+    expect(hide.duration).toBe(reveal[2].duration);
+    expect(hide.ease).toBe(reveal[2].ease);
+    hide.onComplete();
+    await nextTick();
+    expect(dialog.find(".countdown").exists()).toBe(false);
+    await yes.trigger("click");
+    animationCompletions.shift()?.();
+    await nextTick();
+    expect(emitTo).toHaveBeenCalledWith("mask", "confirmation-result", true);
+    wrapper.unmount();
+  });
+
+  it("allows cancellation during the reading time", async () => {
+    const wrapper = mount(TheChaoxingMaskPage);
+    await flushPromises();
+    vi.useFakeTimers();
+    events.get("confirmation-pop-up")?.({
+      payload: {
+        message: "Read this",
+        options: { title: null, readSeconds: 5 },
+      },
+    });
+    await nextTick();
+    const timelines = animations.timeline.mock.results;
+    const entrance = timelines[timelines.length - 1].value;
+    const calls = entrance.fromTo.mock.calls;
+    const reveal = calls[calls.length - 1] as unknown as [
+      unknown,
+      unknown,
+      { onComplete: () => void },
+    ];
+    reveal[2].onComplete();
+    await wrapper.findAll("button")[1].trigger("click");
+    animationCompletions.shift()?.();
+    await nextTick();
+    expect(emitTo).toHaveBeenCalledWith("mask", "confirmation-result", false);
+    expect(vi.getTimerCount()).toBe(0);
+    wrapper.unmount();
+  });
+
   it.each([TheMaskPage, TheChaoxingMaskPage])(
     "uses the saved Chinese confirmation title",
     async (Page) => {
@@ -85,7 +180,9 @@ describe("TheMaskPage", () => {
       });
       const wrapper = mount(Page);
       await flushPromises();
-      events.get("confirmation-pop-up")?.({ payload: "测试消息" });
+      events.get("confirmation-pop-up")?.({
+        payload: { message: "测试消息", options: null },
+      });
       await flushPromises();
       const dialog = wrapper.get('[role="dialog"]');
       expect(dialog.get("h1").text()).toBe("确认");
@@ -268,7 +365,7 @@ describe("TheMaskPage", () => {
       expect(wrapper.findAll(".mask-layer")).toHaveLength(0);
 
       events.get("confirmation-pop-up")?.({
-        payload: "Continue?",
+        payload: { message: "Continue?", options: null },
       });
       await nextTick();
       expect(wrapper.find('[role="dialog"]').text()).toContain("Continue?");
@@ -293,7 +390,9 @@ describe("TheMaskPage", () => {
     currentWebview.label = "chaoxing-mask";
     const wrapper = mount(TheChaoxingMaskPage);
     await flushPromises();
-    events.get("confirmation-pop-up")?.({ payload: "Old page" });
+    events.get("confirmation-pop-up")?.({
+      payload: { message: "Old page", options: null },
+    });
     await nextTick();
     expect(wrapper.find('[role="dialog"]').text()).toContain("Old page");
 
@@ -306,7 +405,9 @@ describe("TheMaskPage", () => {
       false,
     );
 
-    events.get("confirmation-pop-up")?.({ payload: "New page" });
+    events.get("confirmation-pop-up")?.({
+      payload: { message: "New page", options: null },
+    });
     await nextTick();
     expect(wrapper.find('[role="dialog"]').text()).toContain("New page");
     await wrapper.findAll("button")[0].trigger("click");
@@ -325,7 +426,9 @@ describe("TheMaskPage", () => {
     currentWebview.label = "chaoxing-mask";
     const wrapper = mount(TheChaoxingMaskPage);
     await flushPromises();
-    events.get("confirmation-pop-up")?.({ payload: "Old page" });
+    events.get("confirmation-pop-up")?.({
+      payload: { message: "Old page", options: null },
+    });
     await nextTick();
     await wrapper.findAll("button")[0].trigger("click");
     const results = animations.timeline.mock.results;
@@ -357,7 +460,9 @@ describe("TheMaskPage", () => {
   it("keeps main-window confirmations independent of Chaoxing navigation", async () => {
     const wrapper = mount(TheMaskPage);
     await flushPromises();
-    events.get("confirmation-pop-up")?.({ payload: "Main window" });
+    events.get("confirmation-pop-up")?.({
+      payload: { message: "Main window", options: null },
+    });
     await nextTick();
     expect(events.has("confirmation-dismissed")).toBe(false);
     expect(wrapper.find('[role="dialog"]').text()).toContain("Main window");

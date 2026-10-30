@@ -42,7 +42,10 @@ export const commands = {
 	saveConfig: () => __TAURI_INVOKE<null>("save_config"),
 	paths: () => __TAURI_INVOKE<PathsConfig>("paths"),
 	/**  显示调用方对应的确认遮罩，并在退出动画及隐藏完成后返回选择。 */
-	confirm: (message: string) => __TAURI_INVOKE<boolean>("confirm", { message }),
+	confirm: (message: string, options: {
+	title: string | null,
+	readSeconds: number | null,
+} | null) => __TAURI_INVOKE<boolean>("confirm", { message, options }),
 	/**  显示初始化时隐藏的主界面和超星 Webview；此命令不检查页面加载状态。 */
 	showContent: () => __TAURI_INVOKE<null>("show_content"),
 	/**  异步隐藏遮罩，避免遮罩 Webview 等待自身 IPC 调用链；开屏完成时通知主界面。 */
@@ -96,6 +99,11 @@ export type ChapterProgressPayload = {
 	index: number,
 	completed: number,
 	total: number,
+};
+
+export type ConfirmOptions = {
+	title: string | null,
+	readSeconds: number | null,
 };
 
 export type CourseMetadata = {

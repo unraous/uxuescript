@@ -70,7 +70,7 @@ onMounted(load);
         pattern="[0-9]*([.][0-9]*)?"
         placeholder="单位：秒，留空不额外等待"
         :label="label('switchingCd')"
-        annotation="每次填题、开始任务或发送互动题的答案验证请求前，先等待这里设置的秒数。例如填 2，每次会随机等待 1.5～2.5 秒。留空则不额外等待。"
+        annotation="每次填题、开始任务或发送互动题的答案验证请求前，先等待这里设置的秒数，默认 1 秒。例如填 2，每次会随机等待 1.5～2.5 秒。留空则不额外等待。"
         class="option speed-input"
         @change="
           saveField(
