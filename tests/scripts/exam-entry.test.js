@@ -109,7 +109,7 @@ it("solves the full page once, fills by displayed number and reports unsupported
   expect(save).not.toHaveBeenCalled();
   expect(window.sessionStorage.length).toBe(0);
   expect(backend.confirm).toHaveBeenLastCalledWith(
-    "答案已填写，请核对答案并自行保存、交卷；如有图片题，请确认当前模型具备视觉能力！！\n需人工处理的题号：3（排序题）",
+    "答案已填写，请核对答案并自行保存、交卷；如有图片题，请确认当前模型具备视觉能力。\n\n如果发现大量题目未作答或未保存，可尝试在课程设置（Course）中调长等待时间（Delay），再重新填写；交卷前请检查并手动保存。\n需人工处理的题号：3（排序题）",
     { title: "考试答题已完成", readSeconds: 5 },
   );
 });

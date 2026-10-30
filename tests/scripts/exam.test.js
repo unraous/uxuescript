@@ -273,8 +273,9 @@ it("runs both passes from storage and fetches configuration only once", async ()
     readSeconds: 5,
   });
   expect(backend.confirm.mock.calls[1][0]).toContain(
-    "如有图片题，请确认当前模型具备视觉能力！！",
+    "如有图片题，请确认当前模型具备视觉能力。",
   );
+  expect(backend.confirm.mock.calls[1][0]).toContain("调长等待时间（Delay）");
   expect(backend.confirm.mock.calls[1][1]).toEqual({
     title: "考试答题已完成",
     readSeconds: 5,

@@ -47,6 +47,6 @@ export const main = async () => {
     return;
   }
   await confirm(
-    `答案已填写并暂存，请核对答案后自行提交；如有图片题，请确认当前模型具备视觉能力！！${skipped.length ? `\n需人工处理的题号：${skipped.join("、")}` : ""}`,
+    `答案已填写并暂存，请核对答案后自行提交；如有图片题，请确认当前模型具备视觉能力。\n\n如果发现大量题目未作答或未保存，可尝试在课程设置（Course）中调长等待时间（Delay），再重新填写；提交前请检查并手动保存。${skipped.length ? `\n需人工处理的题号：${skipped.join("、")}` : ""}`,
   );
 };
