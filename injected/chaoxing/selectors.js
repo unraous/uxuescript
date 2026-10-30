@@ -1,4 +1,22 @@
 /** 超星课程及题目处理使用的 DOM 与 URL 选择器。 */
+const sharedOptions = {
+  container: ".B-info",
+  options: ".stem_answer.padleft20 > .padbtom10",
+  label: ":scope > span",
+  text: ".p_wid805",
+  items: ".B-answer-ct",
+  item: {
+    number: ".B-tit",
+    title: ".B-tit",
+    kindName: "单选题",
+    choice: {
+      single: ".B-answerCon > span[choice_name]",
+      attribute: "choice_name",
+    },
+    clearSelectedClass: ".B-answerCon > span.check_answer",
+  },
+};
+
 const workExam = {
   form: "#submitForm",
   question: ".questionLi.singleQuesId",
@@ -12,9 +30,11 @@ const workExam = {
     text: ".answer_p",
     single: ".stem_answer span.num_option",
     multiple: ".stem_answer span.num_option_dx",
+    attribute: "data",
   },
   clearSelectedClass: ".stem_answer span:is(.check_answer, .check_answer_dx)",
   textInputs: ".stem_answer textarea, .stem_answer input[type='text']",
+  textSave: /** @type {{container: string, button: string} | null} */ (null),
   blanks: ".stem_answer .Answer",
   fontStyles: "style",
   folio: {
@@ -33,6 +53,7 @@ const workExam = {
         text: ".answer_p",
       },
     },
+    shared: /** @type {typeof sharedOptions | null} */ (null),
   },
   matching: {
     groups: [
@@ -50,12 +71,18 @@ const workExam = {
 
 export const SELECTORS = {
   workExam,
-  context: { title: ".mark_title", courseId: "input#courseId" },
+  context: { title: ".mark_title, .h2_subject", courseId: "input#courseId" },
   examPreview: {
     ...workExam,
+    textSave: { container: ".sub_que_div", button: ".saveButtonClass" },
     question: ".questionLi",
     number: ":scope > h3",
     title: ":scope > h3",
+    folio: {
+      ...workExam.folio,
+      titleEnd: `${workExam.folio.titleEnd}, form, .B-answerCon`,
+      shared: sharedOptions,
+    },
   },
   courseTree: {
     nodeClass: "div.posCatalog_select",
@@ -93,10 +120,12 @@ export const SELECTORS = {
       text: ".after",
       single: "span.num_option",
       multiple: "span.num_option_dx",
+      attribute: "data",
     },
     titleClass: ".newZy_TItle",
     clearSelectedClass: "span:is(.check_answer, .check_answer_dx)",
     textInputs: 'textarea[id^="answer"], textarea',
+    textSave: /** @type {{container: string, button: string} | null} */ (null),
     blanks: ".blankItemDiv",
     // 暂保留既有结构规则；当前 Quiz 样本只有普通题，分区及材料题待验证。
     folio: {
@@ -114,6 +143,7 @@ export const SELECTORS = {
           text: ".answer_p",
         },
       },
+      shared: /** @type {typeof sharedOptions | null} */ (null),
     },
     ueditorIframe: 'iframe[id^="ueditor_"]',
     frameContentId: "#frame_content",

@@ -1,5 +1,10 @@
 import { assert } from "@injected/utils/async.js";
-import { extractFont, extractQuestion, classifyQuestion } from "./extract.js";
+import {
+  extractFont,
+  extractQuestion,
+  extractContent,
+  classifyQuestion,
+} from "./extract.js";
 import { QuestionType } from "./types.js";
 
 /**
@@ -7,7 +12,7 @@ import { QuestionType } from "./types.js";
  * @typedef {import("../../../src/services/cmds").Entry_Deserialize} Entry
  * @typedef {import("../../../src/services/cmds").Section_Deserialize} Section
  * @typedef {typeof import("../selectors.js").SELECTORS.workExam | typeof import("../selectors.js").SELECTORS.quiz} PageSelectors
- * @typedef {Pick<PageSelectors, "kind" | "choice" | "clearSelectedClass" | "textInputs">} FillingSelectors
+ * @typedef {Pick<PageSelectors, "kind" | "choice" | "clearSelectedClass" | "textInputs" | "textSave"> & {kindName?: string}} FillingSelectors
  * @typedef {import("./extract.js").ExtractionSelectors & FillingSelectors & Pick<PageSelectors, "folio" | "blanks">} QuestionSelectors
  */
 
@@ -43,6 +48,60 @@ const readTitle = (node, selectors) => {
 };
 
 /**
+ * 提取共用选项及子题；选项正文归公共材料，子题只保留可点击的标识。
+ * @param {Element} node
+ * @param {import("./extract.js").Question} question
+ * @param {QuestionSelectors} selectors
+ * @param {NonNullable<QuestionSelectors["folio"]["shared"]>} shared
+ * @param {Map<string, Anchor>} anchors
+ * @returns {Entry}
+ */
+const parseShared = (node, question, selectors, shared, anchors) => {
+  const options = [];
+  for (const option of node.querySelectorAll(shared.options)) {
+    const label = option
+      .querySelector(shared.label)
+      .textContent.trim()
+      .replace(/\.$/, "");
+    options.push(
+      `${label} ${extractContent(option.querySelector(shared.text), question.images)}`,
+    );
+  }
+  const itemSelectors = {
+    ...selectors,
+    ...shared.item,
+    choice: { ...selectors.choice, ...shared.item.choice },
+  };
+  /** @type {Entry[]} */
+  const entries = [];
+  for (const item of node.querySelectorAll(shared.items)) {
+    const child = extractQuestion(
+      item,
+      itemSelectors,
+      readTitle(item, itemSelectors),
+    );
+    child.id = `${question.id}.${child.id}`;
+    child.options = Array.from(
+      item.querySelectorAll(itemSelectors.choice.single),
+      (option) => option.getAttribute(itemSelectors.choice.attribute),
+    );
+    anchors.set(child.id, { node: item, selectors: itemSelectors });
+    entries.push({ type: "question", data: child });
+  }
+  return {
+    type: "section",
+    data: {
+      title: `${question.id}. ${question.kind}`,
+      passage: {
+        text: [question.stem, "共用备选答案：", ...options].join("\n"),
+        images: question.images,
+      },
+      entries,
+    },
+  };
+};
+
+/**
  * @param {Element} node
  * @param {QuestionSelectors} selectors
  * @param {string[]} path 祖先题组的显示编号。
@@ -54,6 +113,8 @@ const parseEntry = (node, selectors, path, anchors) => {
   const position = [...path, question.id];
   question.id = position.join(".");
   const { folio } = selectors;
+  if (folio.shared && node.querySelector(folio.shared.container))
+    return parseShared(node, question, selectors, folio.shared, anchors);
   const reading = node.querySelector(folio.reading);
   if (reading) {
     const itemSelectors = {
@@ -73,7 +134,7 @@ const parseEntry = (node, selectors, path, anchors) => {
     };
   }
 
-  const { kind, choice, clearSelectedClass, textInputs } = selectors;
+  const { kind, choice, clearSelectedClass, textInputs, textSave } = selectors;
   if (classifyQuestion(question.kind) === QuestionType.Completion) {
     // 章节结果页保留空位容器但不再含编辑器，解析空数不依赖页面是否可编辑。
     question.blank_count =
@@ -83,7 +144,7 @@ const parseEntry = (node, selectors, path, anchors) => {
   }
   anchors.set(question.id, {
     node,
-    selectors: { kind, choice, clearSelectedClass, textInputs },
+    selectors: { kind, choice, clearSelectedClass, textInputs, textSave },
   });
   return { type: "question", data: question };
 };

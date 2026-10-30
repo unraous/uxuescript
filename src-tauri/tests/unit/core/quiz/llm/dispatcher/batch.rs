@@ -16,6 +16,18 @@ fn splits_reading_groups_without_losing_material_or_renumbering_questions() {
         [1, 2, 2, 1, 2, 2, 1, 1]
     );
     assert_eq!(batches[0].questions[0].question.blank_count, Some(10));
+    let mut ids = Vec::new();
+    for batch in &batches {
+        for item in &batch.questions {
+            ids.push(item.question.id.as_str());
+        }
+    }
+    assert_eq!(
+        ids,
+        [
+            "1", "2.1", "2.2", "2.3", "2.4", "2.5", "3.1", "3.2", "3.3", "3.4", "3.5", "4"
+        ]
+    );
     assert!(batches[0].materials.is_empty());
     assert_eq!(batches[1].questions[0].question.id, "2.1");
     assert_eq!(batches[2].questions[0].question.id, "2.3");
@@ -32,6 +44,7 @@ fn splits_reading_groups_without_losing_material_or_renumbering_questions() {
 
 #[test]
 fn includes_outer_and_inner_material_once_per_batch() {
+    // 人工给真实归档包一层材料，仅验证模型的递归能力；没有对应的真实页面样本。
     let mut folio = archived();
     folio.entries = vec![Entry::Section(Section {
         title: "共同要求".into(),
@@ -50,21 +63,24 @@ fn includes_outer_and_inner_material_once_per_batch() {
 
 #[test]
 fn rejects_missing_blank_counts_and_duplicate_ids_before_requests() {
-    let mut folio = archived();
-    let Entry::Section(section) = &mut folio.entries[0] else {
-        panic!()
-    };
-    let Entry::Question(question) = &mut section.entries[0] else {
-        panic!()
-    };
-    question.blank_count = None;
-    assert!(
-        prepare(folio, 5)
-            .err()
-            .unwrap()
-            .to_string()
-            .contains("空数")
-    );
+    for kind in ["填空题", "分录题"] {
+        let mut folio = archived();
+        let Entry::Section(section) = &mut folio.entries[0] else {
+            panic!()
+        };
+        let Entry::Question(question) = &mut section.entries[0] else {
+            panic!()
+        };
+        question.kind = kind.into();
+        question.blank_count = None;
+        assert!(
+            prepare(folio, 5)
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("空数")
+        );
+    }
     let mut folio = archived();
     folio.entries.push(folio.entries[0].clone());
     assert!(

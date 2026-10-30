@@ -61,7 +61,11 @@ async function setup(options = {}) {
   const nativeConfirm = vi.fn(() => true);
   const confirm = vi.fn(async () => options.start ?? true);
   const saveWork = vi.fn();
-  const editor = { isReady: options.editorReady ?? true, setContent: vi.fn() };
+  const editor = {
+    isReady: options.editorReady ?? true,
+    focus: vi.fn(),
+    setContent: vi.fn(),
+  };
   const invoke = vi.fn().mockImplementation(async (command) => {
     if (command === "options") return { switchingCd: null };
     if (command === "confirm") return confirm();

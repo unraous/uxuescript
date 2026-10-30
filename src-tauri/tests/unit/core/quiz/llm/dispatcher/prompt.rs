@@ -3,13 +3,42 @@ use crate::core::quiz::llm::dispatcher::batch;
 use crate::core::quiz::{Entry, Folio, Question};
 
 #[test]
+#[ignore = "手动查看组装后的提示词"]
+fn preview_folio_prompt() {
+    let mut folio: Folio =
+        serde_json::from_str(include_str!("../../../../../assets/course-page/folio.json")).unwrap();
+    folio.context.course = Some("外刊精读".into());
+    folio.context.chapter = Some("城市与自然".into());
+
+    for (index, batch) in batch::prepare(folio, 5).unwrap().iter().enumerate() {
+        let prompt = assemble(batch, vec![]).unwrap();
+        println!(
+            "\n===== 第 {} 批：系统提示词 =====\n{}",
+            index + 1,
+            prompt.system
+        );
+        println!("\n===== 第 {} 批：用户内容 =====", index + 1);
+        for part in prompt.parts {
+            match part {
+                Part::Text(text) => println!("{text}"),
+                Part::Image(image) => {
+                    println!("[图片：{} {}，{}]", image.owner, image.marker, image.mime)
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn selects_detailed_rules_only_for_present_types_in_fixed_order() {
     let kinds = [
         "单选题",
         "多选题",
         "判断题",
         "填空题",
+        "分录题",
         "简答题",
+        "论述题",
         "计算题",
         "句子翻译题",
         "连线题",
@@ -22,7 +51,7 @@ fn selects_detailed_rules_only_for_present_types_in_fixed_order() {
                 stem: "题干".into(),
                 options: vec![],
                 images: vec![],
-                blank_count: kind.contains("填空").then_some(10),
+                blank_count: (kind.contains("填空") || kind.contains("分录")).then_some(10),
             })],
             ..Default::default()
         };

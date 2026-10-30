@@ -18,7 +18,7 @@ export const main = async () => {
     if (window.location.pathname.endsWith("/mooc2/exam/preview")) {
       if (
         !(await confirm(
-          "是否开始整卷答题？填写完成后请检查并自行保存、交卷。\n\n含图片的题目需要当前模型支持视觉输入；否则图片可能被忽略，答案可能不准确。",
+          "是否开始整卷答题？文本题将逐空暂存，填写完成后请检查并自行保存、交卷。\n\n含图片的题目需要当前模型支持视觉输入；否则图片可能被忽略，答案可能不准确。",
         ))
       )
         return;

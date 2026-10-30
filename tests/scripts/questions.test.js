@@ -111,8 +111,16 @@ describe.each([
       const frame = document.createElement("iframe");
       document.body.append(frame);
       const frameDoc = frame.contentDocument;
-      const firstEditor = { isReady: true, setContent: vi.fn() };
-      const secondEditor = { isReady: true, setContent: vi.fn() };
+      const firstEditor = {
+        isReady: true,
+        focus: vi.fn(),
+        setContent: vi.fn(),
+      };
+      const secondEditor = {
+        isReady: true,
+        focus: vi.fn(),
+        setContent: vi.fn(),
+      };
       const getEditor = vi.fn((id) =>
         id === "answer1" ? firstEditor : secondEditor,
       );
@@ -133,8 +141,17 @@ describe.each([
 
       expect(topGetEditor).not.toHaveBeenCalled();
       expect(getEditor).toHaveBeenNthCalledWith(1, "answer1");
+      expect(firstEditor.focus).toHaveBeenCalledOnce();
+      expect(firstEditor.focus).toHaveBeenCalledBefore(firstEditor.setContent);
       if (kind === "填空题") {
         expect(getEditor).toHaveBeenNthCalledWith(2, "answer2");
+        expect(secondEditor.focus).toHaveBeenCalledOnce();
+        expect(firstEditor.setContent).toHaveBeenCalledBefore(
+          secondEditor.focus,
+        );
+        expect(secondEditor.focus).toHaveBeenCalledBefore(
+          secondEditor.setContent,
+        );
         expect(firstEditor.setContent).toHaveBeenCalledExactlyOnceWith(
           "第一段",
         );
@@ -147,6 +164,7 @@ describe.each([
           "第一段;第二段",
         );
         expect(secondEditor.setContent).not.toHaveBeenCalled();
+        expect(secondEditor.focus).not.toHaveBeenCalled();
       }
     },
   );

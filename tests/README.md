@@ -39,11 +39,23 @@ cargo test -p uxuescript test_solve_bigmodel -- --ignored --nocapture
 
 未实际请求外部服务时，只报告本地验证结果；不要将编译或入口列出成功表述为联测通过。
 
+## 查看提示词
+
+```powershell
+pnpm sync:config
+pnpm build:scripts
+cargo test -p uxuescript preview_folio_prompt -- --ignored --nocapture
+```
+
+该用例使用作业卷面样本，按每批最多 5 题组装并打印系统提示词及用户内容，不请求模型服务。输出是协议编码前的提示词；具体接口还会附加对应的输出格式约束。样本没有图片，因此不会下载或打印图片数据。
+
 ## 增补测试
 
 `tests/fixtures/chaoxing/` 保存用户提供的真实单选、连线题 HTML 节选，去除身份信息及无关页面区域。`tests/scripts/questions.test.js` 检查题目提取和选项点击，尤其覆盖连线题显示编号与内部 `data` 标识不同，以及公式元数据解码和普通图片占位的情况。样本未包含下拉框处理脚本，因此这些用例不验证页面脚本更新隐藏答案或服务端暂存。
 
 同一 JS 用例还读取 `src-tauri/tests/assets/course-page/webpage.html.gz`，用章节测验选择器核对题目列表与字体原始字节。Rust 命令测试分别覆盖 `Folio` 无字体直传和有字体解密后求解；解密测试及求解联测直接读取题目 JSON 与字体样本，不再解析 HTML。
+
+`exam-preview.html` 节选考试预览页的乱序单选、多选、两个共用选项题组和五空分录题，去除平台脚本及编辑器工具栏等无关内容；不代表完整试卷归档。`tests/scripts/exam-preview.test.js` 检查题后表单边界、卷名、公共选项及图片归属、子题选择隔离、五空填写和缺项拒绝，并用构造的单编辑器场景验证论述题。选项切换、IPC、UEditor 和逐空保存均使用本地模拟，不验证平台请求、暂存和评分。
 
 `tests/scripts/folio.test.js` 验证结构化卷面解析。`webpage3.html.gz` 保存用户提供的完整作业 DOM 和页面脚本，账号及签名值已脱敏；测试以静态文档读取，不执行其中脚本。对应的 `folio.json` 同时作为 JS 解析期望与 Rust `Folio` 反序列化样本，覆盖三个分区、两篇阅读材料、十个单选子题、十空填空及翻译题。旧章节和考试样本用于验证题干、选项、字体及分区归属；章节结果页通过保留的空位容器读取空数。附加图片用例检查材料和子题的图片分别保存。
 

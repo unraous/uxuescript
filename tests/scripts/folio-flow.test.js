@@ -31,6 +31,7 @@ async function setup(
       node.id,
       {
         isReady: true,
+        focus: vi.fn(),
         setContent: vi.fn(),
       },
     ]),

@@ -17,13 +17,14 @@ const cleanup = (node, selector) => {
  * @param {Element} quizDiv
  * @param {string} content
  * @param {string} selector
+ * @param {string} attribute
  */
-const fillSingle = (quizDiv, content, selector) => {
+const fillSingle = (quizDiv, content, selector, attribute) => {
   const rawContent = String(content).trim();
   assert(rawContent, "单选题 AI 返回答案为空，拒绝提交");
 
   const opt = /** @type {HTMLSpanElement|null} */ (
-    quizDiv.querySelector(`${selector}[data="${rawContent}"]`)
+    quizDiv.querySelector(`${selector}[${attribute}="${rawContent}"]`)
   );
   assert(opt, `单选题未找到对应选项 [${rawContent}]，拒绝提交`);
   opt.click();
@@ -71,10 +72,11 @@ const fillJudge = (quizDiv, content, selector) => {
 /**
  * @param {HTMLInputElement | HTMLTextAreaElement} input
  * @param {string} text
+ * @param {import("./folio.js").FillingSelectors["textSave"]} save
  */
-const setTextContent = async (input, text) => {
+const setTextContent = async (input, text, save) => {
   if (input.tagName === "TEXTAREA") {
-    await fillEditor(/** @type {HTMLTextAreaElement} */ (input), text);
+    await fillEditor(/** @type {HTMLTextAreaElement} */ (input), text, save);
   } else {
     input.value = text;
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -86,8 +88,9 @@ const setTextContent = async (input, text) => {
  * @param {Element} quizDiv
  * @param {string} content
  * @param {string} selector
+ * @param {import("./folio.js").FillingSelectors["textSave"]} save
  */
-const fillCompletion = async (quizDiv, content, selector) => {
+const fillCompletion = async (quizDiv, content, selector, save) => {
   const ansArr = String(content)
     .split(";")
     .map((s) => s.trim());
@@ -99,7 +102,7 @@ const fillCompletion = async (quizDiv, content, selector) => {
     `填空题需要 ${inputs.length} 个非空答案，收到 ${ansArr.length} 项，拒绝填写`,
   );
   for (const [index, input] of inputs.entries()) {
-    await setTextContent(input, ansArr[index]);
+    await setTextContent(input, ansArr[index], save);
   }
 };
 
@@ -107,38 +110,51 @@ const fillCompletion = async (quizDiv, content, selector) => {
  * @param {Element} quizDiv
  * @param {string} content
  * @param {string} selector
+ * @param {import("./folio.js").FillingSelectors["textSave"]} save
  */
-const fillShort = async (quizDiv, content, selector) => {
+const fillShort = async (quizDiv, content, selector, save) => {
   const val = String(content).trim();
   assert(val, "简答题 AI 返回答案为空，拒绝提交");
   const input = /** @type {HTMLInputElement | HTMLTextAreaElement} */ (
     await wait.element(null, selector, quizDiv)
   );
-  await setTextContent(input, val);
+  await setTextContent(input, val, save);
 };
 
 /**
  * 清空旧选项后按题型填写答案。
  * @param {Element} node 当前题目容器。
  * @param {string} content 模型返回的答案。
- * @param {{kind: string, choice: {single: string, multiple: string}, clearSelectedClass: string, textInputs: string}} selectors 页面选择器。
+ * @param {import("./folio.js").FillingSelectors} selectors 页面选择器。
  * @returns {Promise<void>}
  */
 export const fillAnswer = async (node, content, selectors) => {
-  const kind = classifyQuestion(node.querySelector(selectors.kind).textContent);
+  const kind = classifyQuestion(
+    selectors.kindName ?? node.querySelector(selectors.kind).textContent,
+  );
   cleanup(node, selectors.clearSelectedClass);
   switch (kind) {
     case QuestionType.SingleChoice:
-      return fillSingle(node, content, selectors.choice.single);
+      return fillSingle(
+        node,
+        content,
+        selectors.choice.single,
+        selectors.choice.attribute,
+      );
     case QuestionType.MultipleChoice:
       return fillMulti(node, content, selectors.choice.multiple);
     case QuestionType.Judgment:
       return fillJudge(node, content, selectors.choice.single);
     case QuestionType.Completion:
-      return fillCompletion(node, content, selectors.textInputs);
+      return fillCompletion(
+        node,
+        content,
+        selectors.textInputs,
+        selectors.textSave,
+      );
     case QuestionType.ShortAnswer:
     case QuestionType.Translation:
-      return fillShort(node, content, selectors.textInputs);
+      return fillShort(node, content, selectors.textInputs, selectors.textSave);
     default:
       throw new Error(`未支持的题目类型: ${kind}`);
   }

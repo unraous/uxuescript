@@ -13,6 +13,7 @@ import { SELECTORS } from "@injected/chaoxing/selectors.js";
  * @typedef {Object} ExtractionSelectors
  * @property {string} number 显示题号。
  * @property {string} kind 题型名称。
+ * @property {string} [kindName] 未单独标注题型的共用选项子题继承单选语义。
  * @property {string} title 题干容器。
  * @property {string} titleMeta 题干中需要移除的题型及分值。
  * @property {string} optionLabel 选项标识。
@@ -45,7 +46,7 @@ const latex = (image) => {
  * @param {Element} root
  * @param {{marker: string, url: string}[]} images
  */
-const content = (root, images) => {
+export const extractContent = (root, images) => {
   const clone = /** @type {Element} */ (root.cloneNode(true));
   for (const image of clone.querySelectorAll("img")) {
     const source = latex(image);
@@ -74,7 +75,9 @@ export const classifyQuestion = (titleText) => {
   if (titleText.includes("判断")) return QuestionType.Judgment;
   if (titleText.includes("单选")) return QuestionType.SingleChoice;
   if (titleText.includes("填空")) return QuestionType.Completion;
+  if (titleText.includes("分录")) return QuestionType.Completion;
   if (titleText.includes("简答")) return QuestionType.ShortAnswer;
+  if (titleText.includes("论述")) return QuestionType.ShortAnswer;
   if (titleText.includes("计算")) return QuestionType.ShortAnswer;
   if (titleText.includes("翻译")) return QuestionType.Translation;
   if (titleText.includes("连线")) return QuestionType.Matching;
@@ -93,7 +96,7 @@ const readChoices = (node, choice, labelFor, images) =>
     const choiceText = /** @type {Element} */ (
       option.querySelector(choice.text)
     );
-    return `${label} ${content(choiceText, images)}`;
+    return `${label} ${extractContent(choiceText, images)}`;
   });
 
 /**
@@ -143,9 +146,9 @@ export const extractQuestion = (
   selectors,
   titleNode = node.querySelector(selectors.title),
 ) => {
-  const kind = text(node.querySelector(selectors.kind)).match(
-    /[\u4e00-\u9fff]+/,
-  )[0];
+  const kind =
+    selectors.kindName ??
+    text(node.querySelector(selectors.kind)).match(/[\u4e00-\u9fff]+/)[0];
   const title = /** @type {Element|null} */ (titleNode?.cloneNode(true));
   assert(title, "未找到题干");
   title.querySelector(selectors.titleMeta)?.remove();
@@ -157,7 +160,7 @@ export const extractQuestion = (
   return {
     id: number,
     kind: kind,
-    stem: content(title, images).replace(
+    stem: extractContent(title, images).replace(
       /^(?:\d+\s*[.．、]|[（(]\d+[)）])\s*/,
       "",
     ),
