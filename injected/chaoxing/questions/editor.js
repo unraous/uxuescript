@@ -1,5 +1,8 @@
 import { wait, assert } from "@injected/utils/async.js";
 
+// 最多等待 15 秒（单位：毫秒），用于前一请求释放锁或当前答案暂存完成；条件满足后立即继续。
+const SAVE_TIMEOUT_MS = 15_000;
+
 /**
  * 等待页面已有的 UEditor 就绪，聚焦后写入内容；考试预览逐空暂存。
  * @param {HTMLTextAreaElement} textarea 编辑器对应的 textarea。
@@ -38,7 +41,7 @@ export async function fillEditor(textarea, content, save) {
   if (button) {
     // 平台在另一个暂存请求进行时会直接忽略新的保存操作。
     assert(
-      await wait.until(() => !page.submitOnce, 15000),
+      await wait.until(() => !page.submitOnce, SAVE_TIMEOUT_MS),
       `等待其他答案暂存完成超时: ${textarea.id}`,
     );
     button.click();
@@ -46,7 +49,7 @@ export async function fillEditor(textarea, content, save) {
       await wait.until(
         () =>
           page.getComputedStyle(button).display === "none" && !page.submitOnce,
-        15000,
+        SAVE_TIMEOUT_MS,
       ),
       `答案暂存超时: ${textarea.id}`,
     );
