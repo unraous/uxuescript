@@ -6,19 +6,15 @@ use reqwest::{
     redirect::Policy,
 };
 
-use crate::core::quiz::QuestionImage;
+use crate::core::{
+    quiz::QuestionImage,
+    url::{Type, classify},
+};
 
 const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
 // Base64 还会膨胀约三分之一，为 Gemini 的 20 MB 请求上限预留正文空间。
 const MAX_BATCH_BYTES: usize = 14 * 1024 * 1024;
 const CHAOXING_REFERER: &str = "https://mooc1-api.chaoxing.com/";
-const TRUSTED_DOMAINS: &[&str] = &[
-    "chaoxing.com",
-    "cldisk.com",
-    "cxfanya.com",
-    "cxerya.com",
-    "xuexitong.com",
-];
 
 pub(super) struct Image {
     pub owner: String,
@@ -33,21 +29,18 @@ impl Image {
     }
 }
 
-fn trusted(url: &Url) -> bool {
-    if url.scheme() != "https" {
-        return false;
+fn image_mime(mime: &str) -> &str {
+    // 超星图片服务使用 image/jpg，模型接口需要标准的 image/jpeg。
+    if mime == "image/jpg" {
+        "image/jpeg"
+    } else {
+        mime
     }
-    let Some(host) = url.host_str() else {
-        return false;
-    };
-    TRUSTED_DOMAINS
-        .iter()
-        .any(|domain| host == *domain || host.ends_with(&format!(".{domain}")))
 }
 
 async fn download(client: &reqwest::Client, url: &str) -> Result<(String, Vec<u8>)> {
     let url = Url::parse(url).context("图片地址无效")?;
-    if !trusted(&url) {
+    if classify(&url) == Type::Unknown {
         bail!("图片地址不属于可信超星域名: {url}");
     }
     let mut response = client.get(url.clone()).send().await?;
@@ -59,8 +52,8 @@ async fn download(client: &reqwest::Client, url: &str) -> Result<(String, Vec<u8
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.split(';').next())
-        .unwrap_or("")
-        .to_owned();
+        .unwrap_or("");
+    let mime = image_mime(mime).to_owned();
     if !matches!(
         mime.as_str(),
         "image/png" | "image/jpeg" | "image/gif" | "image/webp"
@@ -87,7 +80,7 @@ pub(super) async fn load(sources: &[(String, &[QuestionImage])]) -> Result<Vec<I
             HeaderValue::from_static(CHAOXING_REFERER),
         )]))
         .redirect(Policy::custom(|attempt| {
-            if attempt.previous().len() >= 5 || !trusted(attempt.url()) {
+            if attempt.previous().len() >= 5 || classify(attempt.url()) == Type::Unknown {
                 attempt.stop()
             } else {
                 attempt.follow()
@@ -121,14 +114,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_accepts_https_urls_from_trusted_domains() {
-        assert!(trusted(&Url::parse("https://p.cldisk.com/a.png").unwrap()));
-        assert!(trusted(
-            &Url::parse("https://p.ananas.chaoxing.com/a.png").unwrap()
-        ));
-        assert!(!trusted(&Url::parse("http://p.cldisk.com/a.png").unwrap()));
-        assert!(!trusted(
-            &Url::parse("https://cldisk.com.example/a.png").unwrap()
-        ));
+    fn normalizes_chaoxing_jpg_mime() {
+        assert_eq!(image_mime("image/jpg"), "image/jpeg");
+        assert_eq!(image_mime("image/png"), "image/png");
     }
 }

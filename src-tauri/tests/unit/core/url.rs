@@ -1,6 +1,20 @@
 use super::*;
 
 #[test]
+fn classifies_cldisk_as_other() {
+    for url in [
+        "http://cldisk.com/",
+        "https://d0.cldisk.com/download/file",
+        "https://i.cldisk.com/mooc-ans/mooc2/work/dowork",
+    ] {
+        assert_eq!(classify(&url.parse().unwrap()), Type::Other, "{url}");
+    }
+    for url in ["https://cldisk.com.example.com/", "https://fakecldisk.com/"] {
+        assert_eq!(classify(&url.parse().unwrap()), Type::Unknown, "{url}");
+    }
+}
+
+#[test]
 fn test_classify_urls() {
     let url = "https://i.chaoxing.com".parse().unwrap();
     assert_eq!(classify(&url), Type::MainSpace);

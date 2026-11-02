@@ -19,10 +19,13 @@ const EXAM_PATHS: &[&str] = &[
     "/mooc-ans/mooc2/exam/preview",
 ];
 
-/// 判定传入 URL 是否属于超星域名并返回其具体分类类型。
+/// 判定传入 URL 是否属于超星及其资源域名并返回具体分类类型。
 pub fn classify(url: &tauri::Url) -> Type {
     let host = url.host_str().unwrap_or_default();
 
+    if host == "cldisk.com" || host.ends_with(".cldisk.com") {
+        return Type::Other;
+    }
     if host != "chaoxing.com" && !host.ends_with(".chaoxing.com") {
         return Type::Unknown;
     }

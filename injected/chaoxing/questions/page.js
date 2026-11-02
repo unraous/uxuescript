@@ -1,5 +1,5 @@
 import { cooldown } from "@injected/chaoxing/runtime.js";
-import { wait, assert } from "@injected/utils/async.js";
+import { wait } from "@injected/utils/async.js";
 import { invoke } from "@injected/utils/backend.js";
 import { classifyQuestion } from "./extract.js";
 import { parseFolio, questions } from "./folio.js";
@@ -33,7 +33,7 @@ export const solveFolio = async (folio) => {
 };
 
 /**
- * 先检查本页填空答案的空数，再按题号定位填写，避免缺项时已经写入前几个空。
+ * 按题号定位并填写答案。
  * @param {import("./folio.js").Folio} folio
  * @param {Map<string, import("./folio.js").Anchor>} anchors
  * @param {import("../../../src/services/cmds").AnswerItem[]} answers
@@ -42,16 +42,6 @@ export const solveFolio = async (folio) => {
 export const applyAnswers = async (folio, anchors, answers) => {
   const leaves = questions(folio.entries);
   const byNumber = new Map(answers.map((answer) => [answer.index, answer]));
-  for (const question of leaves) {
-    if (question.blank_count != null) {
-      const answer = byNumber.get(question.id);
-      const values = answer.content.split(";").map((value) => value.trim());
-      assert(
-        values.length === question.blank_count && values.every(Boolean),
-        `填空题 ${question.id} 需要 ${question.blank_count} 个非空答案，收到 ${values.length} 项，拒绝填写`,
-      );
-    }
-  }
   const skipped = [];
   for (const question of leaves) {
     const kind = classifyQuestion(question.kind);
