@@ -15,6 +15,11 @@ use crate::core::quiz::{
 
 use tauri::Emitter;
 
+#[uxs_commands::command]
+pub async fn load_course_cover(url: String) -> CommandsResult<String> {
+    Ok(crate::core::image::download_data_url(&url).await?)
+}
+
 /// 用固定简答题检查当前 API 和模型，成功返回 ok，失败返回具体错误字符串。
 #[uxs_commands::command]
 pub async fn healthy() -> CommandsResult<String> {

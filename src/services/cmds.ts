@@ -4,6 +4,7 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
+	loadCourseCover: (url: string) => __TAURI_INVOKE<string>("load_course_cover", { url }),
 	/**  用固定简答题检查当前 API 和模型，成功返回 ok，失败返回具体错误字符串。 */
 	healthy: () => __TAURI_INVOKE<string>("healthy"),
 	solveQuestions: (payload: Folio_Deserialize) => __TAURI_INVOKE<AnswerItem[]>("solve_questions", { payload }),

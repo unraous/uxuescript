@@ -23,6 +23,7 @@
           "hide_mask",
           "insert_course_meta_map",
           "is_msi_install",
+          "load_course_cover",
           "minimize",
           "options",
           "paths",

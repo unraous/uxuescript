@@ -1,9 +1,33 @@
 <script setup lang="ts">
 import { label } from "@/labels";
 import VRollTransition from "@/components/base/VRollTransition.vue";
-defineProps<{
+import { ref, watch } from "vue";
+import { commands } from "@/services/cmds";
+
+const props = defineProps<{
   coverSrc: string;
 }>();
+
+const imageSrc = ref("");
+
+watch(
+  () => props.coverSrc,
+  async (url, _previous, onCleanup) => {
+    let active = true;
+    onCleanup(() => { active = false; });
+    imageSrc.value = "";
+    if (!url) return;
+    try {
+      const image = await commands.loadCourseCover(url);
+      if (active) imageSrc.value = image;
+    } catch (error) {
+      console.error("课程封面加载失败:", url, error);
+    }
+  },
+  { immediate: true },
+);
+
+const logCoverError = () => console.error("课程封面显示失败:", props.coverSrc);
 </script>
 
 <template>
@@ -11,22 +35,23 @@ defineProps<{
     <Transition name="fade">
       <!-- 真实封面展示组（绑定 key 确保 URL 改变时也能直接叠化过渡） -->
       <div
-        v-if="coverSrc"
-        :key="coverSrc"
+        v-if="imageSrc"
+        :key="imageSrc"
         class="cover-group"
       >
         <!-- 底层彩色氛围光晕投影 -->
         <img
-          :src="coverSrc"
+          :src="imageSrc"
           aria-hidden="true"
           referrerpolicy="no-referrer"
           class="cover-glow"
         />
         <!-- 顶层封面主体 -->
         <img
-          :src="coverSrc"
+          :src="imageSrc"
           referrerpolicy="no-referrer"
           class="cover-main"
+          @error="logCoverError"
         />
       </div>
 
