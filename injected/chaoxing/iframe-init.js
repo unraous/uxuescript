@@ -6,7 +6,7 @@ import { preserveFocusState } from "./focus.js";
  * @returns {void}
  */
 const safeNavigate = (url) => {
-  if (!url || url.startsWith("javascript:")) return;
+  if (url.startsWith("javascript:")) return;
   try {
     window.top.location.href = url;
   } catch {

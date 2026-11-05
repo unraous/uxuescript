@@ -166,17 +166,6 @@ const resolveInteractiveQuizData = async (timeline, datas, validationUrl2) => {
       throw error;
     }
   }
-
-  const unanswered = datas.filter(
-    ({ answerContent }) => !String(answerContent ?? "").trim(),
-  );
-  if (unanswered.length) {
-    const error = new Error(`互动题答案缺失（${unanswered.length} 道）`);
-    await showAnswerFailure(error);
-    throw error;
-  }
-
-  return datas;
 };
 
 /**

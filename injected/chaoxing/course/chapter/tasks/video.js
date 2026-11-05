@@ -8,7 +8,7 @@ import { muteVideo, applySpeed } from "./media.js";
 import { wait, sleep, assert } from "@injected/utils/async.js";
 
 /**
- * 启动视频，应用静音和倍速配置，独立处理视频互动题与批注。
+ * 启动视频，应用音量和倍速配置，独立处理视频互动题与批注。
  * @param {Document} taskDoc 视频任务点文档。
  * @returns {Promise<void>}
  */
@@ -26,7 +26,7 @@ export const handleVideo = async (taskDoc) => {
   if (config.muteVideo) muteVideo(videoEl);
 
   const isStarted = await wait.until(() => {
-    if (videoEl?.currentTime > 0 && !videoEl.paused) return true;
+    if (videoEl.currentTime > 0 && !videoEl.paused) return true;
     launchBtn.click();
     return null;
   });

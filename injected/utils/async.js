@@ -101,8 +101,8 @@ export const wait = {
    * @param {(() => unknown)|null} preAction 进入章节或切换页签的操作。
    * @param {string} selector iframe 选择器。
    * @param {Document|Element} root 查询范围。
-   * @param {string|false} [errorMsg] 自定义超时错误，false 表示返回 null。
-   * @returns {Promise<Document|null>}
+   * @param {string} [errorMsg] 自定义超时错误。
+   * @returns {Promise<Document>}
    */
   iframeDoc: async (preAction, selector, root, errorMsg = "") => {
     let oldDoc = null;
@@ -119,14 +119,7 @@ export const wait = {
         oldDoc,
       ),
     );
-    if (errorMsg !== false) {
-      assert(
-        doc,
-        typeof errorMsg === "string" && errorMsg
-          ? errorMsg
-          : `等待 iframe [${selector}] 框架文档超时`,
-      );
-    }
+    assert(doc, errorMsg || `等待 iframe [${selector}] 框架文档超时`);
     return doc;
   },
 };

@@ -116,8 +116,6 @@ const stringify = (value, seen = new WeakSet(), depth = 0) => {
  */
 const forwardConsole = (fnName) => {
   const original = console[fnName];
-  if (typeof original !== "function") return;
-
   console[fnName] = /** @param {unknown[]} args */ (...args) => {
     original.apply(console, args);
 
@@ -133,12 +131,10 @@ const forwardConsole = (fnName) => {
 };
 
 /**
- * 有 Tauri IPC 时将页面 console 调用转发到桌面端，普通浏览器中不安装代理。
+ * 将页面 console 调用转发到桌面端。
  * @returns {void}
  */
 export function main() {
-  if (typeof invoke !== "function") return;
-
   forwardConsole("log");
   forwardConsole("debug");
   forwardConsole("info");
