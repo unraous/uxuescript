@@ -104,9 +104,9 @@ API Key 的日志格式化会脱敏，配置序列化仍保留明文。读取或
 
 三个入口统一调用 `solve_questions(payload: Folio)`。Rust 有字体时递归还原篇标题、材料与题目文字，无字体时直接分批求解；生产入口不解析整页 HTML。字体映射针对字形，不是整个字体文件的哈希；未匹配字符保留原样。章节测验开启人工核验时，在提交前等待用户确认；独立作业和逐题考试仅暂存，整卷预览考试提示用户自行保存和交卷。
 
-Prompt 由后端 [`prompt.rs`](../../src-tauri/src/core/quiz/llm/dispatcher/prompt.rs) 按变化频率拼装：通用约定和本批题型说明 → 可选课业背景 → 公共材料及其图片 → 本批题目及其图片。十种题型的输入、输出规则与示例分别维护在 [`prompts/`](../../src-tauri/src/core/quiz/llm/prompts/)，只加入本批实际出现的类型，固定排列并去重；共用选项子题使用单选规则。课程名来自已采集的课程缓存，章节名来自课程导航，作业或试卷名来自已验证的页面标题（`.mark_title` 或 `.h2_subject`）；没有的信息省略。前端只用课程 ID 查询缓存，不将其作为模型背景。
+Prompt 由后端 [`prompt.rs`](../../src-tauri/src/core/quiz/llm/prompt.rs) 按变化频率拼装：通用约定和本批题型说明 → 可选课业背景 → 公共材料及其图片 → 本批题目及其图片。[`protocol.rs`](../../src-tauri/src/core/quiz/llm/protocol.rs) 负责分发，具体协议及请求模板归在 `protocol/`。十种题型的输入、输出规则与示例分别维护在 [`prompts/`](../../src-tauri/src/core/quiz/llm/prompts/)，只加入本批实际出现的类型，固定排列并去重；共用选项子题使用单选规则。课程名来自已采集的课程缓存，章节名来自课程导航，作业或试卷名来自已验证的页面标题（`.mark_title` 或 `.h2_subject`）；没有的信息省略。前端只用课程 ID 查询缓存，不将其作为模型背景。
 
-批处理在 [`batch.rs`](../../src-tauri/src/core/quiz/llm/dispatcher/batch.rs) 中通过 `collect` 递归收集题目。遍历按当前层 `entries` 的顺序深度优先进行：遇到 `Question` 就追加一个叶子，遇到 `Section` 就先处理其全部子条目，再回到当前层继续。空篇不产生叶子，题目显示编号不变；收集结果保留原卷面的作答顺序。
+批处理在 [`batch.rs`](../../src-tauri/src/core/quiz/llm/batch.rs) 中通过 `collect` 递归收集题目。遍历按当前层 `entries` 的顺序深度优先进行：遇到 `Question` 就追加一个叶子，遇到 `Section` 就先处理其全部子条目，再回到当前层继续。空篇不产生叶子，题目显示编号不变；收集结果保留原卷面的作答顺序。
 
 真实样本已验证的嵌套是“题型分区（无材料）→ 材料题组 → 可作答子题”：完整作业归档中的阅读理解，以及考试预览中的共用选项题均使用这种结构。以下示例取自作业归档的实际层级。“带材料的题组内部再嵌套另一份材料”目前只有手动构造的模型测试，没有实际页面样本支持。
 
@@ -135,7 +135,7 @@ Prompt 由后端 [`prompt.rs`](../../src-tauri/src/core/quiz/llm/dispatcher/prom
 
 答案严格解析为数组或 `answers` 对象，校验数量、题号和非空内容，并按输入题号排序。填空的 `content` 使用英文分号连接各空，项数必须等于 `blank_count` 且每项非空；数量错误沿用该批次重试。前端回填前也检查本页所有填空答案，再按锚点依次写入，防止少答、多答或空项导致部分写入。Chat Completions 配置 `json_object` 时，提示词明确要求 `answers` 对象；Responses 与其 JSON Schema 保持同样约定。所有批次结束后仍有失败时，返回成功题数、失败批次及具体原因，不回填或自动提交。成功结果仅在本次调用内保留，不支持跨调用恢复。
 
-入口：[前端提取](../../injected/chaoxing/questions/extract.js)、[请求结构](../../src-tauri/src/core/quiz/payload.rs)、[测验处理](../../src-tauri/src/core/quiz.rs)、[协议分发](../../src-tauri/src/core/quiz/llm/dispatcher.rs)、[供应商交互](../../src/composables/useLLMProviders.ts)。
+入口：[前端提取](../../injected/chaoxing/questions/extract.js)、[请求结构](../../src-tauri/src/core/quiz/payload.rs)、[测验处理](../../src-tauri/src/core/quiz.rs)、[协议分发](../../src-tauri/src/core/quiz/llm/protocol.rs)、[供应商交互](../../src/composables/useLLMProviders.ts)。
 
 ## 更新与分发
 
