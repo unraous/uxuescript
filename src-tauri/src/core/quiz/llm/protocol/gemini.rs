@@ -1,4 +1,4 @@
-use super::{
+use super::super::{
     answers::parse,
     batch::Batch,
     pool::RequestPool,
@@ -17,8 +17,7 @@ pub(super) async fn solve(
     prompt: &Prompt,
     pool: &RequestPool,
 ) -> Result<Vec<AnswerItem>> {
-    let mut body: serde_json::Value =
-        serde_json::from_str(include_str!("../req_body/google.json"))?;
+    let mut body: serde_json::Value = serde_json::from_str(include_str!("requests/gemini.json"))?;
     let parts: Vec<_> = prompt
         .parts
         .iter()

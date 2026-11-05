@@ -1,4 +1,6 @@
+use crate::core::quiz::QuestionData;
 use anyhow::{Result, bail};
+use serde::Serialize;
 use serde_json::json;
 
 use super::{
@@ -16,39 +18,46 @@ pub(super) struct Prompt {
     pub parts: Vec<Part>,
 }
 
+#[derive(Serialize)]
+struct PromptQuestion<'a> {
+    #[serde(flatten)]
+    data: &'a QuestionData,
+    passages: &'a [String],
+}
+
 // 固定排列；同一批出现多道同类题时只附加一次说明。
 const RULES: &[(&str, &str)] = &[
-    ("单选", include_str!("../prompts/single.txt")),
-    ("多选", include_str!("../prompts/multiple.txt")),
-    ("判断", include_str!("../prompts/judgment.txt")),
-    ("填空", include_str!("../prompts/completion.txt")),
-    ("分录", include_str!("../prompts/entry.txt")),
-    ("简答", include_str!("../prompts/short.txt")),
-    ("论述", include_str!("../prompts/essay.txt")),
-    ("计算", include_str!("../prompts/calculation.txt")),
-    ("翻译", include_str!("../prompts/translation.txt")),
-    ("连线", include_str!("../prompts/matching.txt")),
+    ("单选", include_str!("prompts/single.txt")),
+    ("多选", include_str!("prompts/multiple.txt")),
+    ("判断", include_str!("prompts/judgment.txt")),
+    ("填空", include_str!("prompts/completion.txt")),
+    ("分录", include_str!("prompts/entry.txt")),
+    ("简答", include_str!("prompts/short.txt")),
+    ("论述", include_str!("prompts/essay.txt")),
+    ("计算", include_str!("prompts/calculation.txt")),
+    ("翻译", include_str!("prompts/translation.txt")),
+    ("连线", include_str!("prompts/matching.txt")),
 ];
 
 pub(super) fn instructions(batch: &Batch) -> Result<String> {
     for item in &batch.questions {
         if !RULES
             .iter()
-            .any(|(kind, _)| item.question.kind.contains(kind))
+            .any(|(kind, _)| item.question.data.kind.contains(kind))
         {
             bail!(
                 "题号 {} 的题型 {} 尚未支持",
-                item.question.id,
-                item.question.kind
+                item.question.data.id,
+                item.question.data.kind
             );
         }
     }
-    let mut text = include_str!("../prompts/common.txt").to_owned();
+    let mut text = include_str!("prompts/common.txt").to_owned();
     for (kind, rule) in RULES {
         if batch
             .questions
             .iter()
-            .any(|item| item.question.kind.contains(kind))
+            .any(|item| item.question.data.kind.contains(kind))
         {
             text.push_str("\n\n");
             text.push_str(rule);
@@ -67,12 +76,18 @@ pub(super) fn assemble(batch: &Batch, images: Vec<Image>) -> Result<Prompt> {
     }
     let mut images = images.into_iter();
     for material in &batch.materials {
-        parts.push(Part::Text(json!({"passage": material}).to_string()));
+        parts.push(Part::Text(json!({"passage": material.data}).to_string()));
         append_images(&mut parts, images.by_ref().take(material.images.len()));
     }
-    parts.push(Part::Text(
-        json!({"questions": batch.questions}).to_string(),
-    ));
+    let questions: Vec<_> = batch
+        .questions
+        .iter()
+        .map(|item| PromptQuestion {
+            data: &item.question.data,
+            passages: &item.passages,
+        })
+        .collect();
+    parts.push(Part::Text(json!({"questions": questions}).to_string()));
     append_images(&mut parts, images);
     Ok(Prompt { system, parts })
 }
@@ -90,10 +105,10 @@ pub(super) async fn build(batch: &Batch) -> Result<Prompt> {
     let sources: Vec<_> = batch
         .materials
         .iter()
-        .map(|p| (format!("材料 {}", p.id), p.images.as_slice()))
+        .map(|p| (format!("材料 {}", p.data.id), p.images.as_slice()))
         .chain(batch.questions.iter().map(|q| {
             (
-                format!("题号 {}", q.question.id),
+                format!("题号 {}", q.question.data.id),
                 q.question.images.as_slice(),
             )
         }))
@@ -102,5 +117,5 @@ pub(super) async fn build(batch: &Batch) -> Result<Prompt> {
 }
 
 #[cfg(test)]
-#[path = "../../../../../tests/unit/core/quiz/llm/dispatcher/prompt.rs"]
+#[path = "../../../../tests/unit/core/quiz/llm/prompt.rs"]
 mod tests;

@@ -20,13 +20,16 @@ fn reads_the_same_structured_homework_as_the_dom_parser() {
     assert_eq!(folio.entries.len(), 3);
     let leaves = questions(&folio.entries);
     assert_eq!(
-        leaves.iter().map(|q| q.id.as_str()).collect::<Vec<_>>(),
+        leaves
+            .iter()
+            .map(|q| q.data.id.as_str())
+            .collect::<Vec<_>>(),
         [
             "1", "2.1", "2.2", "2.3", "2.4", "2.5", "3.1", "3.2", "3.3", "3.4", "3.5", "4"
         ]
     );
-    assert_eq!(leaves[0].kind, "填空题");
-    assert_eq!(leaves[11].kind, "句子翻译题");
+    assert_eq!(leaves[0].data.kind, "填空题");
+    assert_eq!(leaves[11].data.kind, "句子翻译题");
     let Entry::Section(reading) = &folio.entries[1] else {
         panic!("Expected reading section")
     };

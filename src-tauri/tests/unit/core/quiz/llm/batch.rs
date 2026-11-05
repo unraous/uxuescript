@@ -2,7 +2,7 @@ use super::*;
 use crate::core::quiz::folio::Passage;
 
 fn archived() -> Folio {
-    serde_json::from_str(include_str!("../../../../../assets/course-page/folio.json")).unwrap()
+    serde_json::from_str(include_str!("../../../../assets/course-page/folio.json")).unwrap()
 }
 
 #[test]
@@ -15,11 +15,11 @@ fn splits_reading_groups_without_losing_material_or_renumbering_questions() {
             .collect::<Vec<_>>(),
         [1, 2, 2, 1, 2, 2, 1, 1]
     );
-    assert_eq!(batches[0].questions[0].question.blank_count, Some(10));
+    assert_eq!(batches[0].questions[0].question.data.blank_count, Some(10));
     let mut ids = Vec::new();
     for batch in &batches {
         for item in &batch.questions {
-            ids.push(item.question.id.as_str());
+            ids.push(item.question.data.id.as_str());
         }
     }
     assert_eq!(
@@ -29,15 +29,24 @@ fn splits_reading_groups_without_losing_material_or_renumbering_questions() {
         ]
     );
     assert!(batches[0].materials.is_empty());
-    assert_eq!(batches[1].questions[0].question.id, "2.1");
-    assert_eq!(batches[2].questions[0].question.id, "2.3");
-    assert_eq!(batches[1].materials[0].id, batches[2].materials[0].id);
-    assert_eq!(batches[1].materials[0].text, batches[2].materials[0].text);
-    assert_ne!(batches[1].materials[0].id, batches[4].materials[0].id);
+    assert_eq!(batches[1].questions[0].question.data.id, "2.1");
+    assert_eq!(batches[2].questions[0].question.data.id, "2.3");
+    assert_eq!(
+        batches[1].materials[0].data.id,
+        batches[2].materials[0].data.id
+    );
+    assert_eq!(
+        batches[1].materials[0].data.text,
+        batches[2].materials[0].data.text
+    );
+    assert_ne!(
+        batches[1].materials[0].data.id,
+        batches[4].materials[0].data.id
+    );
     for batch in &batches[1..7] {
         assert_eq!(batch.materials.len(), 1);
         for item in &batch.questions {
-            assert_eq!(item.passages, vec![batch.materials[0].id.clone()]);
+            assert_eq!(item.passages, vec![batch.materials[0].data.id.clone()]);
         }
     }
 }
@@ -56,8 +65,13 @@ fn includes_outer_and_inner_material_once_per_batch() {
     })];
     let batches = prepare(folio, 5).unwrap();
     assert_eq!(batches[1].materials.len(), 2);
-    assert_eq!(batches[1].materials[0].text, "外层材料");
-    assert!(batches[1].materials[1].text.contains("Why Urban Wildlife"));
+    assert_eq!(batches[1].materials[0].data.text, "外层材料");
+    assert!(
+        batches[1].materials[1]
+            .data
+            .text
+            .contains("Why Urban Wildlife")
+    );
     assert_eq!(batches[1].questions[0].passages.len(), 2);
 }
 
@@ -71,8 +85,8 @@ fn rejects_missing_blank_counts_and_duplicate_ids_before_requests() {
         let Entry::Question(question) = &mut section.entries[0] else {
             panic!()
         };
-        question.kind = kind.into();
-        question.blank_count = None;
+        question.data.kind = kind.into();
+        question.data.blank_count = None;
         assert!(
             prepare(folio, 5)
                 .err()

@@ -1,12 +1,12 @@
 use super::*;
-use crate::core::quiz::llm::dispatcher::batch;
+use crate::core::quiz::llm::batch;
 use crate::core::quiz::{Entry, Folio, Question};
 
 #[test]
 #[ignore = "手动查看组装后的提示词"]
 fn preview_folio_prompt() {
     let mut folio: Folio =
-        serde_json::from_str(include_str!("../../../../../assets/course-page/folio.json")).unwrap();
+        serde_json::from_str(include_str!("../../../../assets/course-page/folio.json")).unwrap();
     folio.context.course = Some("外刊精读".into());
     folio.context.chapter = Some("城市与自然".into());
 
@@ -46,12 +46,14 @@ fn selects_detailed_rules_only_for_present_types_in_fixed_order() {
     for (index, kind) in kinds.iter().enumerate() {
         let folio = Folio {
             entries: vec![Entry::Question(Question {
-                id: "1".into(),
-                kind: (*kind).into(),
-                stem: "题干".into(),
-                options: vec![],
+                data: crate::core::quiz::QuestionData {
+                    id: "1".into(),
+                    kind: (*kind).into(),
+                    stem: "题干".into(),
+                    options: vec![],
+                    blank_count: (kind.contains("填空") || kind.contains("分录")).then_some(10),
+                },
                 images: vec![],
-                blank_count: (kind.contains("填空") || kind.contains("分录")).then_some(10),
             })],
             ..Default::default()
         };
@@ -75,12 +77,14 @@ fn mixed_batches_deduplicate_rules_and_keep_order_independent_of_question_order(
         .enumerate()
         .map(|(index, kind)| {
             Entry::Question(Question {
-                id: index.to_string(),
-                kind: (*kind).into(),
-                stem: "题干".into(),
-                options: vec![],
+                data: crate::core::quiz::QuestionData {
+                    id: index.to_string(),
+                    kind: (*kind).into(),
+                    stem: "题干".into(),
+                    options: vec![],
+                    blank_count: kind.contains("填空").then_some(10),
+                },
                 images: vec![],
-                blank_count: kind.contains("填空").then_some(10),
             })
         })
         .collect();
@@ -113,7 +117,7 @@ fn mixed_batches_deduplicate_rules_and_keep_order_independent_of_question_order(
 #[test]
 fn orders_context_material_images_questions_and_question_images_with_stable_prefixes() {
     let mut folio: Folio =
-        serde_json::from_str(include_str!("../../../../../assets/course-page/folio.json")).unwrap();
+        serde_json::from_str(include_str!("../../../../assets/course-page/folio.json")).unwrap();
     folio.context.course = Some("外刊精读".into());
     folio.context.chapter = Some("城市与自然".into());
     let mut batches = batch::prepare(folio, 2).unwrap();
@@ -148,6 +152,7 @@ fn orders_context_material_images_questions_and_question_images_with_stable_pref
     };
     let questions: serde_json::Value = serde_json::from_str(questions).unwrap();
     assert_eq!(questions["questions"][0]["passages"], json!(["p.2.1"]));
+    assert!(questions["questions"][0].get("images").is_none());
     assert!(matches!(&prompt.parts[6], Part::Image(_)));
     let next = assemble(&batches[2], vec![]).unwrap();
     assert_eq!(prompt.system, next.system);

@@ -1,12 +1,13 @@
 use super::*;
 use crate::config::llm::ApiKey;
+use crate::config::llm::LLMProtocol;
 use crate::core::quiz::{Entry, Question};
 use crate::test_support::http::input_questions;
 use crate::test_support::http::{response, serve};
 use serde_json::json;
 use tokio::time::{Duration, Instant};
 
-#[path = "dispatcher/folio.rs"]
+#[path = "llm/folio.rs"]
 mod folio_flow;
 
 async fn solve(
@@ -26,12 +27,14 @@ fn folio(questions: Vec<Question>) -> Folio {
 fn questions(count: usize) -> Vec<Question> {
     (1..=count)
         .map(|index| Question {
-            id: index.to_string(),
-            kind: "单选题".into(),
-            stem: "Choose A".into(),
-            options: vec!["A".into()],
+            data: crate::core::quiz::QuestionData {
+                id: index.to_string(),
+                kind: "单选题".into(),
+                stem: "Choose A".into(),
+                options: vec!["A".into()],
+                blank_count: None,
+            },
             images: Vec::new(),
-            blank_count: None,
         })
         .collect()
 }
@@ -75,7 +78,7 @@ async fn retries_only_invalid_batches_and_preserves_successes() {
             serde_json::from_value::<Vec<Question>>(input_questions(&request.body))
                 .unwrap()
                 .into_iter()
-                .map(|question| question.id)
+                .map(|question| question.data.id)
                 .collect()
         })
         .collect();
@@ -189,12 +192,14 @@ async fn preset_chat_requests_preserve_options_and_read_answer_arrays() {
         let answers = solve(
             &provider,
             vec![Question {
-                id: "1".into(),
-                kind: "单选题".into(),
-                stem: "Choose A".into(),
-                options: vec!["A".into()],
+                data: crate::core::quiz::QuestionData {
+                    id: "1".into(),
+                    kind: "单选题".into(),
+                    stem: "Choose A".into(),
+                    options: vec!["A".into()],
+                    blank_count: None,
+                },
                 images: Vec::new(),
-                blank_count: None,
             }],
         )
         .await
@@ -247,12 +252,14 @@ async fn sends_protocol_requests_with_application_headers() {
         let answers = solve(
             &provider,
             vec![Question {
-                id: "1".into(),
-                kind: "单选题".into(),
-                stem: "?? A".into(),
-                options: vec!["A".into()],
+                data: crate::core::quiz::QuestionData {
+                    id: "1".into(),
+                    kind: "单选题".into(),
+                    stem: "?? A".into(),
+                    options: vec!["A".into()],
+                    blank_count: None,
+                },
                 images: Vec::new(),
-                blank_count: None,
             }],
         )
         .await
@@ -324,44 +331,16 @@ async fn sends_images_in_each_protocol_native_format() {
         }];
         let prompt = prompt::assemble(&input, images).unwrap();
         let pool = RequestPool::new(10);
-        match protocol {
-            LLMProtocol::OpenAIChatCompletions => {
-                chat::solve(
-                    &reqwest::Client::new(),
-                    &provider,
-                    "vision-model",
-                    &input,
-                    &prompt,
-                    &pool,
-                )
-                .await
-                .unwrap();
-            }
-            LLMProtocol::OpenAIResponses => {
-                responses::solve(
-                    &reqwest::Client::new(),
-                    &provider,
-                    "vision-model",
-                    &input,
-                    &prompt,
-                    &pool,
-                )
-                .await
-                .unwrap();
-            }
-            LLMProtocol::GoogleGemini => {
-                gemini::solve(
-                    &reqwest::Client::new(),
-                    &provider,
-                    "vision-model",
-                    &input,
-                    &prompt,
-                    &pool,
-                )
-                .await
-                .unwrap();
-            }
-        }
+        protocol::solve(
+            &reqwest::Client::new(),
+            &provider,
+            "vision-model",
+            &input,
+            &prompt,
+            &pool,
+        )
+        .await
+        .unwrap();
         let body = request.await.unwrap().body;
         match protocol {
             LLMProtocol::OpenAIChatCompletions => {

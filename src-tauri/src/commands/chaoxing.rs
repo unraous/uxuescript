@@ -36,12 +36,14 @@ pub async fn healthy() -> CommandsResult<String> {
         &provider,
         Folio {
             entries: vec![Entry::Question(Question {
-                id: "1".into(),
-                kind: "简答题".into(),
-                stem: "天空为什么是蓝色的？请用一句话回答。".into(),
-                options: Vec::new(),
+                data: crate::core::quiz::QuestionData {
+                    id: "1".into(),
+                    kind: "简答题".into(),
+                    stem: "天空为什么是蓝色的？请用一句话回答。".into(),
+                    options: Vec::new(),
+                    blank_count: None,
+                },
                 images: Vec::new(),
-                blank_count: None,
             })],
             ..Default::default()
         },

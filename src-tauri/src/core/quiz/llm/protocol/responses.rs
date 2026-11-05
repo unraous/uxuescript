@@ -1,4 +1,4 @@
-use super::{
+use super::super::{
     answers::parse,
     batch::Batch,
     pool::RequestPool,
@@ -18,7 +18,7 @@ pub(super) async fn solve(
     pool: &RequestPool,
 ) -> Result<Vec<AnswerItem>> {
     let mut request_body: serde_json::Value =
-        serde_json::from_str(include_str!("../req_body/openai.json"))?;
+        serde_json::from_str(include_str!("requests/responses.json"))?;
     request_body["model"] = serde_json::json!(model);
     request_body["instructions"] = serde_json::json!(format!(
         "{}\n本次输出遵循 JSON Schema，将答案数组放在 answers 字段中。",

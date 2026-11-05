@@ -77,9 +77,9 @@ fn decrypt_entries(entries: &mut [Entry], font_map: &HashMap<char, char>) {
                 decrypt_entries(&mut section.entries, font_map);
             }
             Entry::Question(question) => {
-                question.kind = map(&question.kind, font_map);
-                question.stem = map(&question.stem, font_map);
-                for option in &mut question.options {
+                question.data.kind = map(&question.data.kind, font_map);
+                question.data.stem = map(&question.data.stem, font_map);
+                for option in &mut question.data.options {
                     *option = map(option, font_map);
                 }
             }

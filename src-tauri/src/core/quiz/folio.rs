@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::{Question, QuestionImage};
 
 /// 卷：保留页面题目层级及用于文字还原的字体。
-#[derive(Deserialize, Debug, Clone, Default, specta::Type)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, specta::Type)]
 pub struct Folio {
     pub entries: Vec<Entry>,
     pub font: Option<Vec<u8>>,
@@ -23,7 +23,7 @@ pub struct FolioContext {
 }
 
 /// 条目：篇负责组织关系，题负责表达需要作答的内容。
-#[derive(Deserialize, Debug, Clone, specta::Type)]
+#[derive(Serialize, Deserialize, Debug, Clone, specta::Type)]
 #[serde(tag = "type", content = "data", rename_all = "snake_case")]
 pub enum Entry {
     Section(Section),
@@ -31,7 +31,7 @@ pub enum Entry {
 }
 
 /// 篇：题型分区或材料题组；子篇可以拥有自己的材料。
-#[derive(Deserialize, Debug, Clone, specta::Type)]
+#[derive(Serialize, Deserialize, Debug, Clone, specta::Type)]
 pub struct Section {
     pub title: String,
     pub passage: Option<Passage>,
@@ -39,7 +39,7 @@ pub struct Section {
 }
 
 /// 文：属于本篇的公共材料，不在解析阶段复制到子题。
-#[derive(Deserialize, Debug, Clone, specta::Type)]
+#[derive(Serialize, Deserialize, Debug, Clone, specta::Type)]
 pub struct Passage {
     pub text: String,
     pub images: Vec<QuestionImage>,

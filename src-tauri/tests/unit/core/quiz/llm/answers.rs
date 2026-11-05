@@ -4,12 +4,14 @@ use super::*;
 fn strict_answers_validate_ids_content_and_restore_order() {
     let questions: Vec<Question> = (1..=2)
         .map(|id| Question {
-            id: id.to_string(),
-            kind: "单选题".into(),
-            stem: "Choose A".into(),
-            options: vec!["A".into()],
+            data: crate::core::quiz::QuestionData {
+                id: id.to_string(),
+                kind: "单选题".into(),
+                stem: "Choose A".into(),
+                options: vec!["A".into()],
+                blank_count: None,
+            },
             images: Vec::new(),
-            blank_count: None,
         })
         .collect();
     let answers = parse(r#"{"answers":[{"index":"2","explanation":"","content":"B"},{"index":"1","explanation":"","content":"A"}]}"#, &questions).unwrap();
@@ -29,12 +31,14 @@ fn strict_answers_validate_ids_content_and_restore_order() {
 #[test]
 fn completion_requires_exactly_ten_nonempty_values() {
     let question = Question {
-        id: "1".into(),
-        kind: "填空题".into(),
-        stem: "十空段落匹配".into(),
-        options: vec![],
+        data: crate::core::quiz::QuestionData {
+            id: "1".into(),
+            kind: "填空题".into(),
+            stem: "十空段落匹配".into(),
+            options: vec![],
+            blank_count: Some(10),
+        },
         images: vec![],
-        blank_count: Some(10),
     };
     let output = |content: &str| {
         serde_json::json!([

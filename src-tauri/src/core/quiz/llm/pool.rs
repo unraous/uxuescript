@@ -106,5 +106,5 @@ impl Cooldown {
 }
 
 #[cfg(test)]
-#[path = "../../../../../tests/unit/core/quiz/llm/dispatcher/pool.rs"]
+#[path = "../../../../tests/unit/core/quiz/llm/pool.rs"]
 mod tests;

@@ -76,7 +76,12 @@ async fn sends_question_payload_to_the_selected_model_without_a_font() {
     let request = request.await.unwrap();
     assert_eq!(request.body["model"], "probe-model");
     let sent: Value = input_questions(&request.body);
-    assert_eq!(sent, input);
+    let mut expected = input;
+    for question in expected.as_array_mut().unwrap() {
+        question["blank_count"] = Value::Null;
+        question["passages"] = json!([]);
+    }
+    assert_eq!(sent, expected);
 }
 
 #[tokio::test]
@@ -105,7 +110,15 @@ async fn decrypts_question_payload_before_sending_it_to_the_model() {
     assert_eq!(result.len(), 5);
     let request = request.await.unwrap();
     let sent: Value = input_questions(&request.body);
-    assert_eq!(sent, serde_json::to_value(expected).unwrap());
+    let expected: Vec<_> = expected
+        .into_iter()
+        .map(|question| {
+            let mut value = serde_json::to_value(question.data).unwrap();
+            value["passages"] = json!([]);
+            value
+        })
+        .collect();
+    assert_eq!(sent, json!(expected));
 }
 
 #[tokio::test]

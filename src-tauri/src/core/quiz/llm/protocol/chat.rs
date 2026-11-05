@@ -1,4 +1,4 @@
-use super::{
+use super::super::{
     answers::parse,
     batch::Batch,
     pool::RequestPool,
@@ -18,7 +18,7 @@ pub(super) async fn solve(
     pool: &RequestPool,
 ) -> Result<Vec<AnswerItem>> {
     let mut request_body: serde_json::Value =
-        serde_json::from_str(include_str!("../req_body/default.json"))?;
+        serde_json::from_str(include_str!("requests/chat.json"))?;
     request_body["model"] = serde_json::json!(model);
     let user_content: Vec<_> = prompt
         .parts

@@ -30,9 +30,9 @@ fn decrypts_questions_and_nested_material_with_the_same_font() {
         serde_json::from_str(include_str!("../../../assets/course-page/decrypted.json")).unwrap();
     let raw = Folio {
         entries: vec![Entry::Section(Section {
-            title: questions[0].stem.clone(),
+            title: questions[0].data.stem.clone(),
             passage: Some(Passage {
-                text: questions[0].stem.clone(),
+                text: questions[0].data.stem.clone(),
                 images: vec![],
             }),
             entries: questions.into_iter().map(Entry::Question).collect(),
@@ -45,8 +45,11 @@ fn decrypts_questions_and_nested_material_with_the_same_font() {
     let Entry::Section(section) = &decrypted.entries[0] else {
         panic!()
     };
-    assert_eq!(section.title, expected[0].stem);
-    assert_eq!(section.passage.as_ref().unwrap().text, expected[0].stem);
+    assert_eq!(section.title, expected[0].data.stem);
+    assert_eq!(
+        section.passage.as_ref().unwrap().text,
+        expected[0].data.stem
+    );
     let actual: Vec<_> = section
         .entries
         .iter()

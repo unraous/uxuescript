@@ -7,20 +7,20 @@ use crate::core::quiz::{
     folio::{FolioContext, Section},
 };
 
-#[derive(Serialize)]
 pub(super) struct ScopedQuestion {
-    #[serde(flatten)]
     pub question: Question,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub passages: Vec<String>,
 }
 
 #[derive(Serialize)]
-pub(super) struct Material {
+pub(super) struct MaterialData {
     pub id: String,
     pub title: String,
     pub text: String,
-    #[serde(skip)]
+}
+
+pub(super) struct Material {
+    pub data: MaterialData,
     pub images: Vec<QuestionImage>,
 }
 
@@ -42,7 +42,7 @@ struct Leaf<'a> {
 ///   返回后再处理当前层的下一个条目；空篇不产生题目，也不改变已有结果。
 /// - `path` 是父层的结构路径，根层为 `p`。篇的路径追加其在当前 `entries` 中
 ///   从 1 开始的位置，例如 `p.2.1`；位置同时计入题和篇。无材料的篇也占据路径，
-///   但不会成为材料引用。此路径只标识材料，题目的显示编号 `question.id` 保持原值。
+///   但不会成为材料引用。此路径只标识材料，题目的显示编号 `question.data.id` 保持原值。
 /// - `passages` 仅包含当前层已继承的、有材料的祖先篇，按外层到内层排列。
 ///   进入篇时为该分支复制材料链，按需追加本篇材料；后代继承这条新链，兄弟分支
 ///   继续使用原链。每个叶子保存自己的链快照，避免材料泄漏到作用域之外。
@@ -97,13 +97,17 @@ fn validate(leaves: &[Leaf<'_>]) -> Result<()> {
     }
     let mut ids = HashSet::new();
     for leaf in leaves {
-        if !ids.insert(&leaf.question.id) {
-            bail!("题号 {} 重复", leaf.question.id);
+        if !ids.insert(&leaf.question.data.id) {
+            bail!("题号 {} 重复", leaf.question.data.id);
         }
-        if (leaf.question.kind.contains("填空") || leaf.question.kind.contains("分录"))
-            && !matches!(leaf.question.blank_count, Some(1..))
+        if (leaf.question.data.kind.contains("填空") || leaf.question.data.kind.contains("分录"))
+            && !matches!(leaf.question.data.blank_count, Some(1..))
         {
-            bail!("{} {} 缺少有效空数", leaf.question.kind, leaf.question.id);
+            bail!(
+                "{} {} 缺少有效空数",
+                leaf.question.data.kind,
+                leaf.question.data.id
+            );
         }
     }
     Ok(())
@@ -132,9 +136,11 @@ fn assemble(leaves: &[Leaf<'_>], context: &FolioContext) -> Batch {
             .as_ref()
             .expect("collected material section");
         materials.push(Material {
-            id: id.clone(),
-            title: section.title.clone(),
-            text: passage.text.clone(),
+            data: MaterialData {
+                id: id.clone(),
+                title: section.title.clone(),
+                text: passage.text.clone(),
+            },
             images: passage.images.clone(),
         });
     }
@@ -159,5 +165,5 @@ fn assemble(leaves: &[Leaf<'_>], context: &FolioContext) -> Batch {
 }
 
 #[cfg(test)]
-#[path = "../../../../../tests/unit/core/quiz/llm/dispatcher/batch.rs"]
+#[path = "../../../../tests/unit/core/quiz/llm/batch.rs"]
 mod tests;

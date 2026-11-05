@@ -8,7 +8,7 @@ pub mod llm;
 pub use folio::{Entry, Folio};
 use llm::AnswerItem;
 use mapper::decrypt;
-pub use payload::{Question, QuestionImage};
+pub use payload::{Question, QuestionData, QuestionImage};
 
 use crate::config::CONFIG;
 use anyhow::Result;

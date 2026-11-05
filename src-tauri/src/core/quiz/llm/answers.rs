@@ -33,18 +33,18 @@ pub(super) fn parse<'a>(
     for question in questions {
         let index = answers
             .iter()
-            .position(|answer| answer.index == question.id)
-            .ok_or_else(|| AnswerError(format!("题号 {} 缺失或重复", question.id)))?;
+            .position(|answer| answer.index == question.data.id)
+            .ok_or_else(|| AnswerError(format!("题号 {} 缺失或重复", question.data.id)))?;
         let answer = answers.remove(index);
         if answer.content.trim().is_empty() {
-            return Err(AnswerError(format!("题号 {} 的答案为空", question.id)).into());
+            return Err(AnswerError(format!("题号 {} 的答案为空", question.data.id)).into());
         }
-        if let Some(count) = question.blank_count {
+        if let Some(count) = question.data.blank_count {
             let blanks: Vec<_> = answer.content.split(';').map(str::trim).collect();
             if blanks.len() != count as usize || blanks.iter().any(|value| value.is_empty()) {
                 return Err(AnswerError(format!(
                     "题号 {} 需要 {} 个非空答案，收到 {} 项",
-                    question.id,
+                    question.data.id,
                     count,
                     blanks.len()
                 ))
@@ -57,5 +57,5 @@ pub(super) fn parse<'a>(
 }
 
 #[cfg(test)]
-#[path = "../../../../../tests/unit/core/quiz/llm/dispatcher/answers.rs"]
+#[path = "../../../../tests/unit/core/quiz/llm/answers.rs"]
 mod tests;

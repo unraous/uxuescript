@@ -9,7 +9,7 @@ async fn all_protocols_preserve_archived_context_material_references_and_blank_c
         LLMProtocol::GoogleGemini,
     ] {
         let mut folio: Folio =
-            serde_json::from_str(include_str!("../../../../../assets/course-page/folio.json"))
+            serde_json::from_str(include_str!("../../../../assets/course-page/folio.json"))
                 .unwrap();
         folio.context.course = Some("外刊精读".into());
         folio.context.chapter = Some("城市与自然".into());
@@ -17,8 +17,8 @@ async fn all_protocols_preserve_archived_context_material_references_and_blank_c
         let batches = batch::prepare(folio, 2).unwrap();
         for batch in batches {
             let expected: Vec<_> = batch.questions.iter().map(|item| json!({
-                "index": item.question.id,
-                "content": if item.question.blank_count.is_some() { "B;H;C;E;D;G;I;F;J;A" } else { "A" },
+                "index": item.question.data.id,
+                "content": if item.question.data.blank_count.is_some() { "B;H;C;E;D;G;I;F;J;A" } else { "A" },
                 "explanation": "mock"
             })).collect();
             let mut reversed = expected.clone();
@@ -69,16 +69,27 @@ async fn all_protocols_preserve_archived_context_material_references_and_blank_c
                 blocks[0],
                 json!({"context":{"course":"外刊精读","chapter":"城市与自然","title":"期中测试"}})
             );
-            assert_eq!(
-                input_questions(&request.body),
-                serde_json::to_value(&batch.questions).unwrap()
-            );
+            let expected_questions: Vec<_> = batch
+                .questions
+                .iter()
+                .map(|item| {
+                    json!({
+                        "id": item.question.data.id,
+                        "kind": item.question.data.kind,
+                        "stem": item.question.data.stem,
+                        "options": item.question.data.options,
+                        "blank_count": item.question.data.blank_count,
+                        "passages": item.passages,
+                    })
+                })
+                .collect();
+            assert_eq!(input_questions(&request.body), json!(expected_questions));
             assert_eq!(blocks.len(), batch.materials.len() + 2);
             for (material, block) in batch.materials.iter().zip(&blocks[1..]) {
-                assert_eq!(block, &json!({"passage":material}));
+                assert_eq!(block, &json!({"passage":material.data}));
             }
             let system = system.as_str().unwrap();
-            let kind = &batch.questions[0].question.kind;
+            let kind = &batch.questions[0].question.data.kind;
             for (name, needle) in [
                 ("单选", "【单选题】"),
                 ("填空", "【填空题】"),
@@ -94,8 +105,8 @@ async fn all_protocols_preserve_archived_context_material_references_and_blank_c
 #[tokio::test]
 async fn retries_wrong_blank_count_without_changing_the_prompt() {
     let mut question = questions(1).remove(0);
-    question.kind = "填空题".into();
-    question.blank_count = Some(10);
+    question.data.kind = "填空题".into();
+    question.data.blank_count = Some(10);
     let protocol = LLMProtocol::OpenAIChatCompletions;
     let output = |content: &str| {
         response(
