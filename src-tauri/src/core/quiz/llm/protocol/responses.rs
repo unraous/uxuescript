@@ -49,13 +49,7 @@ pub(super) async fn solve(
         })
         .await?;
 
-    if !response.status().is_success() {
-        anyhow::bail!(
-            "OpenAI API 错误 ({}): {}",
-            response.status(),
-            response.text().await?
-        );
-    }
+    let response = super::error::check(response, provider).await?;
 
     let data: serde_json::Value = response.json().await?;
     let content = data

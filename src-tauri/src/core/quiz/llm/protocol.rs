@@ -1,4 +1,5 @@
 mod chat;
+mod error;
 mod gemini;
 mod responses;
 

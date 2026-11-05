@@ -180,6 +180,42 @@ async fn preserves_http_status_and_upstream_error_details() {
 }
 
 #[tokio::test]
+async fn reports_friendly_http_errors_for_each_protocol() {
+    for protocol in [
+        LLMProtocol::OpenAIChatCompletions,
+        LLMProtocol::OpenAIResponses,
+        LLMProtocol::GoogleGemini,
+    ] {
+        let (url, request) = serve(401, "upstream authentication failed".into()).await;
+        let error = probe(&provider(protocol, url))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("检查 API Key"), "{error}");
+        assert!(error.contains("401"), "{error}");
+        assert!(error.contains("upstream authentication failed"), "{error}");
+        request.await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn reports_rejection_without_assuming_its_cause_and_redacts_key() {
+    let key = "test-secret-key-123";
+    let body =
+        json!({"error": {"code": "1301", "message": format!("内容审核拒绝 {key}")}}).to_string();
+    let (url, request) = serve(400, body).await;
+    let mut provider = provider(LLMProtocol::OpenAIChatCompletions, url);
+    provider.api_key = Some(crate::config::llm::ApiKey::new(key.into()).unwrap());
+    let error = probe(&provider).await.unwrap_err().to_string();
+    assert!(error.contains("服务商拒绝了请求"), "{error}");
+    assert!(error.contains("1301"), "{error}");
+    assert!(error.contains("内容审核拒绝"), "{error}");
+    assert!(error.contains("[已隐藏 API Key]"), "{error}");
+    assert!(!error.contains(key), "{error}");
+    request.await.unwrap();
+}
+
+#[tokio::test]
 async fn rejects_empty_and_unparseable_answers() {
     let protocol = LLMProtocol::OpenAIChatCompletions;
     for (body, expected, attempts) in [
