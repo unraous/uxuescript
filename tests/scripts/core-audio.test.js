@@ -57,14 +57,15 @@ function setup(options = {}) {
   };
 }
 describe("standalone audio playback", () => {
-  it("starts once, applies mute and speed, then seeks near the end", async () => {
+  it("starts once, lowers volume and applies speed, then seeks near the end", async () => {
     const page = setup();
     page.config.lockSpeed = 2;
     const run = handleAudio(page.doc);
     await vi.advanceTimersByTimeAsync(1000);
     await run;
     expect(page.click).toHaveBeenCalledOnce();
-    expect(page.audio.muted).toBe(true);
+    expect(page.audio.volume).toBe(0.0001);
+    expect(page.audio.muted).toBe(false);
     expect(page.audio.playbackRate).toBe(2);
     expect(page.seek).toHaveBeenCalledExactlyOnceWith(106);
     expect(

@@ -31,7 +31,7 @@ onMounted(load);
       <VToggle
         :model-value="options.muteWebview ?? false"
         :label="label('muteCourse')"
-        annotation="开启后，课程视频会自动静音；关闭后，视频声音由课程页面控制。"
+        annotation="开启后，课程音视频会自动静音；关闭后，音量由课程页面控制。"
         class="option"
         @update:model-value="
           saveField(commands.setOptions, 'muteWebview', $event, boolean)

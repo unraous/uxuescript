@@ -1,11 +1,14 @@
-/** 设置媒体元素静音。
+/** 降低并保持媒体音量。
  * @param {HTMLMediaElement} videoEl 音视频元素。
  * @returns {void}
  */
 export const muteVideo = (videoEl) => {
-  if (!videoEl) return;
-  videoEl.muted = true;
-  videoEl.defaultMuted = true;
+  const apply = () => {
+    // macOS WebView 最小化时，实测静音或零音量会卡住视频；此音量可继续播放。
+    if (videoEl.volume !== 0.0001) videoEl.volume = 0.0001;
+  };
+  videoEl.addEventListener("volumechange", apply);
+  apply();
 };
 
 /** 设置并锁定媒体播放倍速。
