@@ -13,6 +13,8 @@ vi.mock("@injected/chaoxing/questions/fill.js", () => ({
 }));
 
 const key = "uxs:exam:folio:paper:user";
+/** @type {import("@injected/chaoxing/exam/paged.js").ExamRun|null} */
+let taskState = null;
 const entries = [
   { id: "q1", start: 0 },
   { id: "q2", start: 1 },
@@ -73,26 +75,49 @@ function setup(index, run) {
       </div></div>
     </div>`;
   window.history.replaceState(null, "", `?question=${index}`);
-  if (run) window.sessionStorage.setItem(key, JSON.stringify(run));
+  if (run) taskState = structuredClone(run);
 }
 
 /** @returns {import("@injected/chaoxing/exam/paged.js").ExamRun} */
 function storedRun() {
-  return JSON.parse(window.sessionStorage.getItem(key));
+  return /** @type {import("@injected/chaoxing/exam/paged.js").ExamRun} */ (
+    taskState
+  );
 }
+
+/**
+ * @param {string} command
+ * @param {{key?: string, value?: import("@injected/chaoxing/exam/paged.js").ExamRun}} [args]
+ * @returns {Promise<null|undefined|import("@injected/chaoxing/exam/paged.js").ExamRun|{switchingCd: number|null}|typeof answers>}
+ */
+const invokeTask = async (command, args) => {
+  if (command === "read_exam_state") {
+    expect(args?.key).toBe(key);
+    return taskState ? structuredClone(taskState) : null;
+  }
+  if (command === "clear_exam_state") {
+    expect(args?.key).toBe(key);
+    taskState = null;
+    return;
+  }
+  if (command === "save_exam_state") {
+    expect(args?.key).toBe(key);
+    taskState = args?.value ? structuredClone(args.value) : null;
+    return;
+  }
+  return command === "options" ? { switchingCd: null } : answers;
+};
 
 beforeEach(() => {
   vi.stubGlobal("getTheQuestionByStart", navigate);
   vi.stubGlobal("submitForm", save);
   backend.confirm.mockResolvedValue(true);
-  backend.invoke.mockImplementation(async (/** @type {string} */ command) =>
-    command === "options" ? { switchingCd: null } : answers,
-  );
+  backend.invoke.mockImplementation(invokeTask);
 });
 
 afterEach(() => {
   document.body.innerHTML = "";
-  window.sessionStorage.clear();
+  taskState = null;
   vi.unstubAllGlobals();
   config.switchingCd = null;
 });
@@ -102,11 +127,11 @@ it("reports an error when starting outside the stored question", async () => {
   await answerPaged();
   expect(navigate).not.toHaveBeenCalled();
   expect(fillAnswer).not.toHaveBeenCalled();
-  expect(window.sessionStorage.getItem(key)).toBeNull();
+  expect(taskState).toBeNull();
   expect(backend.confirm).toHaveBeenLastCalledWith(
     expect.stringContaining("不支持手动跳题"),
   );
-  expect(backend.invoke).toHaveBeenCalledExactlyOnceWith("options");
+  expect(backend.invoke).toHaveBeenCalledWith("options");
 });
 
 it("reports manual navigation instead of correcting the stored position", async () => {
@@ -122,7 +147,10 @@ it("reports manual navigation instead of correcting the stored position", async 
   expect(navigate).not.toHaveBeenCalled();
   expect(fillAnswer).not.toHaveBeenCalled();
   expect(save).not.toHaveBeenCalled();
-  expect(backend.invoke).not.toHaveBeenCalled();
+  expect(backend.invoke).not.toHaveBeenCalledWith(
+    "solve_questions",
+    expect.anything(),
+  );
   expect(backend.confirm).toHaveBeenCalledExactlyOnceWith(
     expect.stringContaining("不支持手动跳题"),
   );
@@ -137,7 +165,7 @@ it("collects the first question and advances without solving", async () => {
     pages: [pages[0]],
   });
   expect(navigate).toHaveBeenCalledExactlyOnceWith(1, "0");
-  expect(backend.invoke).toHaveBeenCalledExactlyOnceWith("options");
+  expect(backend.invoke).toHaveBeenCalledWith("options");
 });
 
 it("solves the collected paper at the last question and returns to the first", async () => {
@@ -150,7 +178,7 @@ it("solves the collected paper at the last question and returns to the first", a
     answers: [],
   });
   await answerPaged();
-  expect(backend.invoke).toHaveBeenLastCalledWith("solve_questions", {
+  expect(backend.invoke).toHaveBeenCalledWith("solve_questions", {
     payload,
   });
   expect(storedRun()).toMatchObject({
@@ -182,7 +210,10 @@ it("fills an answer by displayed number and advances", async () => {
   expect(navigate).toHaveBeenCalledExactlyOnceWith(1, "0");
   expect(save).not.toHaveBeenCalled();
   expect(config.switchingCd).toBeNull();
-  expect(backend.invoke).not.toHaveBeenCalled();
+  expect(backend.invoke).not.toHaveBeenCalledWith(
+    "solve_questions",
+    expect.anything(),
+  );
   expect(backend.confirm).not.toHaveBeenCalled();
 });
 
@@ -206,7 +237,7 @@ it("saves the last answer and clears progress without submitting or navigating",
     false,
     expect.any(Function),
   );
-  expect(window.sessionStorage.getItem(key)).toBeNull();
+  expect(taskState).toBeNull();
   expect(navigate).not.toHaveBeenCalled();
 });
 
@@ -224,7 +255,9 @@ it("awaits answers before switching strategy or navigating", async () => {
   const response = new Promise((resolve) => {
     resolveAnswers = resolve;
   });
-  backend.invoke.mockReturnValue(response);
+  backend.invoke.mockImplementation((command, args) =>
+    command === "solve_questions" ? response : invokeTask(command, args),
+  );
   const processing = answerPaged();
   await vi.waitFor(() =>
     expect(backend.invoke).toHaveBeenCalledWith("solve_questions", {
@@ -251,10 +284,13 @@ it("runs both passes from storage and fetches configuration only once", async ()
     setup(index, null);
     await answerPaged();
   }
-  expect(backend.invoke.mock.calls.map(([command]) => command)).toEqual([
-    "options",
-    "solve_questions",
-  ]);
+  expect(
+    backend.invoke.mock.calls
+      .map(([command]) => command)
+      .filter(
+        (command) => command === "options" || command === "solve_questions",
+      ),
+  ).toEqual(["options", "solve_questions"]);
   expect(navigate.mock.calls).toEqual([
     [1, "0"],
     [0, "0"],
@@ -280,5 +316,5 @@ it("runs both passes from storage and fetches configuration only once", async ()
     title: "考试答题已完成",
     readSeconds: 5,
   });
-  expect(window.sessionStorage.getItem(key)).toBeNull();
+  expect(taskState).toBeNull();
 });

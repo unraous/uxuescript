@@ -1,6 +1,6 @@
 import { config, cooldown } from "@injected/chaoxing/runtime.js";
 import { assert, wait } from "@injected/utils/async.js";
-import { confirm } from "@injected/utils/backend.js";
+import { confirm, invoke } from "@injected/utils/backend.js";
 import { parseFolio, questions } from "@injected/chaoxing/questions/folio.js";
 import { solveFolio, applyAnswers } from "@injected/chaoxing/questions/page.js";
 import { readContext } from "@injected/chaoxing/questions/context.js";
@@ -14,13 +14,7 @@ const page =
   );
 
 /**
- * @typedef {Object} ExamRun
- * @property {"collect" | "answer"} phase
- * @property {number} index 当前待处理题目在答题卡中的位置，从 0 开始。
- * @property {{switchingCd: number|null}} config 本次运行使用的配置快照。
- * @property {{id: string, start: number}[]} entries
- * @property {import("@injected/chaoxing/questions/folio.js").Folio[]} pages
- * @property {import("../../../src/services/cmds").AnswerItem[]} answers
+ * @typedef {import("../../../src/services/cmds").ExamRun_Deserialize} ExamRun
  */
 
 /**
@@ -45,7 +39,7 @@ const readEntries = () =>
       ?.match(/getTheQuestionByStart\(\s*(\d+)\s*,\s*['"]0['"]\s*\)/);
     assert(match, "答题卡包含不支持的跳题方式或分卷");
     return {
-      id: entry.getAttribute("data-asq") ?? "",
+      id: /** @type {string} */ (entry.getAttribute("data-asq")),
       start: Number(match[1]),
     };
   });
@@ -72,13 +66,12 @@ const assertExamSupported = () => {
  */
 const initialize = async (key) => {
   assertExamSupported();
-  let run = /** @type {ExamRun|null} */ (
-    JSON.parse(window.sessionStorage.getItem(key) ?? "null")
-  );
+  /** @type {ExamRun|null} */
+  let run = await invoke("read_exam_state", { key });
   if (!run) {
     run = await startRun();
     if (!run) return null;
-    persistRun(key, run);
+    await persistRun(key, run);
   }
   config.switchingCd = run.config.switchingCd;
   return run;
@@ -109,13 +102,14 @@ const startRun = async () => {
 };
 
 /**
- * 把两遍处理进度写入当前窗口，供翻页后继续使用。
+ * 保存两遍处理进度，供翻页后继续使用。
  * @param {string} key 当前考试的存储键。
  * @param {ExamRun} run 两遍处理进度。
- * @returns {void}
+ * @returns {Promise<void>}
  */
-const persistRun = (key, run) =>
-  window.sessionStorage.setItem(key, JSON.stringify(run));
+const persistRun = async (key, run) => {
+  await invoke("save_exam_state", { key, value: run });
+};
 
 /**
  * 调用页面跳题入口，等待导航开始。
@@ -169,7 +163,7 @@ const answerQuestion = async (node, run) => {
  */
 const finishExam = async (run, key) => {
   await save();
-  window.sessionStorage.removeItem(key);
+  await invoke("clear_exam_state", { key });
   const skipped = run.pages
     .flatMap((folio) => questions(folio.entries))
     .flatMap((item) =>
@@ -219,7 +213,7 @@ const finish = async (run, key) => {
   if (run.index + 1 < run.entries.length) {
     run.index++;
   } else if (run.phase === "collect") {
-    persistRun(key, run);
+    await persistRun(key, run);
     await solveExam(run);
     run.phase = "answer";
     run.index = 0;
@@ -227,13 +221,13 @@ const finish = async (run, key) => {
     await finishExam(run, key);
     return;
   }
-  persistRun(key, run);
+  await persistRun(key, run);
   await navigateTo(run.entries[run.index]);
 };
 
 /**
  * 通过页面翻题采集整卷，再返回首题填写和暂存，不自动交卷。
- * 两遍进度保存在当前窗口 sessionStorage 中，导航后由重新注入的脚本继续。
+ * 两遍进度在后端临时保存，导航后由重新注入的脚本恢复并继续。
  * @returns {Promise<void>}
  */
 export const answerPaged = async () => {
@@ -262,7 +256,13 @@ export const answerPaged = async () => {
     const position = run
       ? `${run.phase === "collect" ? "采集" : "填写"}第 ${run.index + 1} 题`
       : "初始化";
-    if (key) window.sessionStorage.removeItem(key);
+    if (key) {
+      try {
+        await invoke("clear_exam_state", { key });
+      } catch (cleanupError) {
+        console.error("清除考试任务状态失败", cleanupError);
+      }
+    }
     console.error(`考试处理失败：${position}`, error);
     await confirm(
       `考试处理失败（${position}）：${error instanceof Error ? error.message : String(error)}`,
