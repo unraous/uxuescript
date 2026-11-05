@@ -1,6 +1,6 @@
 import { config } from "@injected/chaoxing/runtime.js";
 import { emit, safeRun } from "@injected/chaoxing/course/runtime.js";
-import { confirm } from "@injected/utils/backend.js";
+import { confirm, invoke } from "@injected/utils/backend.js";
 import {
   totalChapterList,
   handleCourse,
@@ -31,8 +31,11 @@ export const main = async () => {
 • 独立脚本不能处理章节测验，请自行完成；视频中的互动题会尝试自动处理。
 • 任务操作按当前配置等待，实际等待时间上下浮动 25%。如有未完成的任务，请检查页面和网络后重试。`;
 
-  const isConfirmed = await confirm(
-    `[运行配置]
+  const resuming = invoke ? await invoke("course_automation") : false;
+  const isConfirmed =
+    resuming ||
+    (await confirm(
+      `[运行配置]
 ${configSummary}
 
 ${guidance}
@@ -43,8 +46,8 @@ ${guidance}
 • 本脚本仅供自动化测试与学习交流使用，请遵守相关法律法规及平台规定。
 
 是否确认开始运行？`,
-    { title: "课程开始", readSeconds: 5 },
-  );
+      { title: "课程开始", readSeconds: 5 },
+    ));
   if (!isConfirmed) {
     console.info("用户已取消脚本运行");
     await emit.cancelled();

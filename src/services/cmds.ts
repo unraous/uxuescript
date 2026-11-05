@@ -13,6 +13,7 @@ export const commands = {
 	title: string,
 	cover: string,
 } | null>("query_course_meta", { courseId }),
+	courseAutomation: () => __TAURI_INVOKE<boolean>("course_automation"),
 	sendStatus: (status: CourseStatus) => __TAURI_INVOKE<null>("send_status", { status }),
 	platform: () => __TAURI_INVOKE<string>("platform"),
 	/**  从本地 Ollama 服务拉取可用模型列表更新至内存配置。 */
@@ -51,6 +52,25 @@ export const commands = {
 	showContent: () => __TAURI_INVOKE<null>("show_content"),
 	/**  异步隐藏遮罩，避免遮罩 Webview 等待自身 IPC 调用链；开屏完成时通知主界面。 */
 	hideMask: (notifyStartup: boolean) => __TAURI_INVOKE<null>("hide_mask", { notifyStartup }),
+	/**  在课程视图跳转到任务页面，并保存返回地址。 */
+	navigateToTask: (url: string) => __TAURI_INVOKE<null>("navigate_to_task", { url }),
+	/**  任务完成后返回之前的页面，并发放一次性恢复凭证。 */
+	returnFromTask: () => __TAURI_INVOKE<null>("return_from_task"),
+	/**  识别刚返回的任务，避免平台尚未更新完成标记时再次打开。 */
+	takeCompletedTask: (url: string) => __TAURI_INVOKE<boolean>("take_completed_task", { url }),
+	/**  保存任务下一页面需要的状态。 */
+	saveExamState: (key: string, value: ExamRun_Deserialize) => __TAURI_INVOKE<void>("save_exam_state", { key, value }),
+	/**  读取本次任务的状态，供页面刷新后恢复。 */
+	readExamState: (key: string) => __TAURI_INVOKE<{
+	phase: ExamPhase,
+	index: number,
+	config: ExamConfig,
+	entries: ExamEntry[],
+	pages: Folio_Serialize[],
+	answers: AnswerItem[],
+} | null>("read_exam_state", { key }),
+	/**  清除指定任务的状态。 */
+	clearExamState: (key: string) => __TAURI_INVOKE<void>("clear_exam_state", { key }),
 	/**  MSI 安装器写入注册表标记，便携程序不写入。 */
 	isMsiInstall: () => __TAURI_INVOKE<boolean | null>("is_msi_install"),
 	/**  检查更新并将 updater 资源 ID 显式交给前端后续下载或释放。 */
@@ -115,13 +135,38 @@ export type CourseMetadata = {
 export type CourseStatus = { kind: "waiting"; payload: null } | { kind: "start"; payload: null } | { kind: "chapter"; payload: ChapterProgressPayload } | { kind: "tab"; payload: TabProgressPayload } | { kind: "task"; payload: TaskProgressPayload } | { kind: "cancel"; payload: null } | { kind: "finish"; payload: null };
 
 /**  条目：篇负责组织关系，题负责表达需要作答的内容。 */
-export type Entry = Entry_Serialize | Entry_Deserialize;
+export type Entry = { type: "section"; data: Section } | { type: "question"; data: Question };
 
-/**  条目：篇负责组织关系，题负责表达需要作答的内容。 */
-export type Entry_Deserialize = { type: "section"; data: Section_Deserialize } | { type: "question"; data: Question_Deserialize };
+export type ExamConfig = {
+	switchingCd: number | null,
+};
 
-/**  条目：篇负责组织关系，题负责表达需要作答的内容。 */
-export type Entry_Serialize = { type: "section"; data: Section_Serialize } | { type: "question"; data: Question_Serialize };
+export type ExamEntry = {
+	id: string,
+	start: number,
+};
+
+export type ExamPhase = "collect" | "answer";
+
+export type ExamRun = ExamRun_Serialize | ExamRun_Deserialize;
+
+export type ExamRun_Deserialize = {
+	phase: ExamPhase,
+	index: number,
+	config: ExamConfig,
+	entries: ExamEntry[],
+	pages: Folio_Deserialize[],
+	answers: AnswerItem[],
+};
+
+export type ExamRun_Serialize = {
+	phase: ExamPhase,
+	index: number,
+	config: ExamConfig,
+	entries: ExamEntry[],
+	pages: Folio_Serialize[],
+	answers: AnswerItem[],
+};
 
 /**  卷：保留页面题目层级及用于文字还原的字体。 */
 export type Folio = Folio_Serialize | Folio_Deserialize;
@@ -145,14 +190,14 @@ export type FolioContext_Serialize = {
 
 /**  卷：保留页面题目层级及用于文字还原的字体。 */
 export type Folio_Deserialize = {
-	entries: Entry_Deserialize[],
+	entries: Entry[],
 	font: number[] | null,
 	context?: FolioContext_Deserialize,
 };
 
 /**  卷：保留页面题目层级及用于文字还原的字体。 */
 export type Folio_Serialize = {
-	entries: Entry_Serialize[],
+	entries: Entry[],
 	font: number[] | null,
 	context: FolioContext_Serialize,
 };
@@ -197,50 +242,31 @@ export type PathsConfig = {
 	files?: { [key in string]: string },
 };
 
-export type Question = Question_Serialize | Question_Deserialize;
+export type Question = {
+	/**  图片地址只用于后端加载媒体；模型文本通过题干中的占位符引用图片。 */
+	images?: QuestionImage[],
+} & QuestionData;
+
+export type QuestionData = {
+	/**  页面显示题号，不是平台内部题目 ID。 */
+	id: string,
+	kind: string,
+	stem: string,
+	options: string[],
+	/**  填空题实际填写位置数；其他题型不提供。 */
+	blank_count?: number | null,
+};
 
 export type QuestionImage = {
 	marker: string,
 	url: string,
 };
 
-export type Question_Deserialize = {
-	/**  页面显示题号，不是平台内部题目 ID。 */
-	id: string,
-	kind: string,
-	stem: string,
-	options: string[],
-	/**  填空题实际填写位置数；其他题型不提供。 */
-	blank_count?: number | null,
-	/**  图片地址只用于后端加载媒体；模型文本通过题干中的占位符引用图片。 */
-	images?: QuestionImage[],
-};
-
-export type Question_Serialize = {
-	/**  页面显示题号，不是平台内部题目 ID。 */
-	id: string,
-	kind: string,
-	stem: string,
-	options: string[],
-	/**  填空题实际填写位置数；其他题型不提供。 */
-	blank_count?: number | null,
-};
-
 /**  篇：题型分区或材料题组；子篇可以拥有自己的材料。 */
-export type Section = Section_Serialize | Section_Deserialize;
-
-/**  篇：题型分区或材料题组；子篇可以拥有自己的材料。 */
-export type Section_Deserialize = {
+export type Section = {
 	title: string,
 	passage: Passage | null,
-	entries: Entry_Deserialize[],
-};
-
-/**  篇：题型分区或材料题组；子篇可以拥有自己的材料。 */
-export type Section_Serialize = {
-	title: string,
-	passage: Passage | null,
-	entries: Entry_Serialize[],
+	entries: Entry[],
 };
 
 export type TabProgressPayload = {

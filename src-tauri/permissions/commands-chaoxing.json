@@ -4,13 +4,20 @@
     {
       "commands": {
         "allow": [
+          "clear_exam_state",
           "confirm",
+          "course_automation",
           "insert_course_meta_map",
+          "navigate_to_task",
           "options",
           "platform",
           "query_course_meta",
+          "read_exam_state",
+          "return_from_task",
+          "save_exam_state",
           "send_status",
-          "solve_questions"
+          "solve_questions",
+          "take_completed_task"
         ],
         "deny": []
       },

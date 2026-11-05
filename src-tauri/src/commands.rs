@@ -1,6 +1,7 @@
 pub mod chaoxing;
 pub mod config;
 pub mod mask;
+pub mod task;
 pub mod updater;
 pub mod webview;
 pub mod window;

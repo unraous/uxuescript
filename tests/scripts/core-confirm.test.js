@@ -113,7 +113,11 @@ describe("course confirmation", () => {
     const invoke = vi
       .fn()
       .mockImplementation(async (command) =>
-        command === "options" ? {} : true,
+        command === "options"
+          ? {}
+          : command === "course_automation"
+            ? false
+            : true,
       );
     const page = await setup(invoke);
     await page.run;
@@ -136,5 +140,23 @@ describe("course confirmation", () => {
       options: { title: "课程处理已完成", readSeconds: 5 },
     });
     expect(page.timer).not.toHaveBeenCalled();
+  });
+
+  it("resumes an active course without showing the start confirmation", async () => {
+    const invoke = vi.fn(async (command) => {
+      if (command === "options") return {};
+      if (command === "course_automation") return true;
+      return true;
+    });
+    const page = await setup(invoke);
+    await page.run;
+    const confirmations = invoke.mock.calls.filter(
+      ([command]) => command === "confirm",
+    );
+    expect(confirmations).toHaveLength(1);
+    expect(invoke).toHaveBeenCalledWith("confirm", {
+      message: expect.any(String),
+      options: { title: "课程处理已完成", readSeconds: 5 },
+    });
   });
 });

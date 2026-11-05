@@ -7,6 +7,24 @@ use crate::core::{
 use anyhow::anyhow;
 use parking_lot::Mutex;
 use tauri::{LogicalPosition, LogicalSize, Url, Webview, WebviewBuilder, WebviewUrl};
+use tauri::utils::config::BackgroundThrottlingPolicy;
+
+/// 课程主视图与课堂小窗共用默认浏览数据存储。
+pub struct CourseWebviews {
+    pub main: Webview,
+    pub mini: Webview,
+}
+
+impl CourseWebviews {
+    pub fn init_on(window: &tauri::Window) -> Result<Self, Box<dyn std::error::Error>> {
+        let main = init_on(window, "chaoxing")?;
+        main.hide()?;
+        let mini = init_on(window, "chaoxing-mini")?;
+        mini.hide()?;
+        mini.set_zoom(0.2)?;
+        Ok(Self { main, mini })
+    }
+}
 
 #[derive(Default)]
 pub struct UrlStack(Mutex<(Vec<Url>, usize)>);
@@ -87,6 +105,7 @@ pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn s
             .devtools(true)
             .initialization_script(include_script!("webview-log.js"))
             .initialization_script_for_all_frames(include_script!("iframe-init.js"))
+            .initialization_script_for_all_frames(include_script!("classroom-mute.js"))
             .initialization_script_for_all_frames(include_script!("course-list-metadata.js"))
             .on_navigation(|url| {
                 log::debug!("检测到页面导航: {}", url);
@@ -95,6 +114,14 @@ pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn s
             .on_page_load(load_on),
             LogicalPosition::new(logical_size.width * 0.51, logical_size.height * 0.46),
             LogicalSize::new(logical_size.width * 0.48, logical_size.height * 0.48),
+        ),
+        "chaoxing-mini" => (
+            WebviewBuilder::new(label, WebviewUrl::External("about:blank".parse()?))
+                .background_color((242, 244, 247).into())
+                .devtools(true)
+                .on_navigation(|url| url.as_str() == "about:blank" || classify(url) != Type::Unknown),
+            LogicalPosition::new(logical_size.width * 0.884, logical_size.height * 0.834),
+            LogicalSize::new(logical_size.width * 0.096, logical_size.height * 0.096),
         ),
         "chaoxing-mask" => (
             WebviewBuilder::new(label, WebviewUrl::App("mask.chaoxing.html".into()))
@@ -115,7 +142,11 @@ pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn s
         size.width,
         size.height
     );
-    Ok(window.add_child(builder, position, size)?)
+    Ok(window.add_child(
+        builder.background_throttling(BackgroundThrottlingPolicy::Disabled),
+        position,
+        size,
+    )?)
 }
 
 #[cfg(test)]

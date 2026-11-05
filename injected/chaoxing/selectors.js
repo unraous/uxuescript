@@ -167,5 +167,6 @@ export const SELECTORS = {
     audio: "/ananas/modules/audio/",
     pdf: "/ananas/modules/pdf/",
     quiz: "/ananas/modules/work/",
+    classroom: "/ananas/modules/zt/classTask/",
   },
 };

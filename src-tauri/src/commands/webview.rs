@@ -5,7 +5,7 @@ use crate::app::config::CONFIG;
 use crate::app::webview::UrlStack;
 
 use anyhow::anyhow;
-use tauri::{webview::Webview, window, Manager};
+use tauri::{Manager, webview::Webview, window};
 
 fn chaoxing_webview(window: &window::Window) -> CommandsResult<Webview> {
     Ok(window
@@ -13,9 +13,15 @@ fn chaoxing_webview(window: &window::Window) -> CommandsResult<Webview> {
         .ok_or_else(|| anyhow!("未找到webview [chaoxing]"))?)
 }
 
+fn stop_task(window: &window::Window) {
+    window.state::<super::task::TaskSession>().clear();
+}
+
 #[uxs_commands::command]
 pub fn set_zoom(window: window::Window, scale: f64) -> CommandsResult<()> {
-    chaoxing_webview(&window)?.set_zoom(scale)?;
+    let course = window.state::<crate::app::webview::CourseWebviews>();
+    course.main.set_zoom(scale)?;
+    course.mini.set_zoom(scale / 5.0)?;
     Ok(())
 }
 
@@ -31,6 +37,7 @@ pub fn can_go_forward(url_stack: tauri::State<UrlStack>) -> bool {
 
 #[uxs_commands::command]
 pub fn go_home(window: window::Window) -> CommandsResult<()> {
+    stop_task(&window);
     let webview = chaoxing_webview(&window)?;
     webview.navigate(CONFIG.home_url.clone())?;
     Ok(())
@@ -38,6 +45,7 @@ pub fn go_home(window: window::Window) -> CommandsResult<()> {
 
 #[uxs_commands::command]
 pub fn go_back(window: window::Window, url_stack: tauri::State<UrlStack>) -> CommandsResult<()> {
+    stop_task(&window);
     if let Some(url) = url_stack.back() {
         chaoxing_webview(&window)?.navigate(url)?;
         Ok(())
@@ -49,6 +57,7 @@ pub fn go_back(window: window::Window, url_stack: tauri::State<UrlStack>) -> Com
 
 #[uxs_commands::command]
 pub fn go_forward(window: window::Window, url_stack: tauri::State<UrlStack>) -> CommandsResult<()> {
+    stop_task(&window);
     if let Some(url) = url_stack.forward() {
         log::debug!("[chaoxing] 前进至: {}", url);
         chaoxing_webview(&window)?.navigate(url)?;
@@ -66,6 +75,7 @@ pub fn current_url(url_stack: tauri::State<UrlStack>) -> Option<String> {
 
 #[uxs_commands::command]
 pub fn reload(window: window::Window) -> CommandsResult<()> {
+    stop_task(&window);
     chaoxing_webview(&window)?.reload()?;
     Ok(())
 }

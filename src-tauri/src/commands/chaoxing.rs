@@ -106,7 +106,20 @@ pub fn query_course_meta(
 }
 
 #[uxs_commands::command(webview = "chaoxing")]
+pub fn course_automation(session: tauri::State<super::task::TaskSession>) -> bool {
+    session.resume_course()
+}
+
+#[uxs_commands::command(webview = "chaoxing")]
 pub fn send_status(webview: tauri::Webview, status: CourseStatus) -> CommandsResult<()> {
+    use tauri::Manager;
+    match status {
+        CourseStatus::Start(()) => webview.state::<super::task::TaskSession>().start_course(),
+        CourseStatus::Cancel(()) | CourseStatus::Finish(()) => {
+            webview.state::<super::task::TaskSession>().clear();
+        }
+        _ => {}
+    }
     log::debug!(
         "接收到来自 [{}] 的章节完成状态: {:?}",
         webview.label(),

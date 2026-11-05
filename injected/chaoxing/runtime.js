@@ -15,7 +15,7 @@ class AppConfig {
 
   /**
    * 非空时只处理列出的附件类型，不受任务点标识或完成状态限制，也不等待任务点完成标记；处理后确认，异常时弹窗。
-   * @type {Array<"Video" | "Audio" | "PDF" | "Quiz" | "Other">}
+   * @type {Array<"Video" | "Audio" | "PDF" | "Quiz" | "Classroom" | "Other">}
    */
   debugTaskTypes = [];
 

@@ -74,10 +74,8 @@ pub fn show_content(window: Window) -> CommandsResult<()> {
         .get_webview("main")
         .ok_or_else(|| anyhow!("未找到主界面 Webview"))?
         .show()?;
-    window
-        .get_webview("chaoxing")
-        .ok_or_else(|| anyhow!("未找到超星 Webview"))?
-        .show()?;
+    let course = window.state::<crate::app::webview::CourseWebviews>();
+    course.main.show()?;
 
     Ok(())
 }

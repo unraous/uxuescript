@@ -6,8 +6,15 @@
  * @typedef {(command: "send_status", args: {status: Parameters<Commands["sendStatus"]>[0]}) => ReturnType<Commands["sendStatus"]>} StatusInvoke
  * @typedef {(command: "insert_course_meta_map", args: {courseId: string, metadata: Parameters<Commands["insertCourseMetaMap"]>[1]}) => Promise<void>} MetadataInvoke
  * @typedef {(command: "query_course_meta", args: {courseId: string}) => ReturnType<Commands["queryCourseMeta"]>} QueryMetadataInvoke
+ * @typedef {(command: "navigate_to_task", args: {url: string}) => Promise<void>} NavigateTaskInvoke
+ * @typedef {(command: "course_automation") => Promise<boolean>} CourseAutomationInvoke
+ * @typedef {(command: "return_from_task") => Promise<void>} ReturnTaskInvoke
+ * @typedef {(command: "take_completed_task", args: {url: string}) => Promise<boolean>} CompletedTaskInvoke
+ * @typedef {(command: "save_exam_state", args: {key: string, value: Parameters<Commands["saveExamState"]>[1]}) => Promise<void>} SaveExamStateInvoke
+ * @typedef {(command: "read_exam_state", args: {key: string}) => ReturnType<Commands["readExamState"]>} ReadExamStateInvoke
+ * @typedef {(command: "clear_exam_state", args: {key: string}) => Promise<void>} ClearExamStateInvoke
  * @typedef {(command: "plugin:log|log", args: {level: number, message: string, location?: string}) => Promise<void>} LogInvoke
- * @typedef {OptionsInvoke & SolveInvoke & ConfirmInvoke & StatusInvoke & MetadataInvoke & QueryMetadataInvoke & LogInvoke} InjectedInvoke
+ * @typedef {OptionsInvoke & SolveInvoke & ConfirmInvoke & StatusInvoke & MetadataInvoke & QueryMetadataInvoke & NavigateTaskInvoke & CourseAutomationInvoke & ReturnTaskInvoke & CompletedTaskInvoke & SaveExamStateInvoke & ReadExamStateInvoke & ClearExamStateInvoke & LogInvoke} InjectedInvoke
  */
 
 /** 当前 WebView 的 IPC 入口；普通浏览器中为 undefined。 */

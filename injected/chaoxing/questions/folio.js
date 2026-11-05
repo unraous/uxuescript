@@ -9,8 +9,8 @@ import { QuestionType } from "./types.js";
 
 /**
  * @typedef {import("../../../src/services/cmds").Folio_Deserialize} Folio
- * @typedef {import("../../../src/services/cmds").Entry_Deserialize} Entry
- * @typedef {import("../../../src/services/cmds").Section_Deserialize} Section
+ * @typedef {import("../../../src/services/cmds").Entry} Entry
+ * @typedef {import("../../../src/services/cmds").Section} Section
  * @typedef {typeof import("../selectors.js").SELECTORS.workExam | typeof import("../selectors.js").SELECTORS.quiz} PageSelectors
  * @typedef {Pick<PageSelectors, "kind" | "choice" | "clearSelectedClass" | "textInputs" | "textSave"> & {kindName?: string}} FillingSelectors
  * @typedef {import("./extract.js").ExtractionSelectors & FillingSelectors & Pick<PageSelectors, "folio" | "blanks">} QuestionSelectors

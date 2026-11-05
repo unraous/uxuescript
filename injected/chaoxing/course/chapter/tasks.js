@@ -4,6 +4,7 @@ import { handleVideo } from "@injected/chaoxing/course/chapter/tasks/video.js";
 import { handleAudio } from "@injected/chaoxing/course/chapter/tasks/audio.js";
 import { handlePDF } from "@injected/chaoxing/course/chapter/tasks/pdf.js";
 import { handleQuiz } from "@injected/chaoxing/course/chapter/tasks/quiz.js";
+import { handleClassroom } from "@injected/chaoxing/course/chapter/tasks/classroom.js";
 import { wait, assert } from "@injected/utils/async.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
 /**
@@ -15,6 +16,7 @@ const classifyTask = (taskDoc) => {
   if (url.includes(SELECTORS.urls.audio)) return "Audio";
   if (url.includes(SELECTORS.urls.pdf)) return "PDF";
   if (url.includes(SELECTORS.urls.quiz)) return "Quiz";
+  if (url.includes(SELECTORS.urls.classroom)) return "Classroom";
   return "Other";
 };
 
@@ -24,17 +26,16 @@ const handlers = {
   Audio: handleAudio,
   PDF: handlePDF,
   Quiz: handleQuiz,
+  Classroom: handleClassroom,
 };
 
 /**
- * 等待任务点容器出现平台完成标记；已完成或无容器时立即返回。
- * @param {Element|null} container 任务点外层容器。
+ * 等待任务点容器出现平台完成标记；已完成时立即返回。
+ * @param {Element} container 任务点外层容器。
  * @returns {Promise<boolean>}
  */
 const taskPointComplete = (container) => {
   console.info("开始监控任务点完成情况");
-  if (!container) return Promise.resolve(true);
-
   const isDone = () =>
     container.classList.contains(SELECTORS.taskPoint.finishedClass);
   if (isDone()) return Promise.resolve(true);
@@ -100,8 +101,8 @@ export const handleTab = async (chapterDoc) => {
     await cooldown();
     await safeRun(async () => {
       assert(handler, `未识别的任务点类型: ${taskDoc.location.href}`);
-      if (type === "Quiz")
-        assert(config.hasBackend, "未开启后端服务，无法处理Quiz任务点");
+      if (type === "Quiz" || type === "Classroom")
+        assert(config.hasBackend, `未开启后端服务，无法处理${type}任务点`);
 
       await handler(taskDoc);
       if (!debugging) await taskPointComplete(container);

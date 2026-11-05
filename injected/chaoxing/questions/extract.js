@@ -5,7 +5,7 @@ import { SELECTORS } from "@injected/chaoxing/selectors.js";
 
 /**
  * Rust 是跨端模型的唯一来源；注入脚本只引用自动生成的输入类型。
- * @typedef {import("../../../src/services/cmds").Question_Deserialize} Question
+ * @typedef {import("../../../src/services/cmds").Question} Question
  */
 
 /**

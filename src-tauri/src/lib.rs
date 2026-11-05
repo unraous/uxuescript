@@ -12,6 +12,7 @@ pub fn run() {
     use app::window;
     use commands::chaoxing::CourseMetaMap;
     use commands::mask::Confirmations;
+    use commands::task::TaskSession;
     use commands::updater::DownloadState;
 
     #[cfg(target_os = "windows")]
@@ -35,6 +36,7 @@ pub fn run() {
         .on_window_event(window::listener)
         .manage(UrlStack::default())
         .manage(CourseMetaMap::default())
+        .manage(TaskSession::default())
         .manage(Confirmations::default())
         .manage(DownloadState::default())
         .invoke_handler(uxs_commands::register!())

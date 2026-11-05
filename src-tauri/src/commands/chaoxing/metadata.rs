@@ -2,7 +2,6 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::collections::HashMap;
-
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Type)]
 pub struct CourseMetadata {
     pub title: String,
