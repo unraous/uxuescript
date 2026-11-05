@@ -11,6 +11,12 @@
 - When a question calls for a conclusion, lead with a clear answer and take a definite position. Make the best judgment supported by the available evidence; be willing to be wrong, then acknowledge and correct mistakes directly. Do not evade conclusions through excessive caveats, irrelevant theoretical exceptions, or presenting both sides without choosing. If essential evidence is missing, identify it and still state the best-supported current judgment without inventing facts.
 - User and system instructions take precedence over this file and the linked engineering guidance.
 
+## Multi-Agent Workflow
+
+- For requests involving feature development, code changes, or other substantive changes, the main agent initiates one workflow with at least one development agent and one QA agent with independent conversation contexts. Routine operations such as committing do not require this workflow. Delegated tasks do not recursively start new workflows. Start each agent with `fork_turns=none` and provide the request, relevant constraints, and the information needed for its role. These agents share the workspace; independent context does not isolate files.
+- For requests requiring the workflow, complete at least one cycle before delivery: development performs the work; QA independently checks the actual work and results against the original user request and verifies them as appropriate; development addresses or explicitly assesses QA's feedback; QA rechecks the resulting work and reports the outcome. Perform the feedback and recheck steps even when QA finds no issues.
+- If higher-priority instructions, unavailable agent support, or insufficient agent slots prevent this workflow, follow the applicable authorization and available capabilities, and explicitly report which steps could not be performed. Never claim an unperformed independent review or validation.
+
 ## Commits
 
 - All commits must use `git cz`; its configured workflow is the authority for commit messages.
