@@ -9,11 +9,6 @@ use parking_lot::Mutex;
 use tauri::utils::config::BackgroundThrottlingPolicy;
 use tauri::{LogicalPosition, LogicalSize, Url, Webview, WebviewBuilder, WebviewUrl};
 
-/// 课程主视图句柄，供课程相关命令使用。
-pub struct CourseWebview {
-    pub main: Webview,
-}
-
 #[derive(Default)]
 pub struct UrlStack(Mutex<(Vec<Url>, usize)>);
 

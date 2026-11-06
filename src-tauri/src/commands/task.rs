@@ -1,10 +1,9 @@
 use super::CommandsResult;
-use crate::app::webview::CourseWebview;
 use crate::core::quiz::{Folio, llm::AnswerItem};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use tauri::Url;
+use tauri::{Url, window::Window};
 
 #[derive(Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -72,7 +71,7 @@ impl TaskSession {
 /// 在课程视图跳转到任务页面，并保存返回地址。
 #[uxs_commands::command(webview = "chaoxing")]
 pub fn navigate_to_task(
-    course: tauri::State<CourseWebview>,
+    window: Window,
     session: tauri::State<TaskSession>,
     url: String,
 ) -> CommandsResult<()> {
@@ -80,7 +79,8 @@ pub fn navigate_to_task(
     if crate::core::url::classify(&url) == crate::core::url::Type::Unknown {
         return Err(anyhow::anyhow!("不支持的任务地址: {url}").into());
     }
-    let return_url = course.main.url()?;
+    let course = super::course_webview(&window)?;
+    let return_url = course.url()?;
     {
         let mut state = session.0.lock();
         state.return_trip = Some((return_url, url.clone()));
@@ -88,7 +88,7 @@ pub fn navigate_to_task(
         state.resume = false;
         state.exam = None;
     }
-    if let Err(error) = course.main.navigate(url) {
+    if let Err(error) = course.navigate(url) {
         session.0.lock().return_trip = None;
         return Err(error.into());
     }
@@ -97,10 +97,8 @@ pub fn navigate_to_task(
 
 /// 任务完成后返回之前的页面，并发放一次性恢复凭证。
 #[uxs_commands::command(webview = "chaoxing")]
-pub fn return_from_task(
-    course: tauri::State<CourseWebview>,
-    session: tauri::State<TaskSession>,
-) -> CommandsResult<()> {
+pub fn return_from_task(window: Window, session: tauri::State<TaskSession>) -> CommandsResult<()> {
+    let course = super::course_webview(&window)?;
     let (url, task_url) = session
         .0
         .lock()
@@ -113,7 +111,7 @@ pub fn return_from_task(
         state.resume = true;
         state.completed_task = Some(task_url.clone());
     }
-    if let Err(error) = course.main.navigate(url.clone()) {
+    if let Err(error) = course.navigate(url.clone()) {
         let mut state = session.0.lock();
         state.resume = false;
         state.completed_task = None;

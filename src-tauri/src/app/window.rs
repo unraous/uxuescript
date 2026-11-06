@@ -147,9 +147,7 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
         .build()?;
 
     webview::init_on(&window, "main")?.hide()?;
-    let course = webview::init_on(&window, "chaoxing")?;
-    course.hide()?;
-    app.manage(webview::CourseWebview { main: course });
+    webview::init_on(&window, "chaoxing")?.hide()?;
     webview::init_on(&window, "chaoxing-mask")?.hide()?;
     let mask = webview::init_on(&window, "mask")?;
     let startup_started = Arc::new(AtomicBool::new(false));

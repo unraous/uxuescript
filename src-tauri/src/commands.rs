@@ -33,3 +33,11 @@ impl Serialize for CommandsError {
 }
 
 pub type CommandsResult<T, E = CommandsError> = Result<T, E>;
+
+fn course_webview(window: &tauri::Window) -> anyhow::Result<tauri::Webview> {
+    use tauri::Manager;
+
+    window
+        .get_webview("chaoxing")
+        .ok_or_else(|| anyhow::anyhow!("未找到超星 Webview: chaoxing"))
+}
