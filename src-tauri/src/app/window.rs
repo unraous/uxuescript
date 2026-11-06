@@ -62,10 +62,6 @@ fn resize(webview: &Webview, size: LogicalSize<f64>) -> Result<()> {
             LogicalPosition::new(size.width * 0.51, size.height * 0.46),
             LogicalSize::new(size.width * 0.48, size.height * 0.48),
         ),
-        "chaoxing-mini" => (
-            LogicalPosition::new(size.width * 0.884, size.height * 0.834),
-            LogicalSize::new(size.width * 0.096, size.height * 0.096),
-        ),
         _ => (LogicalPosition::new(0.0, 0.0), size),
     };
     webview.set_position(pos)?;
@@ -120,7 +116,7 @@ fn select_monitor_from(monitors: &[tauri::Monitor]) -> &tauri::Monitor {
 
 /**
  * Creates a hidden fullscreen window and four child WebViews in order:
- * main, chaoxing, chaoxing-mini, chaoxing-mask, mask. Content is hidden initially;
+ * main, chaoxing, chaoxing-mask, mask. Content is hidden initially;
  * the startup mask controls when the window and content become visible.
  *
  * Doesn't use `anyhow::Result` because `tauri::Builder::setup` strictly expects
@@ -151,8 +147,9 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
         .build()?;
 
     webview::init_on(&window, "main")?.hide()?;
-    let course_webviews = webview::CourseWebviews::init_on(&window)?;
-    app.manage(course_webviews);
+    let course = webview::init_on(&window, "chaoxing")?;
+    course.hide()?;
+    app.manage(webview::CourseWebview { main: course });
     webview::init_on(&window, "chaoxing-mask")?.hide()?;
     let mask = webview::init_on(&window, "mask")?;
     let startup_started = Arc::new(AtomicBool::new(false));

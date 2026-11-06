@@ -46,9 +46,7 @@ pub fn load_on(webview: tauri::Webview, payload: tauri::webview::PageLoadPayload
             .emit_to("main", "status-update", CourseStatus::Cancel(()))
             .ok();
         let url_stack = webview.state::<UrlStack>();
-        if url_stack.current().as_ref() != Some(payload.url()) {
-            url_stack.push(payload.url().clone());
-        }
+        url_stack.push(payload.url().clone());
 
         if let Some(script) = obtain(url_type) {
             log::debug!("正在注入脚本到Webview \"{}\"...", webview.label());

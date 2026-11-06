@@ -11,7 +11,7 @@ fn preview_folio_prompt() {
     folio.context.chapter = Some("城市与自然".into());
 
     for (index, batch) in batch::prepare(folio, 5).unwrap().iter().enumerate() {
-        let prompt = assemble(batch, vec![]).unwrap();
+        let prompt = assemble(batch, vec![], instructions(batch).unwrap()).unwrap();
         println!(
             "\n===== 第 {} 批：系统提示词 =====\n{}",
             index + 1,
@@ -133,7 +133,12 @@ fn orders_context_material_images_questions_and_question_images_with_stable_pref
             marker: "图片1".into(),
             url: "https://p.cldisk.com/a.png".into(),
         });
-    let prompt = assemble(&batches[1], vec![image("材料 p.2.1"), image("题号 2.1")]).unwrap();
+    let prompt = assemble(
+        &batches[1],
+        vec![image("材料 p.2.1"), image("题号 2.1")],
+        instructions(&batches[1]).unwrap(),
+    )
+    .unwrap();
     let Part::Text(context) = &prompt.parts[0] else {
         panic!()
     };
@@ -154,13 +159,13 @@ fn orders_context_material_images_questions_and_question_images_with_stable_pref
     assert_eq!(questions["questions"][0]["passages"], json!(["p.2.1"]));
     assert!(questions["questions"][0].get("images").is_none());
     assert!(matches!(&prompt.parts[6], Part::Image(_)));
-    let next = assemble(&batches[2], vec![]).unwrap();
+    let next = assemble(&batches[2], vec![], instructions(&batches[2]).unwrap()).unwrap();
     assert_eq!(prompt.system, next.system);
     let Part::Text(next_material) = &next.parts[1] else {
         panic!()
     };
     assert_eq!(material, next_material);
-    let empty = assemble(&batches[0], vec![]).unwrap();
+    let empty = assemble(&batches[0], vec![], instructions(&batches[0]).unwrap()).unwrap();
     assert!(empty.system.contains("【填空题】"));
     assert!(!empty.system.contains("【单选题】"));
 }

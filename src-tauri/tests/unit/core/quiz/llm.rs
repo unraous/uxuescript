@@ -329,7 +329,8 @@ async fn sends_images_in_each_protocol_native_format() {
             mime: "image/png".into(),
             data: "AQID".into(),
         }];
-        let prompt = prompt::assemble(&input, images).unwrap();
+        let prompt =
+            prompt::assemble(&input, images, prompt::instructions(&input).unwrap()).unwrap();
         let pool = RequestPool::new(10);
         protocol::solve(
             &reqwest::Client::new(),

@@ -13,8 +13,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({ once: mocks.once }),
 }));
-vi.mock("@/composables/useUpdater", () => ({
-  useUpdater: () => ({ checkForUpdates: mocks.check }),
+vi.mock("@/services/updater", () => ({
+  checkForUpdates: mocks.check,
 }));
 vi.mock("@/components/TheMenuBar.vue", () => ({
   default: { template: "<div/>" },

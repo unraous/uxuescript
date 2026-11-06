@@ -71,7 +71,7 @@ const initialize = async (key) => {
   if (!run) {
     run = await startRun();
     if (!run) return null;
-    await persistRun(key, run);
+    await invoke("save_exam_state", { key, value: run });
   }
   config.switchingCd = run.config.switchingCd;
   return run;
@@ -99,16 +99,6 @@ const startRun = async () => {
     pages: [],
     answers: [],
   };
-};
-
-/**
- * 保存两遍处理进度，供翻页后继续使用。
- * @param {string} key 当前考试的存储键。
- * @param {ExamRun} run 两遍处理进度。
- * @returns {Promise<void>}
- */
-const persistRun = async (key, run) => {
-  await invoke("save_exam_state", { key, value: run });
 };
 
 /**
@@ -213,7 +203,7 @@ const finish = async (run, key) => {
   if (run.index + 1 < run.entries.length) {
     run.index++;
   } else if (run.phase === "collect") {
-    await persistRun(key, run);
+    await invoke("save_exam_state", { key, value: run });
     await solveExam(run);
     run.phase = "answer";
     run.index = 0;
@@ -221,7 +211,7 @@ const finish = async (run, key) => {
     await finishExam(run, key);
     return;
   }
-  await persistRun(key, run);
+  await invoke("save_exam_state", { key, value: run });
   await navigateTo(run.entries[run.index]);
 };
 

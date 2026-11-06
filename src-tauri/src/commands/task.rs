@@ -1,5 +1,5 @@
 use super::CommandsResult;
-use crate::app::webview::CourseWebviews;
+use crate::app::webview::CourseWebview;
 use crate::core::quiz::{Folio, llm::AnswerItem};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -72,14 +72,12 @@ impl TaskSession {
 /// 在课程视图跳转到任务页面，并保存返回地址。
 #[uxs_commands::command(webview = "chaoxing")]
 pub fn navigate_to_task(
-    course: tauri::State<CourseWebviews>,
+    course: tauri::State<CourseWebview>,
     session: tauri::State<TaskSession>,
     url: String,
 ) -> CommandsResult<()> {
     let url = Url::parse(&url).map_err(anyhow::Error::from)?;
-    if !matches!(url.scheme(), "http" | "https")
-        || crate::core::url::classify(&url) == crate::core::url::Type::Unknown
-    {
+    if crate::core::url::classify(&url) == crate::core::url::Type::Unknown {
         return Err(anyhow::anyhow!("不支持的任务地址: {url}").into());
     }
     let return_url = course.main.url()?;
@@ -100,7 +98,7 @@ pub fn navigate_to_task(
 /// 任务完成后返回之前的页面，并发放一次性恢复凭证。
 #[uxs_commands::command(webview = "chaoxing")]
 pub fn return_from_task(
-    course: tauri::State<CourseWebviews>,
+    course: tauri::State<CourseWebview>,
     session: tauri::State<TaskSession>,
 ) -> CommandsResult<()> {
     let (url, task_url) = session

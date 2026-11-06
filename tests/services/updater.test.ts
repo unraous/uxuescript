@@ -3,7 +3,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { commands } from "@/services/cmds";
 import { showError } from "@/services/errors";
-import { useUpdater } from "@/composables/useUpdater";
+import { checkForUpdates } from "@/services/updater";
 
 const mocks = vi.hoisted(() => ({ closeResource: vi.fn(async () => {}) }));
 
@@ -39,10 +39,10 @@ beforeEach(() => {
   mocks.closeResource.mockResolvedValue();
 });
 
-describe("useUpdater", () => {
+describe("checkForUpdates", () => {
   it("does not prompt when no update exists", async () => {
     vi.mocked(commands.checkUpdate).mockResolvedValue(null);
-    await useUpdater().checkForUpdates("2.1.4");
+    await checkForUpdates("2.1.4");
     expect(commands.confirm).not.toHaveBeenCalled();
   });
 
@@ -50,7 +50,7 @@ describe("useUpdater", () => {
     const error = new Error("failed");
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.mocked(commands.checkUpdate).mockRejectedValue(error);
-    await useUpdater().checkForUpdates("2.1.4");
+    await checkForUpdates("2.1.4");
     expect(commands.confirm).not.toHaveBeenCalled();
     expect(showError).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith("检查更新失败", error);
@@ -58,7 +58,7 @@ describe("useUpdater", () => {
   });
 
   it("releases a declined update resource", async () => {
-    await useUpdater().checkForUpdates("2.1.4");
+    await checkForUpdates("2.1.4");
     expect(commands.confirm).toHaveBeenCalledWith(
       expect.stringContaining("v2.2.0"),
       null,
@@ -70,7 +70,7 @@ describe("useUpdater", () => {
   it("opens the release page for a portable Windows installation", async () => {
     vi.mocked(commands.isMsiInstall).mockResolvedValue(false);
     vi.mocked(commands.confirm).mockResolvedValue(true);
-    await useUpdater().checkForUpdates("2.1.4");
+    await checkForUpdates("2.1.4");
     expect(openUrl).toHaveBeenCalledWith(
       "https://github.com/unraous/uxuescript/releases/latest",
     );
@@ -92,7 +92,7 @@ describe("useUpdater", () => {
         expect(rid).toBe(42);
         return true;
       });
-      await useUpdater().checkForUpdates("2.1.4");
+      await checkForUpdates("2.1.4");
       expect(commands.downloadUpdate).toHaveBeenCalledWith(42);
       expect(relaunch).toHaveBeenCalledTimes(platform === "macos" ? 1 : 0);
       expect(mocks.closeResource).toHaveBeenCalledOnce();
@@ -105,7 +105,7 @@ describe("useUpdater", () => {
       vi.mocked(commands.platform).mockResolvedValue(platform);
       vi.mocked(commands.confirm).mockResolvedValue(true);
       vi.mocked(commands.downloadUpdate).mockResolvedValue(false);
-      await useUpdater().checkForUpdates("2.1.4");
+      await checkForUpdates("2.1.4");
       expect(relaunch).not.toHaveBeenCalled();
       expect(showError).not.toHaveBeenCalled();
       expect(mocks.closeResource).toHaveBeenCalledOnce();
@@ -117,7 +117,7 @@ describe("useUpdater", () => {
     vi.mocked(commands.platform).mockResolvedValue("macos");
     vi.mocked(commands.confirm).mockResolvedValue(true);
     vi.mocked(commands.downloadUpdate).mockRejectedValue(error);
-    await useUpdater().checkForUpdates("2.1.4");
+    await checkForUpdates("2.1.4");
     expect(relaunch).not.toHaveBeenCalled();
     expect(showError).toHaveBeenCalledWith("下载或安装更新失败：", error);
     expect(mocks.closeResource).toHaveBeenCalledOnce();

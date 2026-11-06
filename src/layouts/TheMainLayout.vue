@@ -7,10 +7,9 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import appConfig from "../../src-tauri/tauri.conf.json";
 import TheBottomBar from "@/components/TheBottomBar.vue";
-import { useUpdater } from "@/composables/useUpdater";
+import { checkForUpdates } from "@/services/updater";
 import { previewUpdateDownload } from "@/services/updateDownloadPreview";
 
-const { checkForUpdates } = useUpdater();
 const metadata = {
   title: appConfig.productName,
   author: appConfig.bundle.publisher,

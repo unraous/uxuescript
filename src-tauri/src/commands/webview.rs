@@ -2,16 +2,10 @@
 use super::CommandsResult;
 
 use crate::app::config::CONFIG;
-use crate::app::webview::UrlStack;
+use crate::app::webview::{CourseWebview, UrlStack};
 
 use anyhow::anyhow;
-use tauri::{Manager, webview::Webview, window};
-
-fn chaoxing_webview(window: &window::Window) -> CommandsResult<Webview> {
-    Ok(window
-        .get_webview("chaoxing")
-        .ok_or_else(|| anyhow!("未找到webview [chaoxing]"))?)
-}
+use tauri::{Manager, window};
 
 fn stop_task(window: &window::Window) {
     window.state::<super::task::TaskSession>().clear();
@@ -19,9 +13,8 @@ fn stop_task(window: &window::Window) {
 
 #[uxs_commands::command]
 pub fn set_zoom(window: window::Window, scale: f64) -> CommandsResult<()> {
-    let course = window.state::<crate::app::webview::CourseWebviews>();
+    let course = window.state::<CourseWebview>();
     course.main.set_zoom(scale)?;
-    course.mini.set_zoom(scale / 5.0)?;
     Ok(())
 }
 
@@ -38,8 +31,10 @@ pub fn can_go_forward(url_stack: tauri::State<UrlStack>) -> bool {
 #[uxs_commands::command]
 pub fn go_home(window: window::Window) -> CommandsResult<()> {
     stop_task(&window);
-    let webview = chaoxing_webview(&window)?;
-    webview.navigate(CONFIG.home_url.clone())?;
+    window
+        .state::<CourseWebview>()
+        .main
+        .navigate(CONFIG.home_url.clone())?;
     Ok(())
 }
 
@@ -47,7 +42,7 @@ pub fn go_home(window: window::Window) -> CommandsResult<()> {
 pub fn go_back(window: window::Window, url_stack: tauri::State<UrlStack>) -> CommandsResult<()> {
     stop_task(&window);
     if let Some(url) = url_stack.back() {
-        chaoxing_webview(&window)?.navigate(url)?;
+        window.state::<CourseWebview>().main.navigate(url)?;
         Ok(())
     } else {
         log::warn!("[chaoxing] 无法后退：已无历史页面");
@@ -60,7 +55,7 @@ pub fn go_forward(window: window::Window, url_stack: tauri::State<UrlStack>) -> 
     stop_task(&window);
     if let Some(url) = url_stack.forward() {
         log::debug!("[chaoxing] 前进至: {}", url);
-        chaoxing_webview(&window)?.navigate(url)?;
+        window.state::<CourseWebview>().main.navigate(url)?;
         Ok(())
     } else {
         log::warn!("[chaoxing] 无法前进：已是最新页面");
@@ -76,6 +71,6 @@ pub fn current_url(url_stack: tauri::State<UrlStack>) -> Option<String> {
 #[uxs_commands::command]
 pub fn reload(window: window::Window) -> CommandsResult<()> {
     stop_task(&window);
-    chaoxing_webview(&window)?.reload()?;
+    window.state::<CourseWebview>().main.reload()?;
     Ok(())
 }

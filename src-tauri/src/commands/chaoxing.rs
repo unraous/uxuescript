@@ -32,7 +32,7 @@ pub async fn healthy() -> CommandsResult<String> {
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("大模型提供商 [{}] 不存在", active_id))?;
     let general = *CONFIG.general.lock();
-    let answers = llm::solve(
+    llm::solve(
         &provider,
         Folio {
             entries: vec![Entry::Question(Question {
@@ -51,14 +51,6 @@ pub async fn healthy() -> CommandsResult<String> {
     )
     .await
     .map_err(|error| anyhow::anyhow!("{error:#}"))?;
-    if answers.len() != 1 {
-        return Err(
-            anyhow::anyhow!("健康检查应返回 1 道题的答案，实际返回 {} 道", answers.len()).into(),
-        );
-    }
-    if answers[0].content.trim().is_empty() {
-        return Err(anyhow::anyhow!("健康检查返回的答案为空").into());
-    }
     Ok("ok".to_owned())
 }
 

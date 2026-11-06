@@ -67,8 +67,7 @@ pub(super) fn instructions(batch: &Batch) -> Result<String> {
 }
 
 /// 文本与图片按课业背景、材料、题目排列，协议层只负责编码。
-pub(super) fn assemble(batch: &Batch, images: Vec<Image>) -> Result<Prompt> {
-    let system = instructions(batch)?;
+pub(super) fn assemble(batch: &Batch, images: Vec<Image>, system: String) -> Result<Prompt> {
     let mut parts = Vec::new();
     let context = serde_json::to_value(&batch.context)?;
     if context.as_object().is_some_and(|value| !value.is_empty()) {
@@ -101,7 +100,7 @@ fn append_images(parts: &mut Vec<Part>, images: impl Iterator<Item = Image>) {
 
 pub(super) async fn build(batch: &Batch) -> Result<Prompt> {
     // 先检查题型，避免不支持的批次仍下载图片。
-    instructions(batch)?;
+    let system = instructions(batch)?;
     let sources: Vec<_> = batch
         .materials
         .iter()
@@ -113,7 +112,7 @@ pub(super) async fn build(batch: &Batch) -> Result<Prompt> {
             )
         }))
         .collect();
-    assemble(batch, media::load(&sources).await?)
+    assemble(batch, media::load(&sources).await?, system)
 }
 
 #[cfg(test)]
