@@ -6,7 +6,18 @@ body:
     attributes:
       value: |
         请先查看[故障排查](https://github.com/unraous/uxuescript/blob/main/docs/troubleshooting.md)及已有 Issue。
-        日志和截图请移除密钥、账号与 URL 中的令牌，无需提供登录凭据或整份配置文件。
+        日志和截图请移除密钥、账号与 URL 中的令牌，不要在公开 Issue 中填写登录凭据或上传整份配置文件。
+  - type: dropdown
+    id: account
+    attributes:
+      label: 是否方便提供超星账号协助排查？
+      description: 部分页面问题需要进入实际课程复现，才能查看页面并定位问题。如方便，请将微信或 QQ 联系方式发送至 unraous@qq.com，维护者会联系你并通过学习通扫码登录，无需提供账号或密码。不方便也可以继续提交反馈，请勿在公开 Issue 中填写登录凭据。
+      options:
+        - 方便，愿意通过邮件联系并扫码协助
+        - 不方便提供
+        - 暂不确定
+    validations:
+      required: true
   - type: input
     id: version
     attributes:
