@@ -72,6 +72,13 @@ export const handleTab = async (chapterDoc) => {
   );
   for (const [index, container] of containers.entries()) {
     const taskInfo = `第 ${index + 1}/${containers.length} 个任务点`;
+    const hasWatchDuration = container
+      .querySelector(SELECTORS.taskPoint.condition)
+      ?.textContent?.includes("观看时长");
+    if (hasWatchDuration) {
+      config.lockSpeed = null;
+      console.warn(`${taskInfo} 有观看时长要求，关闭后续倍速锁定`);
+    }
     await wait.element(
       null,
       SELECTORS.taskPoint.iframeTag,

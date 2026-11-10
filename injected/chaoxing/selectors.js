@@ -163,6 +163,7 @@ export const SELECTORS = {
     finishedClass: "ans-job-finished",
     containerSelector: ".ans-attach-ct:has(.ans-job-icon)",
     attachmentSelector: ".ans-attach-ct:has(iframe)",
+    condition: ".ans-job-icon .task-condition",
     iframeTag: "iframe",
   },
   frames: {

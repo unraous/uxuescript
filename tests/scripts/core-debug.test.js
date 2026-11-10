@@ -39,6 +39,7 @@ function setup(debugTypes, hasBackend = true) {
     debugTaskTypes: debugTypes,
     hasBackend,
     switchingCd: null,
+    lockSpeed: null,
   });
   vi.spyOn(window, "confirm").mockReturnValue(true);
   const error = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -119,6 +120,54 @@ describe("audio task dispatch", () => {
     expect(page.handlers.Audio).toHaveBeenCalledOnce();
     expect(page.handlers.Video).not.toHaveBeenCalled();
     expect(page.observe).not.toHaveBeenCalled();
+  });
+});
+describe("watch duration tasks", () => {
+  it("disables speed locking for the task and subsequent tasks", async () => {
+    const page = setup([]);
+    config.lockSpeed = 2;
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const task = page.add("video", true);
+    task.querySelector(".ans-job-icon").innerHTML =
+      '<span class="task-condition">观看时长需 ≥ 总时长的 90%</span>';
+    page.add("video", true);
+    vi.mocked(page.handlers.Video).mockImplementation(async () => {
+      expect(config.lockSpeed).toBeNull();
+    });
+
+    await page.run();
+
+    expect(page.handlers.Video).toHaveBeenCalledTimes(2);
+    expect(warning).toHaveBeenCalledWith(
+      expect.stringContaining("有观看时长要求，关闭后续倍速锁定"),
+    );
+    expect(config.lockSpeed).toBeNull();
+  });
+
+  it("recognizes the requirement on a completed task before skipping it", async () => {
+    const page = setup([]);
+    config.lockSpeed = 2;
+    const task = page.add("video", true, true);
+    task.querySelector(".ans-job-icon").innerHTML =
+      '<span class="task-condition">观看时长需 ≥ 总时长的 90%</span>';
+    page.add("video", true);
+
+    await page.run();
+
+    expect(page.handlers.Video).toHaveBeenCalledOnce();
+    expect(config.lockSpeed).toBeNull();
+  });
+
+  it("leaves speed locking unchanged for other task conditions", async () => {
+    const page = setup([]);
+    config.lockSpeed = 2;
+    const task = page.add("video", true);
+    task.querySelector(".ans-job-icon").innerHTML =
+      '<span class="task-condition">其他要求</span>';
+
+    await page.run();
+
+    expect(config.lockSpeed).toBe(2);
   });
 });
 describe("debug task selection", () => {
