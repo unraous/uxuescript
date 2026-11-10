@@ -20,7 +20,7 @@ const classifyTask = (taskDoc) => {
   return "Other";
 };
 
-/** @type {Partial<Record<ReturnType<typeof classifyTask>, (document: Document) => Promise<void>>>} */
+/** @type {Partial<Record<ReturnType<typeof classifyTask>, (document: Document, container: Element) => Promise<void>>>} */
 const handlers = {
   Video: handleVideo,
   Audio: handleAudio,
@@ -104,7 +104,7 @@ export const handleTab = async (chapterDoc) => {
       if (type === "Quiz" || type === "Classroom")
         assert(config.hasBackend, `未开启后端服务，无法处理${type}任务点`);
 
-      await handler(taskDoc);
+      await handler(taskDoc, container);
       if (!debugging) await taskPointComplete(container);
     }, `${taskInfo} 处理异常，自动跳过，任务点类别：${type}`);
   }

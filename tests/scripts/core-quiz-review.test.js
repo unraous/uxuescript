@@ -16,7 +16,8 @@ vi.mock("@injected/utils/backend.js", () => ({
  * @param {(message: string) => boolean | Promise<boolean>} confirm
  */
 async function setup(enabled, confirm) {
-  const submit = vi.fn();
+  const container = document.createElement("div");
+  const submit = vi.fn(() => container.classList.add("ans-job-finished"));
   const setTimeout = vi.spyOn(window, "setTimeout");
   const invoke = invokeMock.mockReset().mockResolvedValue([]);
   vi.mocked(backend.confirm).mockImplementation(confirm);
@@ -42,9 +43,12 @@ async function setup(enabled, confirm) {
     return quizDoc.getElementById(id);
   });
   // Submission is already covered above; this scenario skips polling the page-owned modal.
-  vi.spyOn(wait, "until").mockResolvedValue(null);
+  vi.spyOn(wait, "until").mockImplementation(async () => ({
+    done: true,
+    doc: quizDoc,
+  }));
   return {
-    run: () => handleQuiz(quizDoc),
+    run: () => handleQuiz(quizDoc, container),
     submit,
     confirm: vi.mocked(confirm),
     setTimeout,
