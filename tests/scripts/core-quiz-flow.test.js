@@ -67,11 +67,17 @@ const setup = (pages, delayed = false) => {
     }
     return null;
   });
-  Object.assign(config, { quizReview: false, debugTaskTypes: [] });
+  Object.assign(config, {
+    quizReview: false,
+    debugTaskTypes: [],
+    switchingCd: null,
+  });
   vi.mocked(answerPage).mockResolvedValue([]);
   return { run: () => handleQuiz(taskDoc, container), attempts, container };
 };
+const originalCd = config.switchingCd;
 afterEach(() => {
+  config.switchingCd = originalCd;
   vi.restoreAllMocks();
   vi.useRealTimers();
   vi.clearAllMocks();

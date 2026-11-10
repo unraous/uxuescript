@@ -1,3 +1,4 @@
+import { cooldown } from "@injected/chaoxing/runtime.js";
 import { wait, assert } from "@injected/utils/async.js";
 import { fillEditor } from "./editor.js";
 import { classifyQuestion } from "./extract.js";
@@ -129,6 +130,7 @@ const fillShort = async (quizDiv, content, selector, save) => {
  * @returns {Promise<void>}
  */
 export const fillAnswer = async (node, content, selectors) => {
+  await cooldown();
   const kind = classifyQuestion(
     selectors.kindName ?? node.querySelector(selectors.kind).textContent,
   );

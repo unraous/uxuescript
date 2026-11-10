@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { config } from "@injected/chaoxing/runtime.js";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import matchingHtml from "../fixtures/chaoxing/exam-matching.html?raw";
@@ -8,6 +9,7 @@ import { parseFolio, questions } from "@injected/chaoxing/questions/folio.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
 import { fillAnswer } from "@injected/chaoxing/questions/fill.js";
 import { fillMatching } from "@injected/chaoxing/questions/matching.js";
+import { applyAnswers } from "@injected/chaoxing/questions/page.js";
 
 const matchingAnswer = "1:G;2:A;3:B;4:D;5:F;6:I;7:C;8:E;9:H";
 
@@ -36,9 +38,60 @@ function recordChoices(node) {
   return clicks;
 }
 
+/** @type {number|null} */
+let originalCd;
+beforeEach(() => {
+  originalCd = config.switchingCd;
+  config.switchingCd = null;
+});
+
 afterEach(() => {
+  config.switchingCd = originalCd;
+  vi.restoreAllMocks();
+  vi.useRealTimers();
   document.body.innerHTML = "";
   vi.unstubAllGlobals();
+});
+
+it("waits once per ordinary and matching question during page filling", async () => {
+  vi.useFakeTimers();
+  vi.spyOn(Math, "random").mockReturnValue(0.5);
+  config.switchingCd = 1;
+  document.body.innerHTML = singleHtml + matchingHtml;
+  const [single, matching] = document.querySelectorAll(
+    ".questionLi.singleQuesId",
+  );
+  for (const element of single.querySelectorAll("[onclick]"))
+    element.removeAttribute("onclick");
+  const singleQuestion = extractQuestion(single, SELECTORS.workExam);
+  const matchingQuestion = extractQuestion(matching, SELECTORS.workExam);
+  const singleClicks = vi.fn();
+  single.addEventListener("click", singleClicks);
+  const matchingClicks = recordChoices(matching);
+  const folio =
+    /** @type {import("@injected/chaoxing/questions/folio.js").Folio} */ ({
+      entries: [singleQuestion, matchingQuestion].map((question) => ({
+        type: "question",
+        data: question,
+      })),
+      font: null,
+    });
+  const anchors = new Map([
+    [singleQuestion.id, { node: single, selectors: SELECTORS.workExam }],
+    [matchingQuestion.id, { node: matching, selectors: SELECTORS.workExam }],
+  ]);
+  const run = applyAnswers(folio, anchors, [
+    { index: singleQuestion.id, content: "A", explanation: "" },
+    { index: matchingQuestion.id, content: matchingAnswer, explanation: "" },
+  ]);
+  await vi.advanceTimersByTimeAsync(999);
+  expect(singleClicks).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(singleClicks).toHaveBeenCalledOnce();
+  expect(matchingClicks).toHaveLength(0);
+  await vi.advanceTimersByTimeAsync(1000);
+  await run;
+  expect(matchingClicks).toHaveLength(9);
 });
 
 describe.each([

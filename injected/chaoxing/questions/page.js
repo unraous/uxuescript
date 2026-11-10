@@ -51,10 +51,10 @@ export const applyAnswers = async (folio, anchors, answers) => {
     }
     const { node, selectors } = anchors.get(question.id);
     const answer = byNumber.get(question.id);
-    await cooldown();
-    if (kind === QuestionType.Matching)
+    if (kind === QuestionType.Matching) {
+      await cooldown();
       fillMatching(node, question.options, answer.content);
-    else await fillAnswer(node, answer.content, selectors);
+    } else await fillAnswer(node, answer.content, selectors);
   }
   return skipped;
 };

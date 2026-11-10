@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { config } from "@injected/chaoxing/runtime.js";
 import {
   createRetryState,
   fillRetry,
@@ -39,7 +40,35 @@ const selected = (doc) =>
     ).join(""),
   );
 
+/** @type {number|null} */
+let originalCd;
+beforeEach(() => {
+  originalCd = config.switchingCd;
+  config.switchingCd = null;
+});
+afterEach(() => {
+  config.switchingCd = originalCd;
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
+
 describe("chapter quiz retry", () => {
+  it("waits before filling each retry answer", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    config.switchingCd = 1;
+    const doc = page(
+      question("单选", ["A", "B"], "B") + question("单选", ["A", "B"], "B"),
+    );
+    const run = fillRetry(doc, createRetryState(), false);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(selected(doc)).toEqual(["B", "B"]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(selected(doc)).toEqual(["A", "B"]);
+    await vi.advanceTimersByTimeAsync(1000);
+    await run;
+    expect(selected(doc)).toEqual(["A", "A"]);
+  });
   it("retains correct answers and changes wrong answers using feedback", async () => {
     const state = createRetryState();
     const first = page(
