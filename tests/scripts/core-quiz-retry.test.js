@@ -60,7 +60,9 @@ describe("chapter quiz retry", () => {
     const doc = page(
       question("单选", ["A", "B"], "B") + question("单选", ["A", "B"], "B"),
     );
-    const run = fillRetry(doc, createRetryState(), false);
+    const state = createRetryState();
+    recordSubmission(doc, state);
+    const run = fillRetry(doc, state, false);
     await vi.advanceTimersByTimeAsync(999);
     expect(selected(doc)).toEqual(["B", "B"]);
     await vi.advanceTimersByTimeAsync(1);
@@ -102,6 +104,32 @@ describe("chapter quiz retry", () => {
       if (i < 3) await fillRetry(doc, state, false);
     }
     expect(attempts).toEqual(["A-A", "A-B", "B-A", "B-B"]);
+    await expect(fillRetry(doc, state, false)).rejects.toThrow(
+      "答案组合已用尽",
+    );
+  });
+  it("keeps the first multiple-choice answer while trying single choices, then tries larger sets first", async () => {
+    const state = createRetryState();
+    const doc = page(
+      question("单选", ["A", "B"], "B") +
+        question("多选", ["A", "B", "C"], "AC") +
+        question("单选", ["A", "B"], "B"),
+    );
+    recordSubmission(doc, state);
+    const attempts = [];
+    for (let i = 0; i < 27; i++) {
+      await fillRetry(doc, state, false);
+      attempts.push(selected(doc));
+      recordSubmission(doc, state);
+    }
+    expect(attempts.slice(0, 3)).toEqual([
+      ["A", "AC", "A"],
+      ["A", "AC", "B"],
+      ["B", "AC", "A"],
+    ]);
+    expect(
+      attempts.filter((_, index) => index % 4 === 3).map((answer) => answer[1]),
+    ).toEqual(["ABC", "AB", "BC", "A", "B", "C"]);
     await expect(fillRetry(doc, state, false)).rejects.toThrow(
       "答案组合已用尽",
     );

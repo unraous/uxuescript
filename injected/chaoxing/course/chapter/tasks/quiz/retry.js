@@ -6,12 +6,13 @@ import { SELECTORS } from "@injected/chaoxing/selectors.js";
 
 /** @typedef {{answer: string, mark: string}} Feedback */
 /** @typedef {{wrong: Set<string>, right: string|null, half: string|null}} QuestionState */
-/** @typedef {{questions: QuestionState[], combinations: Set<string>}} RetryState */
+/** @typedef {{questions: QuestionState[], combinations: Set<string>, firstAnswers: string[]}} RetryState */
 
 /** @returns {RetryState} */
 export const createRetryState = () => ({
   questions: [],
   combinations: new Set(),
+  firstAnswers: [],
 });
 
 /** @param {Element} node */
@@ -70,6 +71,7 @@ const readFeedback = (node) => {
 export const recordSubmission = (doc, state) => {
   const nodes = Array.from(doc.querySelectorAll(SELECTORS.quiz.question));
   const answers = nodes.map(selectedAnswer);
+  if (!state.combinations.size) state.firstAnswers = answers;
   state.combinations.add(JSON.stringify(answers));
 };
 
@@ -134,8 +136,8 @@ const updateFeedback = (nodes, state) => {
   }
 };
 
-/** @param {Element[]} nodes @param {RetryState} state */
-const chooseAnswers = (nodes, state) => {
+/** @param {Element[]} nodes @param {RetryState} state @param {boolean} hasFeedback */
+const chooseAnswers = (nodes, state, hasFeedback) => {
   const candidates = nodes.map((node, index) =>
     candidatesFor(node, state.questions[index]),
   );
@@ -143,13 +145,31 @@ const chooseAnswers = (nodes, state) => {
     candidates.every((list) => list.length),
     "测验可尝试的答案已用尽",
   );
+  const order = nodes.map((_, index) => index);
+  if (!hasFeedback) {
+    const kinds = nodes.map((node) => optionsFor(node).kind);
+    for (const [index, list] of candidates.entries()) {
+      if (kinds[index] !== QuestionType.MultipleChoice) continue;
+      list.sort((a, b) => b.length - a.length);
+      const first = list.indexOf(state.firstAnswers[index]);
+      if (first >= 0) list.unshift(...list.splice(first, 1));
+    }
+    order.sort(
+      (a, b) =>
+        Number(kinds[b] === QuestionType.MultipleChoice) -
+        Number(kinds[a] === QuestionType.MultipleChoice),
+    );
+  }
   const indexes = candidates.map(() => 0);
   let answers = candidates.map((list) => list[0]);
   while (state.combinations.has(JSON.stringify(answers))) {
-    let index = indexes.length - 1;
-    while (index >= 0 && ++indexes[index] >= candidates[index].length)
-      indexes[index--] = 0;
-    assert(index >= 0, "测验可尝试的答案组合已用尽");
+    let position = order.length - 1;
+    while (
+      position >= 0 &&
+      ++indexes[order[position]] >= candidates[order[position]].length
+    )
+      indexes[order[position--]] = 0;
+    assert(position >= 0, "测验可尝试的答案组合已用尽");
     answers = candidates.map((list, i) => list[indexes[i]]);
   }
   return answers;
@@ -163,7 +183,7 @@ export const fillRetry = async (doc, state, hasFeedback) => {
     state.questions[index] ??= { wrong: new Set(), right: null, half: null };
   }
   if (hasFeedback) updateFeedback(nodes, state);
-  const answers = chooseAnswers(nodes, state);
+  const answers = chooseAnswers(nodes, state, hasFeedback);
   for (const [index, answer] of answers.entries()) {
     if (answer) await fillAnswer(nodes[index], answer, SELECTORS.quiz);
   }
