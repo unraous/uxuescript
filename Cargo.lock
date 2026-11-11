@@ -4903,6 +4903,7 @@ dependencies = [
  "dotenv",
  "log",
  "md5",
+ "objc2-foundation",
  "parking_lot",
  "reqwest",
  "serde",

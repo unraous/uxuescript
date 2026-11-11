@@ -3,6 +3,23 @@ pub mod commands;
 pub mod config;
 pub mod core;
 
+#[cfg(target_os = "macos")]
+fn prefer_chinese_for_app() {
+    use objc2_foundation::{
+        NSArgumentDomain, NSArray, NSMutableDictionary, NSUserDefaults, ns_string,
+    };
+
+    let defaults = NSUserDefaults::standardUserDefaults();
+    // Preserve other command-line defaults; this domain exists only for this launch.
+    let arguments = NSMutableDictionary::dictionaryWithDictionary(
+        &defaults.volatileDomainForName(unsafe { NSArgumentDomain }),
+    );
+    let languages = NSArray::from_slice(&[ns_string!("zh-CN"), ns_string!("zh")]);
+    arguments.insert(ns_string!("AppleLanguages"), languages.as_ref());
+    // AppleLanguages is a property-list array of strings, as required by UserDefaults.
+    unsafe { defaults.setVolatileDomain_forName(&arguments, NSArgumentDomain) };
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(debug_assertions)]
@@ -14,6 +31,9 @@ pub fn run() {
     use commands::mask::Confirmations;
     use commands::task::TaskSession;
     use commands::updater::DownloadState;
+
+    #[cfg(target_os = "macos")]
+    prefer_chinese_for_app();
 
     #[cfg(target_os = "windows")]
     // Set before Tauri starts its worker threads, so no other thread can access the environment concurrently.
