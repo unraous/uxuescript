@@ -4,6 +4,7 @@
   "exam": "chaoxing/exam.js",
   "click-auto-login": "chaoxing/click-auto-login.js",
   "iframe-init": "chaoxing/iframe-init.js",
+  "course-redirect": "chaoxing/course-redirect.js",
   "classroom-mute": "chaoxing/classroom-mute.js",
   "course-list-metadata": "chaoxing/course-list-metadata.js",
   "webview-log": "runtime/webview-log.js"

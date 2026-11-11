@@ -84,6 +84,7 @@ pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn s
                 .background_color((242, 244, 247).into())
                 .devtools(true)
                 .initialization_script(include_script!("webview-log.js"))
+                .initialization_script_for_all_frames(include_script!("course-redirect.js"))
                 .initialization_script_for_all_frames(include_script!("iframe-init.js"))
                 .initialization_script_for_all_frames(include_script!("classroom-mute.js"))
                 .initialization_script_for_all_frames(include_script!("course-list-metadata.js"))
