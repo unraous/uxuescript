@@ -28,6 +28,24 @@ export const themes = {
     surfaceLight: "#f6eaf0",
     mode: "light",
   },
+  marigold: {
+    brand: "#89611e",
+    surface: "#f0d8a4",
+    surfaceLight: "#fff2d0",
+    mode: "light",
+  },
+  cornflower: {
+    brand: "#315f83",
+    surface: "#c8e1f0",
+    surfaceLight: "#edf7fc",
+    mode: "light",
+  },
+  charcoal: {
+    brand: "#d4d6db",
+    surface: "#252628",
+    surfaceLight: "#3c3e41",
+    mode: "dark",
+  },
   iris: {
     brand: "#c2b2ff",
     surface: "#211d35",
