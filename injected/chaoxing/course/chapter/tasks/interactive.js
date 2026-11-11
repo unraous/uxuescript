@@ -2,6 +2,9 @@ import { cooldown } from "@injected/chaoxing/runtime.js";
 import { wait, assert } from "@injected/utils/async.js";
 import { confirm } from "@injected/utils/backend.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
+import { answerCandidates } from "@injected/chaoxing/questions/candidates.js";
+import { classifyQuestion } from "@injected/chaoxing/questions/extract.js";
+import { QuestionType } from "@injected/chaoxing/questions/types.js";
 import { waitForTimeline } from "./timeline.js";
 /**
  * @typedef {Object} QuizData
@@ -29,33 +32,6 @@ const buildValidationUrl = (validationUrl, quizData, answerContent, host) => {
 };
 
 /**
- * @param {QuizData} quizData
- */
-const getAnswerCandidates = (quizData) => {
-  const optionNames = (quizData.options ?? [])
-    .map(({ name }) =>
-      String(name ?? "")
-        .trim()
-        .toUpperCase(),
-    )
-    .filter(Boolean);
-
-  /** @type {string[]} */
-  const candidates = [];
-
-  const isMulti = String(quizData.questionType ?? "").includes("多选");
-  for (const optionName of optionNames) {
-    const previous = candidates.slice();
-    candidates.push(optionName);
-    if (isMulti) {
-      for (const candidate of previous)
-        candidates.push(`${candidate},${optionName}`);
-    }
-  }
-  return candidates;
-};
-
-/**
  * @param {string} url
  */
 const requestValidation = async (url) => {
@@ -67,7 +43,7 @@ const requestValidation = async (url) => {
 };
 
 /**
- * 随机排序候选答案后逐个请求页面验证接口，首次正确即停止。
+ * 按选项数量从多到少验证候选，同数量随机排序，首次正确即停止。
  * @param {string} validationUrl 页面提供的验证地址。
  * @param {QuizData} quizData Ext 中的互动题数据，包含 options、resourceId 和 memberinfo。
  * @param {string} host 用于解析相对验证地址的页面来源。
@@ -78,14 +54,33 @@ export const resolveInteractiveQuizAnswer = async (
   quizData,
   host,
 ) => {
-  const candidates = getAnswerCandidates(quizData);
-  for (let index = candidates.length - 1; index > 0; index--) {
+  const optionNames = (quizData.options ?? [])
+    .map(({ name }) =>
+      String(name ?? "")
+        .trim()
+        .toUpperCase(),
+    )
+    .filter(Boolean);
+  const kind = classifyQuestion(quizData.questionType ?? "");
+  // Interactive quizzes historically try single options for every non-multiple type.
+  const candidateKind = [
+    QuestionType.SingleChoice,
+    QuestionType.MultipleChoice,
+    QuestionType.Judgment,
+  ].includes(kind)
+    ? kind
+    : QuestionType.SingleChoice;
+  const selections = answerCandidates(optionNames, candidateKind);
+  for (let index = selections.length - 1; index > 0; index--) {
     const target = Math.floor(Math.random() * (index + 1));
-    [candidates[index], candidates[target]] = [
-      candidates[target],
-      candidates[index],
+    [selections[index], selections[target]] = [
+      selections[target],
+      selections[index],
     ];
   }
+  const candidates = selections
+    .sort((a, b) => b.length - a.length)
+    .map((selection) => selection.join(","));
   console.info("开始验证互动题候选答案", {
     resourceId: quizData.resourceId,
     description: quizData.description,

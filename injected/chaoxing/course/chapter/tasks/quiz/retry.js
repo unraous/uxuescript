@@ -1,18 +1,18 @@
 import { assert } from "@injected/utils/async.js";
+import { answerCandidates } from "@injected/chaoxing/questions/candidates.js";
 import { classifyQuestion } from "@injected/chaoxing/questions/extract.js";
 import { fillAnswer } from "@injected/chaoxing/questions/fill.js";
 import { QuestionType } from "@injected/chaoxing/questions/types.js";
 import { SELECTORS } from "@injected/chaoxing/selectors.js";
 
 /** @typedef {{answer: string, mark: string}} Feedback */
-/** @typedef {{wrong: Set<string>, right: string|null, half: string|null}} QuestionState */
-/** @typedef {{questions: QuestionState[], combinations: Set<string>, firstAnswers: string[]}} RetryState */
+/** @typedef {{kind: number, candidates: string[], answer: string, wrong: Set<string>, right: string|null, half: string|null}} QuestionState */
+/** @typedef {{questions: QuestionState[], combinations: Set<string>}} RetryState */
 
 /** @returns {RetryState} */
 export const createRetryState = () => ({
   questions: [],
   combinations: new Set(),
-  firstAnswers: [],
 });
 
 /** @param {Element} node */
@@ -67,46 +67,52 @@ const readFeedback = (node) => {
   };
 };
 
+/** @param {Element} node @returns {QuestionState} */
+const createQuestion = (node) => {
+  const { kind, labels } = optionsFor(node);
+  const supported = [
+    QuestionType.SingleChoice,
+    QuestionType.MultipleChoice,
+    QuestionType.Judgment,
+  ].includes(kind);
+  const firstAnswer = selectedAnswer(node);
+  const candidates = supported
+    ? answerCandidates(labels, kind).map((selection) => selection.join(""))
+    : [""];
+  const first = candidates.indexOf(firstAnswer);
+  if (first >= 0) candidates.unshift(...candidates.splice(first, 1));
+  return {
+    kind,
+    candidates,
+    answer: firstAnswer,
+    wrong: new Set(),
+    right: null,
+    half: null,
+  };
+};
+
 /** @param {Document} doc @param {RetryState} state */
 export const recordSubmission = (doc, state) => {
   const nodes = Array.from(doc.querySelectorAll(SELECTORS.quiz.question));
+  if (!state.questions.length) state.questions = nodes.map(createQuestion);
   const answers = nodes.map(selectedAnswer);
-  if (!state.combinations.size) state.firstAnswers = answers;
+  for (const [index, answer] of answers.entries())
+    state.questions[index].answer = answer;
   state.combinations.add(JSON.stringify(answers));
 };
 
-/** @param {Element} node @param {QuestionState} state */
-const candidatesFor = (node, state) => {
-  const { kind, labels } = optionsFor(node);
-  if (
-    ![
-      QuestionType.SingleChoice,
-      QuestionType.MultipleChoice,
-      QuestionType.Judgment,
-    ].includes(kind)
-  )
-    return [""];
-  const max =
-    kind === QuestionType.MultipleChoice
-      ? 2 ** labels.length
-      : labels.length + 1;
-  /** @type {string[]} */
-  const candidates = [];
-  for (let i = 1; i < max; i++) {
-    const answer =
-      kind === QuestionType.MultipleChoice
-        ? labels
-            .filter((_label, index) => Math.floor(i / 2 ** index) % 2)
-            .join("")
-        : labels[i - 1];
-    if (state.right && answer !== state.right) continue;
-    if (state.wrong.has(answer)) continue;
-    if (state.half && ![...state.half].every((label) => answer.includes(label)))
-      continue;
-    candidates.push(answer);
-  }
-  return candidates;
-};
+/** @param {QuestionState} question */
+const candidatesFor = (question) =>
+  question.candidates.filter((answer) => {
+    if (question.right && answer !== question.right) return false;
+    if (question.wrong.has(answer)) return false;
+    if (
+      question.half &&
+      ![...question.half].every((label) => answer.includes(label))
+    )
+      return false;
+    return true;
+  });
 
 /** @param {Element[]} nodes @param {RetryState} state */
 const updateFeedback = (nodes, state) => {
@@ -136,42 +142,46 @@ const updateFeedback = (nodes, state) => {
   }
 };
 
-/** @param {Element[]} nodes @param {RetryState} state @param {boolean} hasFeedback */
-const chooseAnswers = (nodes, state, hasFeedback) => {
-  const candidates = nodes.map((node, index) =>
-    candidatesFor(node, state.questions[index]),
+/** @param {QuestionState} question */
+const orderedCandidates = (question) => {
+  const candidates = candidatesFor(question);
+  if (question.kind !== QuestionType.MultipleChoice) {
+    const current = candidates.indexOf(question.answer);
+    if (current >= 0) candidates.unshift(...candidates.splice(current, 1));
+  }
+  return candidates;
+};
+
+/** @param {RetryState} state */
+const chooseAnswers = (state) => {
+  // Later questions vary first: preserve multiple-choice answers while trying
+  // the single-choice and judgment combinations.
+  const questions = state.questions.map((question, index) => ({
+    question,
+    index,
+  }));
+  questions.sort(
+    (a, b) =>
+      Number(b.question.kind === QuestionType.MultipleChoice) -
+      Number(a.question.kind === QuestionType.MultipleChoice),
   );
-  assert(
-    candidates.every((list) => list.length),
-    "测验可尝试的答案已用尽",
-  );
-  const order = nodes.map((_, index) => index);
-  if (!hasFeedback) {
-    const kinds = nodes.map((node) => optionsFor(node).kind);
-    for (const [index, list] of candidates.entries()) {
-      if (kinds[index] !== QuestionType.MultipleChoice) continue;
-      list.sort((a, b) => b.length - a.length);
-      const first = list.indexOf(state.firstAnswers[index]);
-      if (first >= 0) list.unshift(...list.splice(first, 1));
+  const answers = state.questions.map((question) => question.answer);
+
+  /** @param {number} position @returns {boolean} */
+  const select = (position) => {
+    if (position === questions.length)
+      return !state.combinations.has(JSON.stringify(answers));
+    const { question, index } = questions[position];
+    const candidates = orderedCandidates(question);
+    assert(candidates.length, "测验可尝试的答案已用尽");
+    for (const answer of candidates) {
+      answers[index] = answer;
+      if (select(position + 1)) return true;
     }
-    order.sort(
-      (a, b) =>
-        Number(kinds[b] === QuestionType.MultipleChoice) -
-        Number(kinds[a] === QuestionType.MultipleChoice),
-    );
-  }
-  const indexes = candidates.map(() => 0);
-  let answers = candidates.map((list) => list[0]);
-  while (state.combinations.has(JSON.stringify(answers))) {
-    let position = order.length - 1;
-    while (
-      position >= 0 &&
-      ++indexes[order[position]] >= candidates[order[position]].length
-    )
-      indexes[order[position--]] = 0;
-    assert(position >= 0, "测验可尝试的答案组合已用尽");
-    answers = candidates.map((list, i) => list[indexes[i]]);
-  }
+    return false;
+  };
+
+  assert(select(0), "测验可尝试的答案组合已用尽");
   return answers;
 };
 
@@ -179,11 +189,8 @@ const chooseAnswers = (nodes, state, hasFeedback) => {
 export const fillRetry = async (doc, state, hasFeedback) => {
   const nodes = Array.from(doc.querySelectorAll(SELECTORS.quiz.question));
   assert(nodes.length, "重做页面未找到测验题目");
-  for (const [index] of nodes.entries()) {
-    state.questions[index] ??= { wrong: new Set(), right: null, half: null };
-  }
   if (hasFeedback) updateFeedback(nodes, state);
-  const answers = chooseAnswers(nodes, state, hasFeedback);
+  const answers = chooseAnswers(state);
   for (const [index, answer] of answers.entries()) {
     if (answer) await fillAnswer(nodes[index], answer, SELECTORS.quiz);
   }

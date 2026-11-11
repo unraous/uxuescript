@@ -66,10 +66,10 @@ describe("chapter quiz retry", () => {
     await vi.advanceTimersByTimeAsync(999);
     expect(selected(doc)).toEqual(["B", "B"]);
     await vi.advanceTimersByTimeAsync(1);
-    expect(selected(doc)).toEqual(["A", "B"]);
+    expect(selected(doc)).toEqual(["B", "B"]);
     await vi.advanceTimersByTimeAsync(1000);
     await run;
-    expect(selected(doc)).toEqual(["A", "A"]);
+    expect(selected(doc)).toEqual(["B", "A"]);
   });
   it("retains correct answers and changes wrong answers using feedback", async () => {
     const state = createRetryState();
@@ -83,14 +83,24 @@ describe("chapter quiz retry", () => {
         question("多选", ["A", "B", "C"], "AB", feedback("A,B", "cuo")),
     );
     await fillRetry(result, state, true);
-    expect(selected(result)).toEqual(["B", "A"]);
+    expect(selected(result)).toEqual(["B", "ABC"]);
     recordSubmission(result, state);
     const next = page(
       question("单选", ["A", "B", "C"], "B", feedback("B", "dui")) +
-        question("多选", ["A", "B", "C"], "A", feedback("A", "bandui")),
+        question("多选", ["A", "B", "C"], "ABC", feedback("A,B,C", "cuo")),
     );
     await fillRetry(next, state, true);
     expect(selected(next)).toEqual(["B", "AC"]);
+  });
+  it("extends a partially correct multiple-choice answer", async () => {
+    const state = createRetryState();
+    const first = page(question("多选", ["A", "B", "C"], "A"));
+    recordSubmission(first, state);
+    const result = page(
+      question("多选", ["A", "B", "C"], "A", feedback("A", "bandui")),
+    );
+    await fillRetry(result, state, true);
+    expect(selected(result)).toEqual(["ABC"]);
   });
   it("tries distinct combinations when there is no feedback and stops after exhaustion", async () => {
     const state = createRetryState();
@@ -103,7 +113,7 @@ describe("chapter quiz retry", () => {
       recordSubmission(doc, state);
       if (i < 3) await fillRetry(doc, state, false);
     }
-    expect(attempts).toEqual(["A-A", "A-B", "B-A", "B-B"]);
+    expect(attempts).toEqual(["A-A", "A-B", "B-B", "B-A"]);
     await expect(fillRetry(doc, state, false)).rejects.toThrow(
       "答案组合已用尽",
     );
@@ -123,9 +133,9 @@ describe("chapter quiz retry", () => {
       recordSubmission(doc, state);
     }
     expect(attempts.slice(0, 3)).toEqual([
+      ["B", "AC", "A"],
       ["A", "AC", "A"],
       ["A", "AC", "B"],
-      ["B", "AC", "A"],
     ]);
     expect(
       attempts.filter((_, index) => index % 4 === 3).map((answer) => answer[1]),

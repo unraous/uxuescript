@@ -82,20 +82,25 @@ describe("course cooldown", () => {
       expect(api.setTimeout).toHaveBeenCalledTimes(cd === null ? 0 : 2);
     },
   );
-  it("reports failure after exhausting candidates", async () => {
-    const api = setup();
-    api.fetch.mockImplementation(async () => Response.json({ isRight: false }));
-    await expect(
-      api.resolveInteractiveQuizAnswer(
-        "/validate",
-        quiz,
-        "https://example.com",
-      ),
-    ).rejects.toThrow("互动题验证未返回正确答案（候选数：3）");
-    expect(api.fetch).toHaveBeenCalledTimes(3);
-  });
-  it("shuffles validation order while retaining every multiple-choice candidate", async () => {
-    const api = setup(null, 0);
+  it.each([undefined, "填空题"])(
+    "tries single options for type %s",
+    async (questionType) => {
+      const api = setup();
+      api.fetch.mockImplementation(async () =>
+        Response.json({ isRight: false }),
+      );
+      await expect(
+        api.resolveInteractiveQuizAnswer(
+          "/validate",
+          { ...quiz, questionType },
+          "https://example.com",
+        ),
+      ).rejects.toThrow("互动题验证未返回正确答案（候选数：3）");
+      expect(api.fetch).toHaveBeenCalledTimes(3);
+    },
+  );
+  it("tries larger multiple-choice selections first and shuffles ties", async () => {
+    const api = setup(null, 0.5);
     const data = { ...quiz, questionType: "多选题" };
     const original = JSON.stringify(data);
     api.fetch.mockImplementation(async () => Response.json({ isRight: false }));
@@ -112,6 +117,10 @@ describe("course cooldown", () => {
     const candidates = ["A", "B", "A,B", "C", "A,C", "B,C", "A,B,C"];
     expect(order).not.toEqual(candidates);
     expect([...order].sort()).toEqual([...candidates].sort());
+    expect(order.map((answer) => answer.split(",").length)).toEqual([
+      3, 2, 2, 2, 1, 1, 1,
+    ]);
+    expect(order.slice(4)).toEqual(["B", "A", "C"]);
     expect(JSON.stringify(data)).toBe(original);
   });
   it("stops on a failed request", async () => {
