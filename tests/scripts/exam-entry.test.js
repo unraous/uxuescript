@@ -78,6 +78,7 @@ it("solves the full page once, fills by displayed number and reports unsupported
   expect(preview).not.toHaveBeenCalled();
   expect(answerPaged).not.toHaveBeenCalled();
   expect(backend.invoke).toHaveBeenLastCalledWith("solve_questions", {
+    allowPartial: true,
     payload: {
       entries: [
         {

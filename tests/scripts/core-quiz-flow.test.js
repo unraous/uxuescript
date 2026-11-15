@@ -85,6 +85,14 @@ afterEach(() => {
 });
 
 describe("chapter quiz submission loop", () => {
+  it("stops without submitting when the strict model request fails", async () => {
+    const page = quizPage(false, "A");
+    const flow = setup([page]);
+    vi.mocked(answerPage).mockRejectedValueOnce(new Error("模型求解失败"));
+    await expect(flow.run()).rejects.toThrow("模型求解失败");
+    expect(answerPage).toHaveBeenCalledWith(page, expect.any(Object), false);
+    expect(flow.attempts).toEqual([]);
+  });
   it("records the manually reviewed answer and retries without answer feedback until the task is complete", async () => {
     const first = quizPage(false, "A");
     const result = quizPage(true, "B");

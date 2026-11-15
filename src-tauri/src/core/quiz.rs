@@ -14,7 +14,7 @@ use crate::config::{CONFIG, solver::SolverKind};
 use anyhow::Result;
 
 /// 根据本次入口选定的求解方式生成测验答案。
-pub async fn solve(payload: Folio) -> Result<Vec<AnswerItem>> {
+pub async fn solve(payload: Folio, allow_partial: bool) -> Result<Vec<AnswerItem>> {
     let solver = *CONFIG.solver.lock();
     match solver {
         SolverKind::NativeLlm => {
@@ -32,7 +32,7 @@ pub async fn solve(payload: Folio) -> Result<Vec<AnswerItem>> {
                 .cloned()
                 .ok_or_else(|| anyhow::anyhow!("大模型提供商 [{}] 不存在", active_id))?;
             let general = *CONFIG.general.lock();
-            llm::solve(&provider, decrypted, general).await
+            llm::solve(&provider, decrypted, general, allow_partial).await
         }
         SolverKind::DeepSeekWeb => anyhow::bail!("DeepSeek Web Solver 尚未接入"),
     }

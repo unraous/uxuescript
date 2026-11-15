@@ -48,6 +48,7 @@ pub async fn healthy() -> CommandsResult<String> {
             ..Default::default()
         },
         general,
+        false,
     )
     .await
     .map_err(|error| anyhow::anyhow!("{error:#}"))?;
@@ -59,8 +60,11 @@ pub async fn healthy() -> CommandsResult<String> {
 mod tests;
 
 #[uxs_commands::command(webview = "chaoxing")]
-pub async fn solve_questions(payload: Folio) -> CommandsResult<Vec<AnswerItem>> {
-    match solve(payload).await {
+pub async fn solve_questions(
+    payload: Folio,
+    allow_partial: bool,
+) -> CommandsResult<Vec<AnswerItem>> {
+    match solve(payload, allow_partial).await {
         Ok(answers) => {
             log::info!("solve_questions 答题成功，获得答案数量: {}", answers.len());
             Ok(answers)

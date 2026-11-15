@@ -30,7 +30,7 @@ export const handleQuiz = async (taskDoc, container) => {
   ) {
     const stage = quizStage(quizDoc);
     if (stage === "model") {
-      const skipped = await answerPage(quizDoc, SELECTORS.quiz);
+      const skipped = await answerPage(quizDoc, SELECTORS.quiz, false);
       assert(
         skipped.length === 0,
         `存在未支持题型，停止提交：${skipped.join("、")}`,

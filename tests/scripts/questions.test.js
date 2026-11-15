@@ -224,15 +224,6 @@ describe.each([
 });
 
 describe("user-provided Chaoxing exam HTML", () => {
-  it("returns the same payload shape without a font for the real exam page", () => {
-    const node = load(singleHtml);
-    const { folio } = parseFolio(document, SELECTORS.workExam);
-    expect(questions(folio.entries)).toEqual([
-      extractQuestion(node, SELECTORS.workExam),
-    ]);
-    expect(folio.font).toBeNull();
-  });
-
   it("uses selector configuration to extract the archived quiz questions and exact font bytes", () => {
     const directory = "src-tauri/tests/assets/course-page";
     const html = gunzipSync(

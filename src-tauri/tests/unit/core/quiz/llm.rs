@@ -14,7 +14,7 @@ async fn solve(
     provider: &LLMProvider,
     questions: Vec<Question>,
 ) -> anyhow::Result<Vec<AnswerItem>> {
-    super::solve(provider, folio(questions), Default::default()).await
+    super::solve(provider, folio(questions), Default::default(), false).await
 }
 
 fn folio(questions: Vec<Question>) -> Folio {
@@ -37,6 +37,44 @@ fn questions(count: usize) -> Vec<Question> {
             images: Vec::new(),
         })
         .collect()
+}
+
+#[tokio::test]
+async fn partial_mode_keeps_successful_batches_after_failure() {
+    use crate::test_support::http::serve_sequence;
+    let valid = response(
+        &LLMProtocol::OpenAIChatCompletions,
+        json!({"answers": (1..=5).map(|id| json!({"index":id.to_string(),"explanation":"mock","content":"A"})).collect::<Vec<_>>()}),
+    );
+    let (url, requests) = serve_sequence(vec![
+        (200, valid),
+        (
+            400,
+            json!({"error":{"code":"1301","message":"rejected"}}).to_string(),
+        ),
+    ])
+    .await;
+    let mut provider = crate::config::llm::LLMConfig::default()
+        .providers
+        .into_inner()
+        .remove("bigmodel")
+        .unwrap();
+    provider.base_url = url;
+    let settings = GeneralConfig {
+        concurrency: std::num::NonZeroU32::new(1).unwrap(),
+        ..Default::default()
+    };
+    let answers = super::solve(&provider, folio(questions(6)), settings, true)
+        .await
+        .unwrap();
+    assert_eq!(
+        answers
+            .iter()
+            .map(|item| item.index.as_str())
+            .collect::<Vec<_>>(),
+        vec!["1", "2", "3", "4", "5"]
+    );
+    assert_eq!(requests.await.unwrap().len(), 2);
 }
 
 #[tokio::test]
@@ -110,6 +148,18 @@ async fn invalid_json_retries_are_bounded_and_rejections_are_not_retried() {
     .await;
     provider.base_url = url;
     let error = solve(&provider, questions(1)).await.unwrap_err();
+    assert!(error.to_string().contains("1301"));
+    request.await.unwrap();
+
+    let (url, request) = serve(
+        400,
+        json!({"error":{"code":"1301","message":"内容审核拒绝"}}).to_string(),
+    )
+    .await;
+    provider.base_url = url;
+    let error = super::solve(&provider, folio(questions(1)), Default::default(), true)
+        .await
+        .unwrap_err();
     assert!(error.to_string().contains("1301"));
     request.await.unwrap();
 }
@@ -383,7 +433,7 @@ async fn general_config_controls_batch_size() {
         batch_size: std::num::NonZeroU32::new(2).unwrap(),
         ..Default::default()
     };
-    let answers = super::solve(&provider, folio(questions(3)), settings)
+    let answers = super::solve(&provider, folio(questions(3)), settings, false)
         .await
         .unwrap();
     assert_eq!(answers.len(), 3);

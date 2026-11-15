@@ -201,10 +201,25 @@ describe("homework takeover", () => {
     });
     expect(page.submit).not.toHaveBeenCalled();
   });
+  it("saves successful answers and reports missing question numbers", async () => {
+    const page = await setup({ answers: [{ index: "1", content: "B" }] });
+    await flushPromises();
+    expect(
+      /** @type {HTMLInputElement} */ (
+        document.querySelector("#answer406063260")
+      ).value,
+    ).toBe("B");
+    expect(page.saveWork).toHaveBeenCalledOnce();
+    page.saveWork.mock.calls[0][0].success();
+    await page.run;
+    expect(page.invoke).toHaveBeenLastCalledWith("confirm", {
+      message: expect.stringContaining(
+        "需人工处理的题号：2、3、4、5、6、7、8、9、10、11",
+      ),
+    });
+  });
   it.each([
     { solveError: "模型不可用" },
-    { answers: [] },
-    { answers: stems.map(() => ({ index: "1", content: "A" })) },
     {
       answers: stems.map((_, i) => ({
         index: String(i + 1),
