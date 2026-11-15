@@ -109,7 +109,7 @@ async fn web_solver_reports_not_connected_without_native_provider() {
     let error = probe_with_solver(
         None,
         crate::config::solver::SolverKind::DeepSeekWeb,
-        super::solve_questions(solver_payload()),
+        super::solve_questions(solver_payload(), false),
     )
     .await
     .unwrap_err();
@@ -127,7 +127,7 @@ async fn web_solver_does_not_validate_native_models() {
         let error = probe_with_solver(
             Some(&provider),
             crate::config::solver::SolverKind::DeepSeekWeb,
-            super::solve_questions(solver_payload()),
+            super::solve_questions(solver_payload(), false),
         )
         .await
         .unwrap_err();
@@ -146,7 +146,7 @@ async fn web_solver_does_not_send_native_api_requests() {
     let result = probe_with_solver(
         Some(&provider(protocol, url)),
         crate::config::solver::SolverKind::DeepSeekWeb,
-        super::solve_questions(solver_payload()),
+        super::solve_questions(solver_payload(), false),
     )
     .await;
     let sent_native_request = requests.is_finished();
@@ -166,7 +166,7 @@ async fn web_solver_reports_not_connected_even_for_an_empty_folio() {
     let error = probe_with_solver(
         None,
         crate::config::solver::SolverKind::DeepSeekWeb,
-        super::solve_questions(Folio::default()),
+        super::solve_questions(Folio::default(), false),
     )
     .await
     .unwrap_err();
@@ -187,7 +187,7 @@ async fn native_solver_keeps_all_protocols_on_the_solve_questions_entry() {
         let (url, request) = serve(200, body).await;
         let result = probe_with(
             &provider(protocol, url),
-            super::solve_questions(solver_payload()),
+            super::solve_questions(solver_payload(), false),
         )
         .await
         .unwrap();
@@ -207,7 +207,7 @@ async fn native_solver_keeps_empty_folio_and_provider_validation() {
         let error = probe_with_solver(
             None,
             crate::config::solver::SolverKind::NativeLlm,
-            super::solve_questions(payload),
+            super::solve_questions(payload, false),
         )
         .await
         .unwrap_err();
@@ -218,7 +218,7 @@ async fn native_solver_keeps_empty_folio_and_provider_validation() {
         "http://127.0.0.1:1".into(),
     );
     native.chosen_model = None;
-    let error = probe_with(&native, super::solve_questions(solver_payload()))
+    let error = probe_with(&native, super::solve_questions(solver_payload(), false))
         .await
         .unwrap_err();
     assert!(error.to_string().contains("选择有效模型"));
