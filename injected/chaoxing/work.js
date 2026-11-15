@@ -37,7 +37,7 @@ export const main = async () => {
     )
       return;
     const form = await wait.element(null, SELECTORS.workExam.form, document);
-    skipped = await answerPage(form, SELECTORS.workExam);
+    skipped = await answerPage(form, SELECTORS.workExam, true);
     await saveWork();
   } catch (error) {
     console.error("作业处理失败", error);

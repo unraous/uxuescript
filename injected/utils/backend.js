@@ -1,7 +1,7 @@
 /**
  * @typedef {typeof import("../../src/services/cmds").commands} Commands
  * @typedef {(command: "options") => ReturnType<Commands["options"]>} OptionsInvoke
- * @typedef {(command: "solve_questions", args: {payload: Parameters<Commands["solveQuestions"]>[0]}) => ReturnType<Commands["solveQuestions"]>} SolveInvoke
+ * @typedef {(command: "solve_questions", args: {payload: Parameters<Commands["solveQuestions"]>[0], allowPartial: boolean}) => ReturnType<Commands["solveQuestions"]>} SolveInvoke
  * @typedef {(command: "confirm", args: {message: string, options?: Partial<import("../../src/services/cmds").ConfirmOptions> | null}) => Promise<boolean>} ConfirmInvoke
  * @typedef {(command: "send_status", args: {status: Parameters<Commands["sendStatus"]>[0]}) => ReturnType<Commands["sendStatus"]>} StatusInvoke
  * @typedef {(command: "insert_course_meta_map", args: {courseId: string, metadata: Parameters<Commands["insertCourseMetaMap"]>[1]}) => Promise<void>} MetadataInvoke

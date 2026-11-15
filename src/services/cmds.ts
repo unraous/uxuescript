@@ -7,7 +7,7 @@ export const commands = {
 	loadCourseCover: (url: string) => __TAURI_INVOKE<string>("load_course_cover", { url }),
 	/**  用固定简答题检查当前 API 和模型，成功返回 ok，失败返回具体错误字符串。 */
 	healthy: () => __TAURI_INVOKE<string>("healthy"),
-	solveQuestions: (payload: Folio_Deserialize) => __TAURI_INVOKE<AnswerItem[]>("solve_questions", { payload }),
+	solveQuestions: (payload: Folio_Deserialize, allowPartial: boolean) => __TAURI_INVOKE<AnswerItem[]>("solve_questions", { payload, allowPartial }),
 	insertCourseMetaMap: (courseId: string, metadata: CourseMetadata) => __TAURI_INVOKE<void>("insert_course_meta_map", { courseId, metadata }),
 	queryCourseMeta: (courseId: string) => __TAURI_INVOKE<{
 	title: string,

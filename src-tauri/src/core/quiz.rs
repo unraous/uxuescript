@@ -14,7 +14,7 @@ use crate::config::CONFIG;
 use anyhow::Result;
 
 /// 使用字体哈希字典解密混淆题目，并结合当前全局配置的大语言模型自动生成测验答案。
-pub async fn solve(payload: Folio) -> Result<Vec<AnswerItem>> {
+pub async fn solve(payload: Folio, allow_partial: bool) -> Result<Vec<AnswerItem>> {
     let decrypted = decrypt(payload);
     if decrypted.entries.is_empty() {
         anyhow::bail!("题目解析失败");
@@ -29,7 +29,7 @@ pub async fn solve(payload: Folio) -> Result<Vec<AnswerItem>> {
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("大模型提供商 [{}] 不存在", active_id))?;
     let general = *CONFIG.general.lock();
-    llm::solve(&provider, decrypted, general).await
+    llm::solve(&provider, decrypted, general, allow_partial).await
 }
 
 #[cfg(test)]

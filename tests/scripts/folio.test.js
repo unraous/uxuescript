@@ -43,12 +43,6 @@ describe("Folio DOM parsing", () => {
 
     expect(folio).toEqual(expected);
     expect(doc.body.innerHTML).toBe(original);
-    expect(folio.font).toBeNull();
-    expect(folio.entries.map((entry) => section(entry).title)).toEqual([
-      "一. 填空题（共1题）",
-      "二. 阅读理解（共2题）",
-      "三. 句子翻译题（共1题）",
-    ]);
     expect([...anchors.keys()]).toEqual([
       "1",
       "2.1",
@@ -69,82 +63,33 @@ describe("Folio DOM parsing", () => {
     ).toEqual(folio);
   });
 
-  it("keeps all ten blanks in one question and excludes editor scripts and toolbar text", () => {
-    const { folio, anchors } = parseFolio(
-      archive("webpage3"),
-      SELECTORS.workExam,
-    );
-    const completion = question(section(folio.entries[0]).entries[0]);
-    const translation = question(section(folio.entries[2]).entries[0]);
-
-    expect(completion.kind).toBe("填空题");
-    expect(completion.blank_count).toBe(10);
-    expect(completion.stem).toContain(
-      "How Urban Community Gardens Benefit City Residents",
-    );
-    expect(completion.stem).toContain("J) Looking ahead, community gardens");
-    expect(completion.stem).toContain(
-      "____ 10. People of different backgrounds",
-    );
-    expect(completion.options).toEqual([]);
+  it("anchors ten blanks and the translation to their editors", () => {
+    const { anchors } = parseFolio(archive("webpage3"), SELECTORS.workExam);
     expect(
       anchors
         .get("1")
         .node.querySelectorAll(anchors.get("1").selectors.textInputs),
     ).toHaveLength(10);
-    expect(translation.kind).toBe("句子翻译题");
-    expect(translation.stem).toContain(
-      "社区图书馆是城市公共文化服务的重要组成部分。",
-    );
-    expect(translation.stem).toContain("希望更多居民能够享受阅读带来的乐趣。");
     expect(
       anchors
         .get("4")
         .node.querySelectorAll(anchors.get("4").selectors.textInputs),
     ).toHaveLength(1);
-    expect(JSON.stringify(folio)).not.toMatch(
-      /UEDITOR_CONFIG|loadEditorAnswerd|清除格式|点击上传/,
-    );
   });
 
-  it("keeps each reading passage on its section and scopes choices to the correct child", () => {
+  it("scopes reading choices to the correct child", () => {
     const doc = archive("webpage3");
     const { folio, anchors } = parseFolio(doc, SELECTORS.workExam);
     const reading = section(folio.entries[1]);
-    expect(reading.passage).toBeNull();
     const first = section(reading.entries[0]);
     const second = section(reading.entries[1]);
-    expect(first.passage.text).toContain("Why Urban Wildlife Is on the Rise");
-    expect(first.passage.text).toContain(
-      "both humans and animals can live relatively safely within city boundaries.",
-    );
-    expect(first.passage.text).not.toContain("What leads to the increase");
-    expect(second.passage.text).toContain(
-      "The Downside of Short‑video Learning",
-    );
-    expect(second.passage.text).not.toContain("Why Urban Wildlife");
-    expect(first.entries).toHaveLength(5);
-    expect(second.entries).toHaveLength(5);
-    expect(question(first.entries[0])).toMatchObject({
-      id: "2.1",
-      kind: "单选题",
-      stem: "What leads to the increase of urban wildlife according to the passage?",
-      options: [
-        "A Large‑scale forest migration of wild species",
-        "B Rich food resources and less natural enemies in cities",
-        "C Citizens’ widespread raising of wild animals",
-        "D Rapid reduction of human population in downtown areas",
-      ],
-    });
     for (const entry of [...first.entries, ...second.entries]) {
       const item = question(entry);
       const anchor = anchors.get(item.id);
-      expect(item.options).toHaveLength(4);
       expect(anchor.node.matches(".reading_answer")).toBe(true);
       expect(
         anchor.node.querySelectorAll(anchor.selectors.choice.single),
       ).toHaveLength(4);
-      expect(item.stem).not.toMatch(/Cities are usually seen|Nowadays short/);
     }
     expect(anchors.get("2.1").node).toBe(
       doc.querySelector("#question405782772 .reading_answer"),

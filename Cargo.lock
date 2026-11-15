@@ -4893,7 +4893,7 @@ dependencies = [
 
 [[package]]
 name = "uxuescript"
-version = "2.5.9"
+version = "2.5.10"
 dependencies = [
  "anyhow",
  "async-trait",

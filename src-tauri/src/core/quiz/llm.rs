@@ -28,6 +28,7 @@ pub async fn solve(
     provider: &LLMProvider,
     folio: Folio,
     settings: GeneralConfig,
+    allow_partial: bool,
 ) -> Result<Vec<AnswerItem>> {
     let chosen_model = provider
         .chosen_model
@@ -83,12 +84,16 @@ pub async fn solve(
         }
     }
     if !failures.is_empty() {
-        anyhow::bail!(
-            "成功求解 {} 题，失败 {} 批；本次未回填或提交。{}",
+        let message = format!(
+            "成功求解 {} 题，失败 {} 批。{}",
             all_answers.len(),
             failures.len(),
             failures.join("；")
         );
+        if !allow_partial || all_answers.is_empty() {
+            anyhow::bail!(message);
+        }
+        log::warn!("{message}");
     }
 
     Ok(all_answers)

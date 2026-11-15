@@ -63,10 +63,13 @@ async fn sends_question_payload_to_the_selected_model_without_a_font() {
     let questions: Vec<Question> = serde_json::from_value(input.clone()).unwrap();
     let result = probe_with(
         &provider(protocol, url),
-        super::solve_questions(Folio {
-            entries: questions.into_iter().map(Entry::Question).collect(),
-            ..Default::default()
-        }),
+        super::solve_questions(
+            Folio {
+                entries: questions.into_iter().map(Entry::Question).collect(),
+                ..Default::default()
+            },
+            false,
+        ),
     )
     .await
     .unwrap();
@@ -104,9 +107,12 @@ async fn decrypts_question_payload_before_sending_it_to_the_model() {
         font: Some(include_bytes!("../../assets/course-page/cxs-font.ttf").to_vec()),
         ..Default::default()
     };
-    let result = probe_with(&provider(protocol, url), super::solve_questions(payload))
-        .await
-        .unwrap();
+    let result = probe_with(
+        &provider(protocol, url),
+        super::solve_questions(payload, false),
+    )
+    .await
+    .unwrap();
     assert_eq!(result.len(), 5);
     let request = request.await.unwrap();
     let sent: Value = input_questions(&request.body);

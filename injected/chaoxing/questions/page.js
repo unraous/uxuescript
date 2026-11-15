@@ -24,11 +24,14 @@ const supportedEntries = (entries) =>
     },
   );
 
-/** @param {import("./folio.js").Folio} folio @returns {Promise<import("../../../src/services/cmds").AnswerItem[]>} */
-export const solveFolio = async (folio) => {
+/** @param {import("./folio.js").Folio} folio @param {boolean} allowPartial @returns {Promise<import("../../../src/services/cmds").AnswerItem[]>} */
+export const solveFolio = async (folio, allowPartial) => {
   const entries = supportedEntries(folio.entries);
   return entries.length
-    ? invoke("solve_questions", { payload: { ...folio, entries } })
+    ? invoke("solve_questions", {
+        payload: { ...folio, entries },
+        allowPartial,
+      })
     : [];
 };
 
@@ -51,6 +54,10 @@ export const applyAnswers = async (folio, anchors, answers) => {
     }
     const { node, selectors } = anchors.get(question.id);
     const answer = byNumber.get(question.id);
+    if (!answer) {
+      skipped.push(question.id);
+      continue;
+    }
     if (kind === QuestionType.Matching) {
       await cooldown();
       fillMatching(node, question.options, answer.content);
@@ -63,12 +70,13 @@ export const applyAnswers = async (folio, anchors, answers) => {
  * 整页解析、求解与回填；保存由页面入口处理。
  * @param {Document|Element} root
  * @param {import("./folio.js").PageSelectors} selectors
+ * @param {boolean} [allowPartial=false]
  */
-export const answerPage = async (root, selectors) => {
+export const answerPage = async (root, selectors, allowPartial = false) => {
   await wait.elements(null, selectors.question, root);
   const { folio, anchors } = parseFolio(root, selectors);
   const doc =
     root.nodeType === 9 ? /** @type {Document} */ (root) : root.ownerDocument;
   folio.context = await readContext(doc);
-  return applyAnswers(folio, anchors, await solveFolio(folio));
+  return applyAnswers(folio, anchors, await solveFolio(folio, allowPartial));
 };

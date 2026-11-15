@@ -179,6 +179,7 @@ it("solves the collected paper at the last question and returns to the first", a
   });
   await answerPaged();
   expect(backend.invoke).toHaveBeenCalledWith("solve_questions", {
+    allowPartial: true,
     payload,
   });
   expect(storedRun()).toMatchObject({
@@ -241,6 +242,24 @@ it("saves the last answer and clears progress without submitting or navigating",
   expect(navigate).not.toHaveBeenCalled();
 });
 
+it("skips a missing answer and reports it after saving", async () => {
+  setup(1, {
+    phase: "answer",
+    index: 1,
+    config: { switchingCd: null },
+    entries,
+    pages,
+    answers: [answers[0]],
+  });
+  await answerPaged();
+  expect(fillAnswer).not.toHaveBeenCalled();
+  expect(save).toHaveBeenCalledOnce();
+  expect(backend.confirm).toHaveBeenCalledWith(
+    expect.stringContaining("需人工处理的题号：2"),
+    expect.any(Object),
+  );
+});
+
 it("awaits answers before switching strategy or navigating", async () => {
   setup(1, {
     phase: "collect",
@@ -261,6 +280,7 @@ it("awaits answers before switching strategy or navigating", async () => {
   const processing = answerPaged();
   await vi.waitFor(() =>
     expect(backend.invoke).toHaveBeenCalledWith("solve_questions", {
+      allowPartial: true,
       payload,
     }),
   );

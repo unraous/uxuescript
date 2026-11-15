@@ -77,7 +77,7 @@ describe("course confirmation", () => {
     );
   });
 
-  it("waits for the backend decision before reporting cancellation", async () => {
+  it("waits for the backend decision and does not start when cancelled", async () => {
     /** @type {(value: boolean) => void} */
     let choose;
     const invoke = vi.fn(async (command) => {
@@ -96,14 +96,6 @@ describe("course confirmation", () => {
     expect(invoke).toHaveBeenCalledWith("send_status", {
       status: { kind: "cancel", payload: null },
     });
-  });
-
-  it("does not start when the backend confirmation is cancelled", async () => {
-    const invoke = vi.fn(async (command) =>
-      command === "options" ? {} : false,
-    );
-    const page = await setup(invoke);
-    await page.run;
     expect(invoke).not.toHaveBeenCalledWith("send_status", {
       status: { kind: "start", payload: null },
     });

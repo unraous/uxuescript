@@ -24,7 +24,7 @@ export const main = async () => {
       )
         return;
       await config.loadFromBackend();
-      const skipped = await answerPage(document, SELECTORS.examPreview);
+      const skipped = await answerPage(document, SELECTORS.examPreview, true);
       await confirm(
         `答案已填写，请核对答案并自行保存、交卷；如有图片题，请确认当前模型具备视觉能力。\n\n如果发现大量题目未作答或未保存，可尝试在课程设置（Course）中调长等待时间（Delay），再重新填写；交卷前请检查并手动保存。${skipped.length ? `\n需人工处理的题号：${skipped.join("、")}` : ""}`,
         { title: "考试答题已完成", readSeconds: 5 },
