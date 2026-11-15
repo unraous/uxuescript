@@ -1,4 +1,6 @@
 use super::config::CONFIG;
+
+mod deepseek;
 use crate::core::{
     script::{include_script, load_on},
     url::{Type, classify},
@@ -109,14 +111,17 @@ pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn s
             LogicalSize::new(logical_size.width * 0.48, logical_size.height * 0.48),
         ),
         "deepseek" => (
-            WebviewBuilder::new(
-                label,
-                WebviewUrl::External("https://chat.deepseek.com/".parse()?),
-            )
-            .background_color((255, 255, 255).into())
-            .devtools(true)
-            // 当前只允许聊天主机；手动登录若跳转到其他主机，再按实际导航补充。
-            .on_navigation(is_deepseek_url),
+            deepseek::configure(
+                window,
+                WebviewBuilder::new(
+                    label,
+                    WebviewUrl::External("https://chat.deepseek.com/".parse()?),
+                )
+                .background_color((255, 255, 255).into())
+                .devtools(true),
+                // 当前只允许聊天主机；手动登录若跳转到其他主机，再按实际导航补充。
+                is_deepseek_url,
+            ),
             LogicalPosition::new(0.0, 0.0),
             logical_size,
         ),
