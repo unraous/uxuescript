@@ -28,11 +28,15 @@ pnpm tauri dev
 
 TypeScript 依赖采用双版本别名：`typescript` 指向提供编译器 API 的 TS 6，供 ESLint 和 Vue 检查器使用；`@typescript/native` 保留 TS 7 及其 `tsc` 命令。Vue 检查继续由 `scripts/typecheck.cjs` 执行。
 
-`pnpm build:scripts` 调用 Vite 的构建 API，由 Rolldown 解析模块和合并依赖；不通过文本替换拼合源码。每个入口构建为独立 IIFE，压缩后输出到 `dist/scripts/embedded/`，供 Rust 内嵌。课程入口在同一次构建中额外输出 `dist/scripts/core.js` 和通过输出配置 `banner` 添加元数据的 `dist/scripts/uxuescript.user.js`；这两份公开产物关闭压缩，并由 Prettier 格式化，方便阅读和复制执行。监听模式同样更新全部产物。Rust 统一通过 `include_script!` 宏读取 `embedded/` 中的压缩产物，根路径基于 Cargo 内置的 `CARGO_MANIFEST_DIR`，不依赖调用文件的目录层级。
+内部脚本由本项目构建：`pnpm build:scripts` 调用 Vite 的构建 API，由 Rolldown 解析模块和合并依赖；不通过文本替换拼合源码。每个入口构建为独立 IIFE，压缩后输出到 `dist/scripts/embedded/`，供 Rust 内嵌。课程入口在同一次构建中额外输出 `dist/scripts/core.js` 和通过输出配置 `banner` 添加元数据的 `dist/scripts/uxuescript.user.js`；这两份公开产物关闭压缩，并由 Prettier 格式化，方便阅读和复制执行。监听模式同样更新全部产物。Rust 对内部脚本统一通过 `include_script!` 宏读取 `embedded/` 中的压缩产物，根路径基于 Cargo 内置的 `CARGO_MANIFEST_DIR`，不依赖调用文件的目录层级。
 
 `pnpm tauri dev` 会启动 `pnpm dev`，后者在启动界面开发服务器前构建脚本，并通过 Vite 持续监听脚本及其依赖。Tauri 通过 `additionalWatchFolders` 监听 `dist/scripts/`；根目录 `.taurignore` 放行该目录，避免 `.gitignore` 中的 `dist` 规则阻止注册监听。脚本重新打包后触发 Rust 重编译并重启应用。修改监听配置后需重新启动 `pnpm tauri dev`。
 
-`pnpm build` 先构建界面，再生成脚本，避免界面构建清理 `dist` 时删除脚本。直接执行 Cargo（包括 `cargo sync-bindings`）前，先运行 `pnpm build:scripts`。不把构建产物作为源码维护。
+`pnpm build` 先构建界面，再生成脚本，避免界面构建清理 `dist` 时删除脚本。直接执行 Cargo（包括 `cargo sync-bindings`）前，先运行 `pnpm build:scripts`。`dist/` 中的生成产物不作为源码维护。
+
+外部脚本由独立项目维护和构建，交付产物保存在 `external-scripts/`。DeepSeek adapter 的 `deepseek-web-adapter.iife.js` 在独立项目执行 `pnpm build` 后，从其 `dist/` 原样复制到这里；主项目通过 `src-tauri/src/core/script.rs` 中的 `include_str!` 直接编译嵌入，不接入主项目的 Node 构建或 `dist/` 生成流水线。更新流程为独立构建 → 替换对应文件 → 重新编译主项目。`external` 表示维护归属，不表示业务重要性或安全隔离；编译嵌入本身也不会执行脚本。
+
+当前 Tauri 未显式配置对 `external-scripts/` 的监听，更新外部产物后需手动重启 `pnpm tauri dev` 以重新编译。Cargo 对 `include_str!` 文件的依赖追踪不等同于 Tauri 的文件监听，不能据此假定开发进程会自动重启。
 
 只调试 Vue 页面可运行 `pnpm dev`，但这不会创建 Tauri 窗口，不能验证 IPC、课程 WebView 或本地配置读写。
 

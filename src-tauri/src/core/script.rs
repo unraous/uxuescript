@@ -5,6 +5,7 @@ use crate::commands::chaoxing::CourseStatus;
 
 use tauri::{Emitter, Manager};
 
+// 内部脚本资源：由本项目构建到 dist/scripts/embedded/。
 macro_rules! include_script {
     ($name:literal) => {
         include_str!(concat!(
@@ -16,6 +17,13 @@ macro_rules! include_script {
 }
 
 pub(crate) use include_script;
+
+// 外部脚本资源：由独立项目维护和构建，主项目仅在编译时直接嵌入。
+// 嵌入不代表运行执行，也不提供安全隔离。
+pub const DEEPSEEK_ADAPTER_SCRIPT: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../external-scripts/deepseek-web-adapter.iife.js"
+));
 
 /// 根据 URL 类型获取对应的 JavaScript 静态脚本内容。
 pub fn obtain(t: Type) -> Option<&'static str> {
@@ -58,3 +66,7 @@ pub fn load_on(webview: tauri::Webview, payload: tauri::webview::PageLoadPayload
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/core/script.rs"]
+mod tests;
