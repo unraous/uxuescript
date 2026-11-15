@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import VButton from "@/components/base/VButton.vue";
 import VRollTransition from "@/components/base/VRollTransition.vue";
-import TheAPIPanel from "@/components/TheConfigPanel/TheAPIPanel.vue";
+import TheSolverPanel from "@/components/TheConfigPanel/TheSolverPanel.vue";
 import TheCourseConfigPanel from "./TheConfigPanel/TheCourseConfigPanel.vue";
 import TheThemePanel from "./TheConfigPanel/TheThemePanel.vue";
 import TheGeneralPanel from "./TheConfigPanel/TheGeneralPanel.vue";
@@ -14,7 +14,7 @@ const configPanel = reactive({
   activeIndex: 0,
 });
 const sidebarItems = computed(() => [
-  { name: label("tabApi") },
+  { name: label("tabSolver") },
   { name: label("tabCourse") },
   { name: label("tabTheme") },
   { name: label("tabGeneral") },
@@ -48,7 +48,7 @@ watch(
       />
       <div class="container">
         <Transition :name="transitionName"
-          ><TheAPIPanel
+          ><TheSolverPanel
             v-show="configPanel.activeIndex === 0"
             id="config-panel-0"
             role="tabpanel"

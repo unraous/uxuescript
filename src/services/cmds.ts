@@ -34,6 +34,8 @@ export const commands = {
 	setKey: (key: string) => __TAURI_INVOKE<null>("set_key", { key }),
 	general: () => __TAURI_INVOKE<GeneralConfig>("general"),
 	setGeneral: (general: GeneralConfig) => __TAURI_INVOKE<void>("set_general", { general }),
+	currentSolver: () => __TAURI_INVOKE<SolverKind>("current_solver"),
+	setSolver: (kind: SolverKind) => __TAURI_INVOKE<void>("set_solver", { kind }),
 	/**  Return the selected color theme for the main and mask WebViews. */
 	currentTheme: () => __TAURI_INVOKE<ThemeName>("current_theme"),
 	/**  Select a supported color theme in memory; save_config persists it with the other settings. */
@@ -268,6 +270,8 @@ export type Section = {
 	passage: Passage | null,
 	entries: Entry[],
 };
+
+export type SolverKind = "native_llm" | "deep_seek_web";
 
 export type TabProgressPayload = {
 	total: number,

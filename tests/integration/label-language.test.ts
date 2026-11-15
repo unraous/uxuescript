@@ -201,7 +201,7 @@ describe("label language", () => {
             h(TheSidebar, {
               modelValue: 1,
               items: (
-                ["tabApi", "tabCourse", "tabTheme", "tabGeneral"] as const
+                ["tabSolver", "tabCourse", "tabTheme", "tabGeneral"] as const
               ).map((key) => ({ name: label(key) })),
             }),
             h(VButton, { label: label("save"), onClick: save }),
@@ -211,7 +211,7 @@ describe("label language", () => {
     const tabs = wrapper.findAll('[role="tab"]');
     const firstTab = tabs[0].element;
     expect(tabs.map((tab) => tab.text())).toEqual([
-      "API",
+      "Solver",
       "Course",
       "Theme",
       "General",
@@ -225,7 +225,7 @@ describe("label language", () => {
     expect(wrapper.get(".base-button").attributes("aria-label")).toBe("保存");
     await vi.advanceTimersByTimeAsync(300);
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
-      "模型",
+      "求解方式",
       "课程",
       "主题",
       "通用",

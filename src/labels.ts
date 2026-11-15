@@ -17,7 +17,11 @@ const labels = {
   endpoint: { en: "Endpoint", zh: "请求地址" },
   apiKey: { en: "API Key", zh: "API 密钥" },
   labelLanguage: { en: "Language", zh: "语言" },
-  tabApi: { en: "API", zh: "模型" },
+  tabSolver: { en: "Solver", zh: "求解方式" },
+  webSolverNotConnected: {
+    en: "DeepSeek Web is not connected yet.",
+    zh: "DeepSeek Web 功能尚未接通。",
+  },
   tabCourse: { en: "Course", zh: "课程" },
   tabTheme: { en: "Theme", zh: "主题" },
   tabGeneral: { en: "General", zh: "通用" },

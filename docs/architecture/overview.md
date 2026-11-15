@@ -55,9 +55,11 @@ Rust 命令声明是注册、TypeScript 绑定和应用命令权限的共同来�
 | --- | --- |
 | 版本、应用标识、更新端点及安装器共享值 | `config/build.json` 经同步脚本写入各构建配置 |
 | 应用显示信息、课程首页与安装器参数 | 运行时读取已同步的 Tauri 配置或包信息 |
-| 模型、课程选项、主题等用户偏好 | 加载到 Rust 配置状态，由命令修改并保存到本地 TOML |
+| 求解方式、模型、课程选项、主题等用户偏好 | 加载到 Rust 配置状态，由命令修改并保存到本地 TOML |
 
 界面操作先修改内存配置，显式保存和正常退出才写入磁盘。加载时补齐缺失的内置供应商；用户配置中的 `version` 用于升级迁移，不决定应用显示版本。升级时会刷新已有内置供应商的模型预设，并尝试按名称保留模型选择，自定义供应商不走此刷新。
+
+求解方式由独立的 [`SolverKind`](../../src-tauri/src/config/solver.rs) 保存，TOML 值为 `native_llm` 或 `deep_seek_web`；旧配置缺少该字段时默认 Native LLM。它不属于 `LLMProvider`，切换求解方式不会修改 Native 的供应商、模型、请求地址或 API Key。设置界面第一类为求解方式，[`TheSolverPanel`](../../src/components/TheConfigPanel/TheSolverPanel.vue) 顶部选择后通过生成的 `currentSolver / setSolver` 命令更新并回读内存；Native 分支继续使用原 API 面板，Web 分支仅显示尚未接通说明。
 
 设置界面通过 [`useConfig<T>`](../../src/composables/useConfig.ts) 统一提交与回填，每次操作结束后重新读取宿主配置，包括校验或命令失败的情况。数字输入使用 [Zod schema](../../src/composables/useConfig/schemas.ts) 转换和校验；通用请求参数保持非零 `u32` 范围，课程数字设置允许留空关闭。错误弹窗等待确认期间，界面仍会回填当前配置。
 
@@ -101,7 +103,9 @@ API Key 的日志格式化会脱敏，配置序列化仍保留明文。读取或
 
 题目从 JS 提取、IPC、Rust 到模型输入统一使用 `id / kind / stem / options / images` 字段；`id` 表示页面显示题号路径。填空额外携带实际空数 `blank_count`，从 DOM 空位容器或填写控件读取，不根据题干下划线猜测。超星公式图片带有可解析元数据时写入 `stem` 或 `options` 的公式占位文本，其他图片以 `[图片N]` 保留原位置，并由 `images` 提供地址；材料和题目的图片分别编号，后端下载后按所属材料或题号标注并发送多模态内容。模型答案使用 `index / explanation / content`，`index` 对应输入的 `id`，不在链路中转换中英文字段。
 
-三个入口统一调用 `solve_questions(payload: Folio)`。Rust 有字体时递归还原篇标题、材料与题目文字，无字体时直接分批求解；生产入口不解析整页 HTML。字体映射针对字形，不是整个字体文件的哈希；未匹配字符保留原样。章节测验开启人工核验时，在提交前等待用户确认；独立作业和逐题考试仅暂存，整卷预览考试提示用户自行保存和交卷。
+三个入口统一调用 `solve_questions(payload: Folio)`，请求与答案回填契约不随求解方式改变。Rust 的 [`quiz::solve`](../../src-tauri/src/core/quiz.rs) 在一次入口读取并固定 `SolverKind`，随后直接分流：Native LLM 有字体时递归还原篇标题、材料与题目文字，无字体时直传，检查空卷后读取供应商和通用配置并进入原模型求解；DeepSeek Web 立即返回 `DeepSeek Web Solver 尚未接入`，不读取或校验 Native 供应商、模型，也不请求 Native API。切换设置只影响之后进入的求解，配置锁不会跨异步请求持有。
+
+Native 生产入口不解析整页 HTML。字体映射针对字形，不是整个字体文件的哈希；未匹配字符保留原样。章节测验开启人工核验时，在提交前等待用户确认；独立作业和逐题考试仅暂存，整卷预览考试提示用户自行保存和交卷。
 
 Prompt 由后端 [`prompt.rs`](../../src-tauri/src/core/quiz/llm/prompt.rs) 按变化频率拼装：通用约定和本批题型说明 → 可选课业背景 → 公共材料及其图片 → 本批题目及其图片。[`protocol.rs`](../../src-tauri/src/core/quiz/llm/protocol.rs) 负责分发，具体协议及请求模板归在 `protocol/`。十种题型的输入、输出规则与示例分别维护在 [`prompts/`](../../src-tauri/src/core/quiz/llm/prompts/)，只加入本批实际出现的类型，固定排列并去重；共用选项子题使用单选规则。课程名来自已采集的课程缓存，章节名来自课程导航，作业或试卷名来自已验证的页面标题（`.mark_title` 或 `.h2_subject`）；没有的信息省略。前端只用课程 ID 查询缓存，不将其作为模型背景。
 
