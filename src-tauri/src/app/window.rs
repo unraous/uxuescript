@@ -44,6 +44,11 @@ async fn notify_exit_animation(window: &Window) {
 async fn close(window: Window) {
     log::debug!("执行程序收尾工作，即将关闭应用");
     prepare_exit(&window).await;
+    if let Some(deepseek) = window.app_handle().get_window("deepseek-debug") {
+        if let Err(error) = deepseek.destroy() {
+            log::error!("销毁 DeepSeek 调试窗口失败: {error}");
+        }
+    }
     window.destroy().ok();
 }
 
@@ -82,11 +87,11 @@ fn resize_webviews(window: &Window, size: PhysicalSize<u32>) -> Result<()> {
 pub fn listener(window: &tauri::Window, event: &tauri::WindowEvent) {
     log::debug!("监听到窗口事件: {:?}", event);
     match event {
-        WindowEvent::CloseRequested { api, .. } => {
+        WindowEvent::CloseRequested { api, .. } if window.label() == "app" => {
             api.prevent_close();
             tauri::async_runtime::spawn(close(window.clone()));
         }
-        WindowEvent::Destroyed => {
+        WindowEvent::Destroyed if window.label() == "app" => {
             log::debug!("主程序窗口已销毁，应用已关闭");
         }
         WindowEvent::Resized(physical_size) => {
@@ -165,6 +170,15 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
             log::error!("启动开屏动画失败: {error}");
         }
     });
+
+    if cfg!(debug_assertions) {
+        // 调试窗体与主应用分离；关闭它时只销毁自身，不执行主应用的退出收尾。
+        let deepseek_window = WindowBuilder::new(app, "deepseek-debug")
+            .title("DeepSeek Debug")
+            .inner_size(1200.0, 900.0)
+            .build()?;
+        webview::init_on(&deepseek_window, "deepseek")?;
+    }
 
     log::info!("初始化应用窗口成功");
 

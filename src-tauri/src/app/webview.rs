@@ -9,6 +9,10 @@ use parking_lot::Mutex;
 use tauri::utils::config::BackgroundThrottlingPolicy;
 use tauri::{LogicalPosition, LogicalSize, Url, Webview, WebviewBuilder, WebviewUrl};
 
+fn is_deepseek_url(url: &Url) -> bool {
+    url.host_str() == Some("chat.deepseek.com")
+}
+
 #[derive(Default)]
 pub struct UrlStack(Mutex<(Vec<Url>, usize)>);
 
@@ -103,6 +107,18 @@ pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn s
                 .initialization_script(include_script!("webview-log.js")),
             LogicalPosition::new(logical_size.width * 0.51, logical_size.height * 0.46),
             LogicalSize::new(logical_size.width * 0.48, logical_size.height * 0.48),
+        ),
+        "deepseek" => (
+            WebviewBuilder::new(
+                label,
+                WebviewUrl::External("https://chat.deepseek.com/".parse()?),
+            )
+            .background_color((255, 255, 255).into())
+            .devtools(true)
+            // 当前只允许聊天主机；手动登录若跳转到其他主机，再按实际导航补充。
+            .on_navigation(is_deepseek_url),
+            LogicalPosition::new(0.0, 0.0),
+            logical_size,
         ),
         _ => return Err(anyhow!("未知的Webview标签").into()),
     };
