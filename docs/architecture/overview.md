@@ -59,7 +59,7 @@ Rust 命令声明是注册、TypeScript 绑定和应用命令权限的共同来�
 
 界面操作先修改内存配置，显式保存和正常退出才写入磁盘。加载时补齐缺失的内置供应商；用户配置中的 `version` 用于升级迁移，不决定应用显示版本。升级时会刷新已有内置供应商的模型预设，并尝试按名称保留模型选择，自定义供应商不走此刷新。
 
-求解方式由独立的 [`SolverKind`](../../src-tauri/src/config/solver.rs) 保存，TOML 值为 `native_llm` 或 `deep_seek_web`；旧配置缺少该字段时默认 Native LLM。它不属于 `LLMProvider`，切换求解方式不会修改 Native 的供应商、模型、请求地址或 API Key。设置界面第一类为求解方式，[`TheSolverPanel`](../../src/components/TheConfigPanel/TheSolverPanel.vue) 顶部选择后通过生成的 `currentSolver / setSolver` 命令更新并回读内存；Native 分支继续使用原 API 面板，Web 分支仅显示尚未接通说明。
+求解方式由独立的 [`SolverKind`](../../src-tauri/src/config/solver.rs) 保存，TOML 值为 `native_llm` 或 `deep_seek_web`；旧配置缺少该字段时默认 Native LLM。它不属于 `LLMProvider`，切换求解方式不会修改 Native 的供应商、模型、请求地址或 API Key。设置界面第一类为求解方式，[`TheSolverPanel`](../../src/components/TheConfigPanel/TheSolverPanel.vue) 顶部选择后通过生成的 `currentSolver / setSolver` 命令更新并回读内存；Native 分支继续使用原 API 面板，Web 分支显示“DeepSeek Web 已接入 · 开发预览”的静态标题与使用、限制说明，不表示实时连接状态，也不提供连接管理控件。
 
 设置界面通过 [`useConfig<T>`](../../src/composables/useConfig.ts) 统一提交与回填，每次操作结束后重新读取宿主配置，包括校验或命令失败的情况。数字输入使用 [Zod schema](../../src/composables/useConfig/schemas.ts) 转换和校验；通用请求参数保持非零 `u32` 范围，课程数字设置允许留空关闭。错误弹窗等待确认期间，界面仍会回填当前配置。
 
@@ -107,7 +107,7 @@ API Key 的日志格式化会脱敏，配置序列化仍保留明文。读取或
 
 Web 第一版只支持纯文本。发送第一批前递归检查整卷材料与题目的 `images` 必须为空，复用原 `batch::prepare` 完成题号、空数、材料链与拆批，再复用 `prompt` 的题型说明和组装，将 system 与所有文本 part 用两个换行拼为一条 text；全部批次 Prompt 都先组装成功，不下载图片或丢弃图片。批次串行调用 B2 文本请求，默认 120 秒，省略 thinking/webSearch 以保留网页设置。应用管理的请求状态只在目标页面成功调度 bootstrap 后保存实际 Webview handle，窗口 `Destroyed` 时释放；原文档门、BUSY 拒绝与应用生命周期隔离仍生效。首次请求固定宿主文档代次和 JS binding generation，后续批次遇到刷新或切会话停止，不在新绑定续跑，也不建立队列。
 
-仅 B2 `completed` 正文进入原严格答案解析，校验数量、题号、非空内容与空数并还原输入顺序；不摘取 Markdown/JSON 片段。`failed / uncertain / rejected / interrupted` 只交付脱敏的固定错误码、delivery、remote 与隔离状态，不把其正文当答案；格式错误统一报告 `INVALID_ANSWER`，不记录回答片段。Web 全任务 all-or-nothing：即使 `allow_partial=true`，也只有全部批次成功并通过校验才返回答案，任何失败立即停止且不向原回填返回部分结果。不自动 retry、回退 Native API 或清除 B2 quarantine；远端状态未知时仍须人工核对网页并重启应用。设置界面的旧“尚未接通”展示本轮未修改；真实调用与学习通回填验收见[测试说明](../../tests/README.md#deepseek-b3纯文本卷面求解)。
+仅 B2 `completed` 正文进入原严格答案解析，校验数量、题号、非空内容与空数并还原输入顺序；不摘取 Markdown/JSON 片段。`failed / uncertain / rejected / interrupted` 只交付脱敏的固定错误码、delivery、remote 与隔离状态，不把其正文当答案；格式错误统一报告 `INVALID_ANSWER`，不记录回答片段。Web 全任务 all-or-nothing：即使 `allow_partial=true`，也只有全部批次成功并通过校验才返回答案，任何失败立即停止且不向原回填返回部分结果。不自动 retry、回退 Native API 或清除 B2 quarantine；远端状态未知时仍须人工核对网页并重启应用。DeepSeek Debug 窗口仅在 Debug 构建中提供；使用前须自行登录并进入已有会话，保持输入框为空、无附件且未在生成，无需 Native API Key。真实学习通回填尚未完成验收，调用与验收条件见[测试说明](../../tests/README.md#deepseek-b3纯文本卷面求解)。
 
 Native 生产入口不解析整页 HTML。字体映射针对字形，不是整个字体文件的哈希；未匹配字符保留原样。章节测验开启人工核验时，在提交前等待用户确认；独立作业和逐题考试仅暂存，整卷预览考试提示用户自行保存和交卷。
 

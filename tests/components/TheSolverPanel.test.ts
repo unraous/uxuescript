@@ -121,9 +121,14 @@ describe("solver configuration", () => {
     expect(mocks.setSolver).toHaveBeenCalledWith("deep_seek_web");
     expect(await mocks.currentSolver()).toBe("deep_seek_web");
     expect(wrapper.findComponent(TheAPIPanel).exists()).toBe(false);
-    expect(wrapper.get(".web-solver-notice").text()).toBe(
-      "DeepSeek Web is not connected yet.",
+    const notice = wrapper.get(".web-solver-notice");
+    expect(notice.text()).toContain(
+      "DeepSeek Web integrated · Development preview",
     );
+    expect(notice.findAll("p").map((paragraph) => paragraph.text())).toEqual([
+      "In DeepSeek Debug, sign in manually and open an existing chat with an empty input, no attachments, and no generation in progress. No Native API Key needed.",
+      "Text only. The DeepSeek Debug window is available only in Debug builds. Real Chaoxing answer filling has not completed acceptance testing.",
+    ]);
     expect(mocks.saveConfig).not.toHaveBeenCalled();
     expect(mocks.healthy).not.toHaveBeenCalled();
     expect(mocks.switchProvider).not.toHaveBeenCalled();
@@ -225,8 +230,11 @@ describe("solver configuration", () => {
       wrapper.getComponent<typeof VSelector>(".solver-selector").props("data")
         .label,
     ).toBe("求解方式");
-    expect(wrapper.get(".web-solver-notice").text()).toBe(
-      "DeepSeek Web 功能尚未接通。",
-    );
+    const notice = wrapper.get(".web-solver-notice");
+    expect(notice.text()).toContain("DeepSeek Web 已接入 · 开发预览");
+    expect(notice.findAll("p").map((paragraph) => paragraph.text())).toEqual([
+      "请在 DeepSeek Debug 自行登录并进入已有会话，保持输入框为空、无附件且未在生成。无需 Native API Key。",
+      "仅支持纯文本；DeepSeek Debug 窗口仅在 Debug 构建中提供。真实学习通回填尚未完成验收。",
+    ]);
   });
 });

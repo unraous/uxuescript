@@ -41,12 +41,14 @@ onMounted(load);
       v-if="solver === 'native_llm'"
       class="native-panel"
     />
-    <p
+    <div
       v-else
       class="web-solver-notice"
     >
-      {{ label("webSolverNotConnected") }}
-    </p>
+      <h2>{{ label("webSolverPreviewTitle") }}</h2>
+      <p>{{ label("webSolverUsage") }}</p>
+      <p>{{ label("webSolverLimitations") }}</p>
+    </div>
   </div>
 </template>
 
@@ -70,6 +72,18 @@ onMounted(load);
   min-height: 0;
 }
 .web-solver-notice {
+  flex: 1;
+  min-height: 0;
   padding: 0 5%;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.web-solver-notice h2 {
+  font-size: inherit;
+  font-weight: inherit;
+  -webkit-text-stroke: 0.4px currentColor;
+}
+.web-solver-notice p {
+  margin-top: 0.75em;
 }
 </style>

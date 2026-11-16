@@ -94,7 +94,9 @@ pnpm exec vitest run tests/scripts/deepseek-bootstrap.test.js
 
 三个合并核心场景验证真实 Prompt 管线、材料引用与乱序 JSON 恢复；后批格式错误/uncertain 不重试也不返回部分答案；整卷后段题图、材料图与不支持题型在发送前拒绝。命令用例继续验证 Web 不访问 Native 配置或 API、空卷校验，以及 Native 三协议正常入口。受控生成只替代网页请求，不替代实际批处理、Prompt 或答案解析；这些本地验证不能证明真实 DOM、模型格式或学习通回填。
 
-真实首轮须在已登录、已有 UUID 会话且 B1 ready/valid 的前提下，由操作者明确选择现有 DeepSeek Web 求解方式；设置面板旧“尚未接通”文案本轮不改。也可由操作者在同一**本地 main** DevTools 显式选择并调用原命令（不是远程 DeepSeek 页）：
+设置面板显示“DeepSeek Web 已接入 · 开发预览”的静态能力说明，不表示实时连接或就绪状态。使用前须在仅 Debug 构建提供的 DeepSeek Debug 窗口自行登录并进入已有会话，保持输入框为空、无附件且未在生成；无需 Native API Key，仅支持纯文本，真实学习通回填尚未完成验收。`tests/components/TheSolverPanel.test.ts` 的现有中英提示场景核对标题、使用条件与限制，仍保留 Native 控件和切换行为验证。
+
+真实验收须在已登录、已有 UUID 会话且 B1 ready/valid 的前提下，由操作者明确选择现有 DeepSeek Web 求解方式。也可由操作者在同一**本地 main** DevTools 显式选择并调用原命令（不是远程 DeepSeek 页）：
 
 ```js
 await window.__TAURI_INTERNALS__.invoke("set_solver", { kind: "deep_seek_web" });

@@ -18,9 +18,17 @@ const labels = {
   apiKey: { en: "API Key", zh: "API 密钥" },
   labelLanguage: { en: "Language", zh: "语言" },
   tabSolver: { en: "Solver", zh: "求解方式" },
-  webSolverNotConnected: {
-    en: "DeepSeek Web is not connected yet.",
-    zh: "DeepSeek Web 功能尚未接通。",
+  webSolverPreviewTitle: {
+    en: "DeepSeek Web integrated · Development preview",
+    zh: "DeepSeek Web 已接入 · 开发预览",
+  },
+  webSolverUsage: {
+    en: "In DeepSeek Debug, sign in manually and open an existing chat with an empty input, no attachments, and no generation in progress. No Native API Key needed.",
+    zh: "请在 DeepSeek Debug 自行登录并进入已有会话，保持输入框为空、无附件且未在生成。无需 Native API Key。",
+  },
+  webSolverLimitations: {
+    en: "Text only. The DeepSeek Debug window is available only in Debug builds. Real Chaoxing answer filling has not completed acceptance testing.",
+    zh: "仅支持纯文本；DeepSeek Debug 窗口仅在 Debug 构建中提供。真实学习通回填尚未完成验收。",
   },
   tabCourse: { en: "Course", zh: "课程" },
   tabTheme: { en: "Theme", zh: "主题" },
