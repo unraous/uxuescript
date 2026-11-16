@@ -98,6 +98,21 @@ fn append_images(parts: &mut Vec<Part>, images: impl Iterator<Item = Image>) {
     }
 }
 
+/// 纯文本请求复用同一套题型说明和组装，不进入媒体下载。
+pub(in crate::core::quiz) fn text(batch: &Batch) -> Result<String> {
+    let prompt = assemble(batch, Vec::new(), instructions(batch)?)?;
+    let mut text = prompt.system;
+    for part in prompt.parts {
+        let Part::Text(part) = part else {
+            unreachable!("assemble 未提供图片，只产生文本")
+        };
+        text.push_str("\n\n");
+        text.push_str(&part);
+    }
+    // HTML textarea 会将换行统一为 LF；交给 Adapter 的文本需与写入后的值一致。
+    Ok(text.replace("\r\n", "\n").replace('\r', "\n"))
+}
+
 pub(super) async fn build(batch: &Batch) -> Result<Prompt> {
     // 先检查题型，避免不支持的批次仍下载图片。
     let system = instructions(batch)?;

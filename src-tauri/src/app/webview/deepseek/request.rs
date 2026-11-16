@@ -21,7 +21,12 @@ pub struct RequestState {
     pub(super) observer: Arc<Observer>,
     nonce: String,
     counter: AtomicU64,
+    target: Mutex<Option<Webview>>,
 }
+
+/// 一份文本求解固定首次观测的宿主文档与 JS 绑定，不跨会话继续后续批次。
+#[derive(Default)]
+pub(crate) struct TextBinding(Mutex<Option<(u64, u64)>>);
 impl Default for RequestState {
     fn default() -> Self {
         let startup = SystemTime::now()
@@ -32,6 +37,7 @@ impl Default for RequestState {
             observer: Arc::new(Observer::default()),
             nonce: format!("{}-{startup:x}", std::process::id()),
             counter: AtomicU64::new(1),
+            target: Mutex::new(None),
         }
     }
 }
@@ -106,6 +112,36 @@ pub(super) fn interrupt(page: &mut super::Page) {
 }
 
 impl RequestState {
+    pub(super) fn attach(&self, webview: Webview) {
+        // 与 Destroyed 同一文档门，避免关闭后迟到的 load 保留句柄。
+        let page = self.observer.0.lock();
+        if !page.closed {
+            *self.target.lock() = Some(webview);
+        }
+    }
+
+    pub(super) fn detach(&self) {
+        self.observer.close();
+        self.target.lock().take();
+    }
+
+    pub(crate) async fn generate_text(
+        &self,
+        text: &str,
+        options: Options,
+        binding: &TextBinding,
+    ) -> Result<Generation, &'static str> {
+        let webview = { self.target.lock().clone() };
+        let Some(webview) = webview else {
+            return Err(if self.observer.0.lock().quarantined {
+                "QUARANTINED"
+            } else {
+                "WEBVIEW_NOT_OPEN"
+            });
+        };
+        self.generate_bound(&webview, text, options, binding).await
+    }
+
     pub(super) fn document_token(&self, epoch: u64) -> String {
         format!("{}:document:{epoch}", self.nonce)
     }
@@ -149,6 +185,17 @@ impl RequestState {
         text: &str,
         options: Options,
     ) -> Result<Generation, &'static str> {
+        self.generate_bound(webview, text, options, &TextBinding::default())
+            .await
+    }
+
+    async fn generate_bound(
+        &self,
+        webview: &Webview,
+        text: &str,
+        options: Options,
+        binding: &TextBinding,
+    ) -> Result<Generation, &'static str> {
         let timeout = options.timeout_ms.unwrap_or(120_000);
         if text.trim().is_empty() || !(1_000..=600_000).contains(&timeout) {
             return Err("INVALID_REQUEST");
@@ -163,6 +210,7 @@ impl RequestState {
                 &mut cancelled,
                 text,
                 &options,
+                binding,
                 deadline,
             )
             .await;
@@ -222,6 +270,7 @@ impl RequestState {
         cancelled: &mut oneshot::Receiver<()>,
         text: &str,
         options: &Options,
+        binding: &TextBinding,
         deadline: tokio::time::Instant,
     ) -> Result<Generation, &'static str> {
         let raw = read_snapshot(webview, cancelled)
@@ -232,6 +281,14 @@ impl RequestState {
         };
         if snapshot.session_state != SessionState::Valid {
             return Err("BINDING_NOT_READY");
+        }
+        let current = (flight.epoch, snapshot.generation);
+        {
+            let mut expected = binding.0.lock();
+            if expected.is_some_and(|expected| expected != current) {
+                return Err("SOLVE_BINDING_CHANGED");
+            }
+            *expected = Some(current);
         }
         let identity = Identity {
             document_token: self.document_token(flight.epoch),

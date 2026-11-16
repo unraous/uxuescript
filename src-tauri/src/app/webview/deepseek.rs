@@ -321,6 +321,8 @@ fn load_on(webview: Webview, payload: PageLoadPayload<'_>, requests: &request::R
     );
     if webview.eval(&bootstrap).is_err() {
         log::warn!("DeepSeek B1 document={epoch} BOOTSTRAP_EVAL_DISPATCH_FAILED");
+    } else {
+        requests.attach(webview.clone());
     }
     tauri::async_runtime::spawn(observe(webview, observer.clone(), epoch, cancelled));
 }
@@ -346,10 +348,10 @@ pub(super) fn configure(
 ) -> WebviewBuilder<Wry> {
     let observer = window.state::<request::RequestState>().observer.clone();
     let app = window.app_handle().clone();
-    let closing = observer.clone();
+    let closing = app.clone();
     window.on_window_event(move |event| {
         if matches!(event, WindowEvent::Destroyed) {
-            closing.close();
+            closing.state::<request::RequestState>().detach();
         }
     });
     builder

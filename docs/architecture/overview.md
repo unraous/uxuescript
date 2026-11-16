@@ -103,7 +103,11 @@ API Key 的日志格式化会脱敏，配置序列化仍保留明文。读取或
 
 题目从 JS 提取、IPC、Rust 到模型输入统一使用 `id / kind / stem / options / images` 字段；`id` 表示页面显示题号路径。填空额外携带实际空数 `blank_count`，从 DOM 空位容器或填写控件读取，不根据题干下划线猜测。超星公式图片带有可解析元数据时写入 `stem` 或 `options` 的公式占位文本，其他图片以 `[图片N]` 保留原位置，并由 `images` 提供地址；材料和题目的图片分别编号，后端下载后按所属材料或题号标注并发送多模态内容。模型答案使用 `index / explanation / content`，`index` 对应输入的 `id`，不在链路中转换中英文字段。
 
-三个入口统一调用 `solve_questions(payload: Folio)`，请求与答案回填契约不随求解方式改变。Rust 的 [`quiz::solve`](../../src-tauri/src/core/quiz.rs) 在一次入口读取并固定 `SolverKind`，随后直接分流：Native LLM 有字体时递归还原篇标题、材料与题目文字，无字体时直传，检查空卷后读取供应商和通用配置并进入原模型求解；DeepSeek Web 立即返回 `DeepSeek Web Solver 尚未接入`，不读取或校验 Native 供应商、模型，也不请求 Native API。切换设置只影响之后进入的求解，配置锁不会跨异步请求持有。
+三个入口统一调用 `solve_questions(payload: Folio, allow_partial: bool)`，客户端参数与 `Vec<AnswerItem>` 回填契约不随求解方式改变；Tauri 注入应用管理的 B2 `RequestState`，不是客户端参数。Rust 的 [`quiz::solve`](../../src-tauri/src/core/quiz.rs) 在一次入口读取并固定 `SolverKind`，随后直接分流：Native LLM 有字体时递归还原篇标题、材料与题目文字，无字体时直传，检查空卷后读取供应商和通用配置并进入原模型求解；DeepSeek Web 通过 [`web.rs`](../../src-tauri/src/core/quiz/web.rs) 还原字体、读取一次通用每批题数，进入单一 [`web/deepseek.rs`](../../src-tauri/src/core/quiz/web/deepseek.rs) 求解器，不读取或校验 Native 供应商、模型、API Key，也不请求 Native API。切换设置只影响之后进入的求解，配置锁不会跨异步请求持有。
+
+Web 第一版只支持纯文本。发送第一批前递归检查整卷材料与题目的 `images` 必须为空，复用原 `batch::prepare` 完成题号、空数、材料链与拆批，再复用 `prompt` 的题型说明和组装，将 system 与所有文本 part 用两个换行拼为一条 text；全部批次 Prompt 都先组装成功，不下载图片或丢弃图片。批次串行调用 B2 文本请求，默认 120 秒，省略 thinking/webSearch 以保留网页设置。应用管理的请求状态只在目标页面成功调度 bootstrap 后保存实际 Webview handle，窗口 `Destroyed` 时释放；原文档门、BUSY 拒绝与应用生命周期隔离仍生效。首次请求固定宿主文档代次和 JS binding generation，后续批次遇到刷新或切会话停止，不在新绑定续跑，也不建立队列。
+
+仅 B2 `completed` 正文进入原严格答案解析，校验数量、题号、非空内容与空数并还原输入顺序；不摘取 Markdown/JSON 片段。`failed / uncertain / rejected / interrupted` 只交付脱敏的固定错误码、delivery、remote 与隔离状态，不把其正文当答案；格式错误统一报告 `INVALID_ANSWER`，不记录回答片段。Web 全任务 all-or-nothing：即使 `allow_partial=true`，也只有全部批次成功并通过校验才返回答案，任何失败立即停止且不向原回填返回部分结果。不自动 retry、回退 Native API 或清除 B2 quarantine；远端状态未知时仍须人工核对网页并重启应用。设置界面的旧“尚未接通”展示本轮未修改；真实调用与学习通回填验收见[测试说明](../../tests/README.md#deepseek-b3纯文本卷面求解)。
 
 Native 生产入口不解析整页 HTML。字体映射针对字形，不是整个字体文件的哈希；未匹配字符保留原样。章节测验开启人工核验时，在提交前等待用户确认；独立作业和逐题考试仅暂存，整卷预览考试提示用户自行保存和交卷。
 

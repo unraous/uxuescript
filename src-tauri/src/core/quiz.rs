@@ -1,6 +1,7 @@
 mod mapper;
 mod payload;
 mod typr;
+mod web;
 
 pub mod folio;
 pub mod llm;
@@ -10,11 +11,16 @@ use llm::AnswerItem;
 use mapper::decrypt;
 pub use payload::{Question, QuestionData, QuestionImage};
 
+use crate::app::webview::deepseek::request::RequestState;
 use crate::config::{CONFIG, solver::SolverKind};
 use anyhow::Result;
 
 /// 根据本次入口选定的求解方式生成测验答案。
-pub async fn solve(payload: Folio, allow_partial: bool) -> Result<Vec<AnswerItem>> {
+pub async fn solve(
+    payload: Folio,
+    allow_partial: bool,
+    requests: &RequestState,
+) -> Result<Vec<AnswerItem>> {
     let solver = *CONFIG.solver.lock();
     match solver {
         SolverKind::NativeLlm => {
@@ -34,7 +40,8 @@ pub async fn solve(payload: Folio, allow_partial: bool) -> Result<Vec<AnswerItem
             let general = *CONFIG.general.lock();
             llm::solve(&provider, decrypted, general, allow_partial).await
         }
-        SolverKind::DeepSeekWeb => anyhow::bail!("DeepSeek Web Solver 尚未接入"),
+        // Web 第一版只交付整卷成功结果；allow_partial 仅沿用 Native 语义。
+        SolverKind::DeepSeekWeb => web::solve(payload, requests).await,
     }
 }
 

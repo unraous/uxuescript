@@ -90,4 +90,8 @@ async fn navigation_ends_a_dispatched_request_and_late_completion_cannot_unlock_
     assert_eq!(flight.finish(false), Err("DOCUMENT_INTERRUPTED"));
     state.observer.begin().unwrap();
     assert_eq!(state.claim().err(), Some("QUARANTINED"));
+    // 关闭目标释放 handle，但远端未知的隔离事实不能被 missing target 覆盖。
+    state.detach();
+    let result = state.generate_text("text", Options::default(), &TextBinding::default()).await;
+    assert_eq!(result.err(), Some("QUARANTINED"));
 }

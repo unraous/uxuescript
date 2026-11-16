@@ -61,10 +61,20 @@ mod tests;
 
 #[uxs_commands::command(webview = "chaoxing")]
 pub async fn solve_questions(
+    state: tauri::State<'_, super::deepseek::RequestState>,
     payload: Folio,
     allow_partial: bool,
 ) -> CommandsResult<Vec<AnswerItem>> {
-    match solve(payload, allow_partial).await {
+    solve_questions_with(state.inner(), payload, allow_partial).await
+}
+
+/// 生产入口与本地协议验证共用业务调用，不要求测试构造 Tauri Runtime。
+pub(crate) async fn solve_questions_with(
+    requests: &super::deepseek::RequestState,
+    payload: Folio,
+    allow_partial: bool,
+) -> CommandsResult<Vec<AnswerItem>> {
+    match solve(payload, allow_partial, requests).await {
         Ok(answers) => {
             log::info!("solve_questions 答题成功，获得答案数量: {}", answers.len());
             Ok(answers)

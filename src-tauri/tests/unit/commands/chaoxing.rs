@@ -105,15 +105,22 @@ async fn solver_commands_update_memory_without_changing_native_configuration() {
 }
 
 #[tokio::test]
-async fn web_solver_reports_not_connected_without_native_provider() {
+async fn web_solver_reports_missing_webview_without_native_provider() {
     let error = probe_with_solver(
         None,
         crate::config::solver::SolverKind::DeepSeekWeb,
-        super::solve_questions(solver_payload(), false),
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
+            solver_payload(),
+            false,
+        ),
     )
     .await
     .unwrap_err();
-    assert_eq!(error.to_string(), "DeepSeek Web Solver 尚未接入");
+    assert_eq!(
+        error.to_string(),
+        "DeepSeek Web WEBVIEW_NOT_OPEN: delivery=not_sent remote=not_started quarantined=false；本次任务停止，未返回部分答案"
+    );
 }
 
 #[tokio::test]
@@ -127,11 +134,18 @@ async fn web_solver_does_not_validate_native_models() {
         let error = probe_with_solver(
             Some(&provider),
             crate::config::solver::SolverKind::DeepSeekWeb,
-            super::solve_questions(solver_payload(), false),
+            super::solve_questions_with(
+                &super::super::deepseek::RequestState::default(),
+                solver_payload(),
+                false,
+            ),
         )
         .await
         .unwrap_err();
-        assert_eq!(error.to_string(), "DeepSeek Web Solver 尚未接入");
+        assert_eq!(
+            error.to_string(),
+            "DeepSeek Web WEBVIEW_NOT_OPEN: delivery=not_sent remote=not_started quarantined=false；本次任务停止，未返回部分答案"
+        );
     }
 }
 
@@ -146,14 +160,18 @@ async fn web_solver_does_not_send_native_api_requests() {
     let result = probe_with_solver(
         Some(&provider(protocol, url)),
         crate::config::solver::SolverKind::DeepSeekWeb,
-        super::solve_questions(solver_payload(), false),
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
+            solver_payload(),
+            false,
+        ),
     )
     .await;
     let sent_native_request = requests.is_finished();
     requests.abort();
     assert_eq!(
         result.unwrap_err().to_string(),
-        "DeepSeek Web Solver 尚未接入"
+        "DeepSeek Web WEBVIEW_NOT_OPEN: delivery=not_sent remote=not_started quarantined=false；本次任务停止，未返回部分答案"
     );
     assert!(
         !sent_native_request,
@@ -162,15 +180,19 @@ async fn web_solver_does_not_send_native_api_requests() {
 }
 
 #[tokio::test]
-async fn web_solver_reports_not_connected_even_for_an_empty_folio() {
+async fn web_solver_validates_an_empty_folio_before_generating() {
     let error = probe_with_solver(
         None,
         crate::config::solver::SolverKind::DeepSeekWeb,
-        super::solve_questions(Folio::default(), false),
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
+            Folio::default(),
+            false,
+        ),
     )
     .await
     .unwrap_err();
-    assert_eq!(error.to_string(), "DeepSeek Web Solver 尚未接入");
+    assert_eq!(error.to_string(), "接收到空的题目列表");
 }
 
 #[tokio::test]
@@ -187,7 +209,11 @@ async fn native_solver_keeps_all_protocols_on_the_solve_questions_entry() {
         let (url, request) = serve(200, body).await;
         let result = probe_with(
             &provider(protocol, url),
-            super::solve_questions(solver_payload(), false),
+            super::solve_questions_with(
+                &super::super::deepseek::RequestState::default(),
+                solver_payload(),
+                false,
+            ),
         )
         .await
         .unwrap();
@@ -207,7 +233,11 @@ async fn native_solver_keeps_empty_folio_and_provider_validation() {
         let error = probe_with_solver(
             None,
             crate::config::solver::SolverKind::NativeLlm,
-            super::solve_questions(payload, false),
+            super::solve_questions_with(
+                &super::super::deepseek::RequestState::default(),
+                payload,
+                false,
+            ),
         )
         .await
         .unwrap_err();
@@ -218,9 +248,16 @@ async fn native_solver_keeps_empty_folio_and_provider_validation() {
         "http://127.0.0.1:1".into(),
     );
     native.chosen_model = None;
-    let error = probe_with(&native, super::solve_questions(solver_payload(), false))
-        .await
-        .unwrap_err();
+    let error = probe_with(
+        &native,
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
+            solver_payload(),
+            false,
+        ),
+    )
+    .await
+    .unwrap_err();
     assert!(error.to_string().contains("选择有效模型"));
 }
 
@@ -241,7 +278,8 @@ async fn sends_question_payload_to_the_selected_model_without_a_font() {
     let questions: Vec<Question> = serde_json::from_value(input.clone()).unwrap();
     let result = probe_with(
         &provider(protocol, url),
-        super::solve_questions(
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
             Folio {
                 entries: questions.into_iter().map(Entry::Question).collect(),
                 ..Default::default()
@@ -287,7 +325,11 @@ async fn decrypts_question_payload_before_sending_it_to_the_model() {
     };
     let result = probe_with(
         &provider(protocol, url),
-        super::solve_questions(payload, false),
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
+            payload,
+            false,
+        ),
     )
     .await
     .unwrap();

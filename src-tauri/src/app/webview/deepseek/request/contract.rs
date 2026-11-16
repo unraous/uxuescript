@@ -79,6 +79,80 @@ pub enum Generation {
 }
 
 impl Generation {
+    /// Quiz 错误会被命令日志记录；只交付固定协议状态，不带上游正文或会话信息。
+    pub(crate) fn failure_summary(&self) -> Option<String> {
+        let (code, delivery, remote, quarantined) = match self {
+            Self::Completed { .. } => return None,
+            Self::Failed { error, .. }
+            | Self::Uncertain { error, .. }
+            | Self::Rejected { error, .. } => (
+                error.code.as_str(),
+                &error.delivery,
+                error.remote.as_str(),
+                self.needs_quarantine(),
+            ),
+            Self::Interrupted {
+                code,
+                delivery,
+                remote,
+                quarantined,
+                ..
+            } => (code.as_str(), delivery, remote.as_str(), *quarantined),
+        };
+        let code = match code {
+            "ATTACHMENT_FAILED"
+            | "BUSY"
+            | "CANCELLED"
+            | "CAPABILITY_UNAVAILABLE"
+            | "COMPOSER_NOT_EMPTY"
+            | "DISPOSED"
+            | "ILLEGAL_STATE_TRANSITION"
+            | "INSTANCE_EXISTS"
+            | "INTERNAL_ERROR"
+            | "INVALID_REQUEST"
+            | "NOT_AUTHENTICATED"
+            | "NOT_INITIALIZED"
+            | "PAGE_NAVIGATED"
+            | "PAGE_NOT_READY"
+            | "RESPONSE_INTERRUPTED"
+            | "RESPONSE_TIMEOUT"
+            | "RESPONSE_UNCERTAIN"
+            | "SEND_FAILED"
+            | "SEND_UNCERTAIN"
+            | "SESSION_MISMATCH"
+            | "UNSUPPORTED_INPUT"
+            | "PROTOCOL_ERROR"
+            | "UNEXPECTED_ERROR"
+            | "DOCUMENT_INTERRUPTED"
+            | "BINDING_CHANGED"
+            | "REQUEST_INTERRUPTED"
+            | "READ_TIMEOUT"
+            | "CALLBACK_DROPPED"
+            | "EVAL_DISPATCH_FAILED"
+            | "INVALID_ACK"
+            | "IDENTITY_MISMATCH"
+            | "INVALID_RESULT"
+            | "SLOT_LOST"
+            | "HOST_TIMEOUT"
+            | "ACK_REJECTED"
+            | "SERIALIZE_FAILED" => code,
+            _ => "UPSTREAM_ERROR",
+        };
+        let delivery = match delivery {
+            Delivery::NotSent => "not_sent",
+            Delivery::Unknown => "unknown",
+            Delivery::Confirmed => "confirmed",
+        };
+        let remote = match remote {
+            "not_started" | "generating" | "completed" | "stopped" => remote,
+            _ => "unknown",
+        };
+        Some(format!(
+            "{code}: status={} delivery={delivery} remote={remote} quarantined={quarantined}",
+            self.status()
+        ))
+    }
+
     pub(super) fn request_id(&self) -> &str {
         match self {
             Self::Completed { request_id, .. }

@@ -77,6 +77,45 @@ await window.__TAURI_INTERNALS__.invoke("deepseek_generate_text", {
 
 定向 `deepseek-bootstrap.test.js` 保留 B1 的 27 个用例，B2 仅增加 4 个核心场景：完整结果/去重关联、failed/uncertain 与隔离、Promise reject/SDK 关联、SPA 中断/晚结果。Rust 保留 B1 18 个用例，并合并 3 个 B2 场景验证单请求与安全 JSON、完整终态关联、导航及 sticky 隔离。这些 mock/本地状态验证不代表真实 Adapter DOM 或 WebView2 生成通过；真实桌面生成由操作者单独验收。
 
+## DeepSeek B3：纯文本卷面求解
+
+B3 将原 `solve_questions` 的 Web 分支接入 B2 文本生成，不新增诊断命令、界面、学习通提取或回填实现。客户端仍传 `payload: Folio` 与 `allowPartial: boolean`，返回同一 `AnswerItem[]`（`index / explanation / content` 均为字符串）。Native 原配置、三协议、字体还原与 `allow_partial` 语义不变；Web 不读取 Native 提供商或模型。
+
+第一版只接受整卷无图片的输入：材料与题目图片在第一次发送前检查，所有批次沿原材料链、题型规则预组装完成，之后串行生成。只解析 `completed` 的严格 JSON 数组或 `{ answers }`；不摘取代码块或修复格式，不 retry，不回退 API。Web all-or-nothing，即使 `allowPartial: true`，任一批次失败也不返回部分答案给回填。首次批次固定文档与 JS 绑定，批间刷新或换会话直接停止；B2 BUSY 和应用生命周期 quarantine 不绕开、不 reset。省略 thinking/webSearch 保留网页开关，默认 timeout 120 秒。
+
+定向验证（已有脚本产物可直接复用）：Windows MSVC 的 library unit test 不继承 Tauri 仅给 bin 链入的 Common Controls v6 `resource.lib`；本 crate 的 `build.rs` 为库测试请求 rustc 自动嵌入 v6 manifest，并以后发的 bin-only `/MANIFEST:NO` 保留 Tauri 原清单，避免两份 `MANIFEST 24/1/1033` 资源冲突。
+
+```powershell
+cargo test --manifest-path src-tauri/Cargo.toml -p uxuescript core::quiz::web::deepseek::tests --locked --lib
+cargo test --manifest-path src-tauri/Cargo.toml -p uxuescript commands::chaoxing::tests --locked --lib
+cargo test --manifest-path src-tauri/Cargo.toml -p uxuescript app::webview --locked --lib
+pnpm exec vitest run tests/scripts/deepseek-bootstrap.test.js
+```
+
+三个合并核心场景验证真实 Prompt 管线、材料引用与乱序 JSON 恢复；后批格式错误/uncertain 不重试也不返回部分答案；整卷后段题图、材料图与不支持题型在发送前拒绝。命令用例继续验证 Web 不访问 Native 配置或 API、空卷校验，以及 Native 三协议正常入口。受控生成只替代网页请求，不替代实际批处理、Prompt 或答案解析；这些本地验证不能证明真实 DOM、模型格式或学习通回填。
+
+真实首轮须在已登录、已有 UUID 会话且 B1 ready/valid 的前提下，由操作者明确选择现有 DeepSeek Web 求解方式；设置面板旧“尚未接通”文案本轮不改。也可由操作者在同一**本地 main** DevTools 显式选择并调用原命令（不是远程 DeepSeek 页）：
+
+```js
+await window.__TAURI_INTERNALS__.invoke("set_solver", { kind: "deep_seek_web" });
+await window.__TAURI_INTERNALS__.invoke("solve_questions", {
+  payload: {
+    entries: [{
+      type: "question",
+      data: {
+        id: "1", kind: "单选题", stem: "中国的首都是？",
+        options: ["A 北京", "B 上海"], blank_count: null, images: [],
+      },
+    }],
+    font: null,
+    context: {},
+  },
+  allowPartial: false,
+});
+```
+
+成功应返回一个 `AnswerItem`，`index` 为 `"1"`、`content` 为 `"A"`，`explanation` 为模型实际说明；核对网页只发送一次及 B2 完整终态、B3 `batch_parsed answers=1` 日志。这个合成单题证明 Folio→Prompt→网页生成→严格解析的 Rust 闭环，不证明学习通实际回填。后者需要操作者自备可安全测试的**纯文本**练习/作业页，通过原业务入口核对题号、选项或文本编辑器；不自动提交，也不能把暂存、服务器评分与填写等同。若暂无真实任务页，应明确记录这项验收未知，不宣称完整回填通过。
+
 ## 按需外部联测
 
 先查看可用入口，再配置对应服务与凭据（`.env` 或环境变量），只运行所需用例：

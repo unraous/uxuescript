@@ -7,7 +7,7 @@ use crate::core::quiz::{
     folio::{FolioContext, Section},
 };
 
-pub(super) struct ScopedQuestion {
+pub(in crate::core::quiz) struct ScopedQuestion {
     pub question: Question,
     pub passages: Vec<String>,
 }
@@ -24,9 +24,9 @@ pub(super) struct Material {
     pub images: Vec<QuestionImage>,
 }
 
-pub(super) struct Batch {
-    pub context: FolioContext,
-    pub materials: Vec<Material>,
+pub(in crate::core::quiz) struct Batch {
+    pub(super) context: FolioContext,
+    pub(super) materials: Vec<Material>,
     pub questions: Vec<ScopedQuestion>,
 }
 
@@ -77,7 +77,7 @@ fn collect<'a>(
 }
 
 /// 同一材料的题优先同批；按题数拆分时保留全部祖先材料和稳定引用。
-pub(super) fn prepare(folio: Folio, size: usize) -> Result<Vec<Batch>> {
+pub(in crate::core::quiz) fn prepare(folio: Folio, size: usize) -> Result<Vec<Batch>> {
     let mut leaves = Vec::new();
     collect(&folio.entries, "p", &[], &mut leaves);
     validate(&leaves)?;
