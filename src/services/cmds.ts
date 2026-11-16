@@ -45,6 +45,8 @@ export const commands = {
 	/**  将内存中的全局配置持久化保存至本地文件。 */
 	saveConfig: () => __TAURI_INVOKE<null>("save_config"),
 	paths: () => __TAURI_INVOKE<PathsConfig>("paths"),
+	/**  开发诊断沿正常生成管线注册，非 debug 构建在入口拒绝；启动流程不发请求。 */
+	deepseekGenerateText: (text: string, timeoutMs: number | null, thinking: boolean | null, webSearch: boolean | null) => __TAURI_INVOKE<Generation>("deepseek_generate_text", { text, timeoutMs, thinking, webSearch }),
 	/**  显示调用方对应的确认遮罩，并在退出动画及隐藏完成后返回选择。 */
 	confirm: (message: string, options: {
 	title: string | null,
@@ -136,6 +138,8 @@ export type CourseMetadata = {
 
 export type CourseStatus = { kind: "waiting"; payload: null } | { kind: "start"; payload: null } | { kind: "chapter"; payload: ChapterProgressPayload } | { kind: "tab"; payload: TabProgressPayload } | { kind: "task"; payload: TaskProgressPayload } | { kind: "cancel"; payload: null } | { kind: "finish"; payload: null };
 
+export type Delivery = "not_sent" | "unknown" | "confirmed";
+
 /**  条目：篇负责组织关系，题负责表达需要作答的内容。 */
 export type Entry = { type: "section"; data: Section } | { type: "question"; data: Question };
 
@@ -210,6 +214,8 @@ export type GeneralConfig = {
 	batchSize?: number,
 };
 
+export type Generation = { status: "completed"; requestId: string; content: string; durationMs: number } | { status: "failed"; requestId: string; error: RequestError; durationMs: number } | { status: "uncertain"; requestId: string; error: RequestError; durationMs: number } | { status: "rejected"; requestId: string; error: RequestError; durationMs: number } | { status: "interrupted"; requestId: string; code: string; delivery: Delivery; remote: string; quarantined: boolean };
+
 /**  支持的大模型 API 发包协议族 */
 export type LLMProtocol = "OpenAIChatCompletions" | "OpenAIResponses" | "GoogleGemini";
 
@@ -263,6 +269,18 @@ export type QuestionImage = {
 	marker: string,
 	url: string,
 };
+
+export type RequestError = {
+	code: string,
+	message: string,
+	stage: string,
+	delivery: Delivery,
+	remote: string,
+	retryable: boolean,
+	diagnostics: { [key in string]: Scalar },
+};
+
+export type Scalar = string | number | null | boolean | "Null";
 
 /**  篇：题型分区或材料题组；子篇可以拥有自己的材料。 */
 export type Section = {

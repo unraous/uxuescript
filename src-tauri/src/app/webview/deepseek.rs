@@ -1,9 +1,11 @@
+pub(crate) mod request;
+
 use crate::core::script::include_script;
 use parking_lot::Mutex;
 use serde::Deserialize;
 use std::{sync::Arc, time::Duration};
 use tauri::webview::{PageLoadEvent, PageLoadPayload};
-use tauri::{Url, Webview, WebviewBuilder, Window, WindowEvent, Wry};
+use tauri::{Manager, Url, Webview, WebviewBuilder, Window, WindowEvent, Wry};
 use tokio::sync::oneshot;
 
 pub(super) fn is_target_url(url: &Url) -> bool {
@@ -148,10 +150,15 @@ struct Page {
     generation: u64,
     closed: bool,
     stop: Option<oneshot::Sender<()>>,
+    loaded: bool,
+    request: Option<request::InFlight>,
+    quarantined: bool,
 }
 
 fn invalidate(page: &mut Page) {
     page.generation += 1;
+    page.loaded = false;
+    request::interrupt(page);
     if let Some(stop) = page.stop.take() {
         let _ = stop.send(());
     }
@@ -164,6 +171,7 @@ impl Observer {
             return None;
         }
         invalidate(&mut page);
+        page.loaded = true;
         let (stop, cancelled) = oneshot::channel();
         page.stop = Some(stop);
         Some((page.generation, cancelled))
@@ -292,7 +300,8 @@ async fn observe(
     }
 }
 
-fn load_on(webview: Webview, payload: PageLoadPayload<'_>, observer: &Arc<Observer>) {
+fn load_on(webview: Webview, payload: PageLoadPayload<'_>, requests: &request::RequestState) {
+    let observer = &requests.observer;
     if payload.event() == PageLoadEvent::Started {
         observer.cancel();
         return;
@@ -304,10 +313,13 @@ fn load_on(webview: Webview, payload: PageLoadPayload<'_>, observer: &Arc<Observ
     let Some((epoch, cancelled)) = observer.begin() else {
         return;
     };
-    if webview
-        .eval(include_script!("deepseek-bootstrap.js"))
-        .is_err()
-    {
+    let token =
+        serde_json::to_string(&requests.document_token(epoch)).expect("document token JSON");
+    let bootstrap = format!(
+        "{}\n;(() => {{ const controller = globalThis.__UXS_DEEPSEEK_B1__; if (controller && !controller.bindDocument({token})) console.warn('[uXS DeepSeek B2] document DOCUMENT_BIND_REJECTED'); }})();",
+        include_script!("deepseek-web-bootstrap.js")
+    );
+    if webview.eval(&bootstrap).is_err() {
         log::warn!("DeepSeek B1 document={epoch} BOOTSTRAP_EVAL_DISPATCH_FAILED");
     }
     tauri::async_runtime::spawn(observe(webview, observer.clone(), epoch, cancelled));
@@ -332,7 +344,8 @@ pub(super) fn configure(
     builder: WebviewBuilder<Wry>,
     allow_navigation: fn(&Url) -> bool,
 ) -> WebviewBuilder<Wry> {
-    let observer = Arc::new(Observer::default());
+    let observer = window.state::<request::RequestState>().observer.clone();
+    let app = window.app_handle().clone();
     let closing = observer.clone();
     window.on_window_event(move |event| {
         if matches!(event, WindowEvent::Destroyed) {
@@ -342,7 +355,9 @@ pub(super) fn configure(
     builder
         .initialization_script(adapter_initialization_script())
         .on_navigation(navigation_handler(observer.clone(), allow_navigation))
-        .on_page_load(move |webview, payload| load_on(webview, payload, &observer))
+        .on_page_load(move |webview, payload| {
+            load_on(webview, payload, &app.state::<request::RequestState>());
+        })
 }
 
 #[cfg(test)]

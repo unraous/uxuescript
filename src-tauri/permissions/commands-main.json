@@ -16,6 +16,7 @@
           "current_solver",
           "current_theme",
           "current_url",
+          "deepseek_generate_text",
           "download_update",
           "fetch_ollama_models",
           "general",

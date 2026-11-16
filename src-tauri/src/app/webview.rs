@@ -1,6 +1,6 @@
 use super::config::CONFIG;
 
-mod deepseek;
+pub(crate) mod deepseek;
 use crate::core::{
     script::{include_script, load_on},
     url::{Type, classify},

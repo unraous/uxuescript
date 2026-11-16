@@ -1,10 +1,10 @@
 import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { main } from "@injected/deepseek/bootstrap.js";
+import { main } from "@injected/deepseek-web/bootstrap.js";
 import adapterScript from "../../external-scripts/deepseek-web-adapter.iife.js?raw";
 
-/** @typedef {import("@injected/deepseek/bootstrap.js").Adapter} Adapter */
-/** @typedef {import("@injected/deepseek/bootstrap.js").Host} Host */
+/** @typedef {import("@injected/deepseek-web/bootstrap.js").Adapter} Adapter */
+/** @typedef {import("@injected/deepseek-web/bootstrap.js").Host} Host */
 const host = /** @type {Host} */ (globalThis);
 const firstId = "11111111-1111-4111-8111-111111111111";
 const secondId = "22222222-2222-4222-8222-222222222222";
@@ -65,6 +65,12 @@ function adapter(
       if (registered === instance) registered = null;
     }),
     generate: vi.fn(),
+    cancel: vi.fn(async (requestId) => ({
+      requestId,
+      localWaitCancelled: true,
+      delivery: /** @type {const} */ ("unknown"),
+      remoteStop: /** @type {const} */ ("not_observed"),
+    })),
   };
   return instance;
 }
@@ -159,6 +165,209 @@ afterEach(async () => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe("DeepSeek B2 single request bridge", () => {
+  const identity = {
+    documentToken: "process:document-1",
+    bindingGeneration: 0,
+    requestId: "process:request-1",
+  };
+  const envelope = {
+    ...identity,
+    text: 'quoted " text\n完整回答',
+    options: { timeoutMs: 1_000 },
+  };
+  const completed = {
+    requestId: identity.requestId,
+    sessionId: firstId,
+    status: /** @type {const} */ ("completed"),
+    content: "完整回答\n不是 response 对象",
+    durationMs: 25,
+  };
+
+  async function ready() {
+    const owned = adapter();
+    installApi([owned, adapter(undefined, undefined, secondId)]);
+    main();
+    await settle();
+    const controller = host.__UXS_DEEPSEEK_B1__;
+    expect(controller.bindDocument(identity.documentToken)).toBe(true);
+    return { owned, controller };
+  }
+
+  it("retains the complete correlated result until ack and deduplicates start without sending twice", async () => {
+    const { owned, controller } = await ready();
+    const pending = deferred();
+    owned.generate.mockImplementation(async () => {
+      await pending.promise;
+      return completed;
+    });
+    const accepted = controller.start(envelope);
+    expect(accepted).toEqual({ kind: "accepted", ...identity });
+    expect(
+      controller.start({ ...envelope, text: "must not replace the original" }),
+    ).toEqual(accepted);
+    expect(owned.generate).toHaveBeenCalledOnce();
+    expect(owned.generate).toHaveBeenCalledWith({
+      requestId: identity.requestId,
+      sessionId: firstId,
+      parts: [{ type: "text", text: envelope.text }],
+      options: envelope.options,
+    });
+    expect(
+      controller.start({ ...envelope, requestId: "second" }),
+    ).toMatchObject({ kind: "rejected", code: "BUSY" });
+    pending.resolve();
+    await settle();
+    expect(controller.read(identity)).toEqual({
+      kind: "terminal",
+      ...identity,
+      result: {
+        requestId: identity.requestId,
+        status: "completed",
+        content: completed.content,
+        durationMs: 25,
+      },
+    });
+    expect(controller.read(identity)).toEqual(controller.read(identity));
+    expect(controller.ack({ ...identity, requestId: "foreign" })).toBe(false);
+    expect(controller.ack(identity)).toBe(true);
+    expect(controller.read(identity)).toMatchObject({
+      kind: "rejected",
+      code: "SLOT_MISSING",
+    });
+    expect(warning).not.toHaveBeenCalled();
+  });
+
+  it("preserves failed and uncertain error semantics, releasing only safe not-sent failure", async () => {
+    const { owned, controller } = await ready();
+    const error = {
+      code: "COMPOSER_NOT_EMPTY",
+      message: "input was preserved",
+      stage: "checking_page",
+      delivery: /** @type {const} */ ("not_sent"),
+      remote: "not_started",
+      retryable: false,
+      diagnostics: { candidateCount: 2 },
+    };
+    owned.generate.mockResolvedValue({ ...completed, status: "failed", error });
+    controller.start(envelope);
+    await settle();
+    expect(controller.read(identity)).toMatchObject({
+      kind: "terminal",
+      result: { status: "failed", error },
+    });
+    expect(controller.read(identity)).not.toHaveProperty("result.content");
+    expect(controller.ack(identity)).toBe(true);
+    const next = { ...envelope, requestId: "process:request-2" };
+    owned.generate.mockResolvedValue({
+      ...completed,
+      requestId: next.requestId,
+      status: "uncertain",
+      error: {
+        ...error,
+        code: "RESPONSE_TIMEOUT",
+        delivery: "confirmed",
+        remote: "generating",
+      },
+    });
+    expect(controller.start(next).kind).toBe("accepted");
+    await settle();
+    expect(controller.read(next)).toMatchObject({
+      kind: "terminal",
+      result: {
+        status: "uncertain",
+        error: {
+          delivery: "confirmed",
+          remote: "generating",
+          code: "RESPONSE_TIMEOUT",
+        },
+      },
+    });
+    controller.ack(next);
+    expect(
+      controller.start({ ...envelope, requestId: "process:request-3" }),
+    ).toMatchObject({ kind: "rejected", code: "QUARANTINED" });
+    expect(owned.generate).toHaveBeenCalledTimes(2);
+  });
+
+  it("serializes rejected Error messages explicitly and quarantines a wrong SDK identity", async () => {
+    const { owned, controller } = await ready();
+    owned.generate.mockRejectedValue(
+      Object.assign(
+        new Error("not enumerable, delivered only to local caller"),
+        { code: "INVALID_REQUEST", stage: "validating", retryable: false },
+      ),
+    );
+    controller.start(envelope);
+    await settle();
+    expect(controller.read(identity)).toMatchObject({
+      kind: "terminal",
+      result: {
+        status: "rejected",
+        error: {
+          code: "INVALID_REQUEST",
+          message: "not enumerable, delivered only to local caller",
+          delivery: "not_sent",
+          remote: "not_started",
+        },
+      },
+    });
+    controller.ack(identity);
+    const next = { ...envelope, requestId: "process:request-2" };
+    owned.generate.mockResolvedValue({
+      ...completed,
+      requestId: next.requestId,
+      sessionId: secondId,
+    });
+    controller.start(next);
+    await settle();
+    expect(controller.read(next)).toMatchObject({
+      kind: "terminal",
+      result: {
+        status: "rejected",
+        error: { code: "PROTOCOL_ERROR", delivery: "unknown" },
+      },
+    });
+    controller.ack(next);
+    expect(
+      controller.start({ ...envelope, requestId: "process:request-3" }),
+    ).toMatchObject({ kind: "rejected", code: "QUARANTINED" });
+    expect(warning.mock.calls.flat().join(" ")).not.toContain("not enumerable");
+    expect(warning.mock.calls.flat().join(" ")).not.toContain(secondId);
+  });
+
+  it("ends an inflight SPA binding synchronously and never publishes its late completed result", async () => {
+    const { owned, controller } = await ready();
+    const pending = deferred();
+    owned.generate.mockImplementation(async () => {
+      await pending.promise;
+      return completed;
+    });
+    controller.start(envelope);
+    page.history.pushState(null, "", secondPath);
+    expect(controller.read(identity)).toMatchObject({
+      kind: "interrupted",
+      code: "BINDING_CHANGED",
+    });
+    pending.resolve();
+    await settle();
+    expect(controller.read(identity)).toMatchObject({
+      kind: "interrupted",
+      code: "BINDING_CHANGED",
+    });
+    expect(controller.read(identity)).not.toHaveProperty("result");
+    controller.ack(identity);
+    expect(
+      controller.start({
+        ...envelope,
+        bindingGeneration: snapshot().generation,
+        requestId: "process:request-2",
+      }),
+    ).toMatchObject({ kind: "rejected", code: "QUARANTINED" });
+    expect(owned.generate).toHaveBeenCalledOnce();
+  });
 });
 
 describe("DeepSeek B1 bootstrap public adapter integration", () => {

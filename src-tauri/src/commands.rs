@@ -1,5 +1,6 @@
 pub mod chaoxing;
 pub mod config;
+pub mod deepseek;
 pub mod mask;
 pub mod task;
 pub mod updater;

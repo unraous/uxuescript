@@ -26,7 +26,7 @@ cargo test --workspace --locked
 
 ## DeepSeek B1：加载、绑定与只读诊断
 
-B1 仅接通 debug 构建中的原生 `deepseek-debug` Window 与子 `deepseek` Webview，不接通题目求解。文档创建时，只在顶层且精确 `https://chat.deepseek.com` origin 中执行原样外部 IIFE；加载完成后执行内部 `deepseek-bootstrap`。JavaScript 唯一管理实例创建、初始化和清理；Rust 每轮用 `Webview::eval_with_callback` 读取同步 JSON 快照，不把异步工作的调度当作初始化完成。
+B1 仅接通 debug 构建中的原生 `deepseek-debug` Window 与子 `deepseek` Webview，不接通题目求解。文档创建时，只在顶层且精确 `https://chat.deepseek.com` origin 中执行原样外部 IIFE；加载完成后执行内部 `deepseek-web-bootstrap`（源码 `injected/deepseek-web/bootstrap.js`）。JavaScript 唯一管理实例创建、初始化和清理；Rust 每轮用 `Webview::eval_with_callback` 读取同步 JSON 快照，不把异步工作的调度当作初始化完成。
 
 指定本地检查：
 
@@ -53,6 +53,29 @@ cargo test --manifest-path src-tauri/Cargo.toml -p uxuescript app::webview --loc
 可在调试窗控制台同步读取 `globalThis.__UXS_DEEPSEEK_B1__.snapshot()`；其中 `initialization` 明确区分 `not_started` / `pending` / `fulfilled` / `rejected`。`generation` 是既有 JS 同文档失效代次，初始为 0，只在捕获路径变化或销毁时推进，重复读取不会推进。Rust 日志的 `document` 是宿主导航观测代次，`binding_generation` 是快照中的 JS 代次，两者不能混同；即使两次成功重绑的其余 `ready` 字段相同，JS 代次变化也会产生新的脱敏日志。`ready` / `valid` 已约束成功绑定代次等于当前 JS 代次，因此新代次的有效快照可以证明发生重新绑定。
 
 默认 Adapter 的初始化通常很快，1 秒宿主采样可能跨过短暂的 `pending`，不要求每次都在日志中看到它。`valid` 只证明成功初始化的缓存 Session 与当前准确路径匹配，不证明认证或 DOM 此刻仍然就绪。Rust 只在诊断变化时记录日志，单轮读取最多等待 2 秒；日志不得包含 UUID、含 UUID 的完整 URL、认证信息、输入或对话内容。
+
+## DeepSeek B2：单请求与完整终态
+
+B2 不接入 Quiz、Folio 或 Router，也不在启动、绑定或采样时发送请求。debug 构建的 `deepseek_generate_text` 仅允许实际本地 `main` Webview（同时核对标签、父窗口及本地页面来源）；无远程 DeepSeek capability。操作者在本地 main DevTools 中显式调用后，Rust 单请求状态生成唯一 requestId，bootstrap 从同一同步段中的 owned Adapter `getSession()` 取绑定 Session，再调用 `generate()`。Rust 不传 UUID。
+
+控制器沿 B1 增加 `bindDocument / start / read / cancel / ack`，仍唯一拥有 Adapter 生命周期；`snapshot()` 不驱动请求。请求身份为宿主文档 token、JS binding generation 与 requestId。同身份重复 start 只确认原请求，完整终态存于唯一 JS 内存槽，直到 Rust 同步轮询读到结果并 ack；没有队列或自动重试。Rust 通过 `eval_with_callback` 每次只读同步返回，单 callback 2 秒、终态轮询 250ms，总等待为 Adapter timeout 加短传输宽限。
+
+诊断接受 `text`，可选 `timeoutMs`（默认 120000，范围 1000..600000）、`thinking`、`webSearch`。省略两种开关保持网页当前设置，不隐式传 false。返回 `completed` 的完整 `content`，或者原 `failed / uncertain / rejected` 的结构化错误；Promise reject 的非枚举 Error.message 也显式交付，仅本地调用者可读，不自动记录 prompt、回答、Session UUID 或上游异常正文。诊断日志只含请求身份、固定状态及内容字节数；`stage=start_dispatched` 仅表示宿主调度，同一 requestId 的 terminal 摘要用于关联，不把调度日志当成远端已确认发送。诊断沿现有管线正常注册，非 debug 构建在命令入口明确拒绝，不扩展生成宏。
+
+在已登录、已有 UUID 会话且 B1 ready/valid 的前提下，由操作者在 main DevTools 执行（示例中的 text 须由操作者决定；不要在 DeepSeek 远程页 invoke）：
+
+```js
+await window.__TAURI_INTERNALS__.invoke("deepseek_generate_text", {
+  text: "请只回复 B2-OK。",
+  timeoutMs: 120000,
+  thinking: false,
+  webSearch: false,
+});
+```
+
+验收核对完整回答与网页正式回答一致，同一时刻第二次调用被 BUSY 拒绝，以及在途 SPA、刷新或关闭立即结束，晚结果不能作为当前结果交付。`uncertain` 或已调度请求后 transport 失联、导航、宿主超时返回明确中断且应用生命周期内隔离后续发送；取消本地等待或调用 Adapter.cancel **不保证远端已停止**。操作者必须自行检查网页、必要时手动停止，再重启应用；无隐式 reset、fallback 或 resume。未发送的普通 failed 不改变其真实语义。
+
+定向 `deepseek-bootstrap.test.js` 保留 B1 的 27 个用例，B2 仅增加 4 个核心场景：完整结果/去重关联、failed/uncertain 与隔离、Promise reject/SDK 关联、SPA 中断/晚结果。Rust 保留 B1 18 个用例，并合并 3 个 B2 场景验证单请求与安全 JSON、完整终态关联、导航及 sticky 隔离。这些 mock/本地状态验证不代表真实 Adapter DOM 或 WebView2 生成通过；真实桌面生成由操作者单独验收。
 
 ## 按需外部联测
 

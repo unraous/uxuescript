@@ -55,6 +55,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .on_window_event(window::listener)
         .manage(UrlStack::default())
+        .manage(app::webview::deepseek::request::RequestState::default())
         .manage(CourseMetaMap::default())
         .manage(TaskSession::default())
         .manage(Confirmations::default())
