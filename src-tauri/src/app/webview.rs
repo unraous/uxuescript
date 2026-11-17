@@ -8,6 +8,8 @@ use parking_lot::Mutex;
 use tauri::utils::config::BackgroundThrottlingPolicy;
 use tauri::{LogicalPosition, LogicalSize, Url, Webview, WebviewBuilder, WebviewUrl};
 
+pub mod layer;
+
 fn select_home_url(old_home: bool) -> Url {
     let url = if old_home {
         "https://i.mooc.chaoxing.com/"

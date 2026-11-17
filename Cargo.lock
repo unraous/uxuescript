@@ -4903,6 +4903,7 @@ dependencies = [
  "dotenv",
  "log",
  "md5",
+ "objc2-app-kit",
  "objc2-foundation",
  "parking_lot",
  "reqwest",
@@ -4924,6 +4925,7 @@ dependencies = [
  "toml 1.1.6+spec-1.1.0",
  "ttf-parser",
  "uxs_commands",
+ "windows",
  "winreg",
 ]
 

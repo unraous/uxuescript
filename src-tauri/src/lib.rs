@@ -25,7 +25,7 @@ pub fn run() {
     #[cfg(debug_assertions)]
     uxs_commands::sync_bindings!();
 
-    use app::webview::UrlStack;
+    use app::webview::{UrlStack, layer::Layers};
     use app::window;
     use commands::chaoxing::CourseMetaMap;
     use commands::mask::Confirmations;
@@ -55,6 +55,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .on_window_event(window::listener)
         .manage(UrlStack::default())
+        .manage(Layers::default())
         .manage(CourseMetaMap::default())
         .manage(TaskSession::default())
         .manage(Confirmations::default())
