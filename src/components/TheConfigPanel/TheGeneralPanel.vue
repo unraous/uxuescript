@@ -2,9 +2,10 @@
 import { computed, onMounted, ref } from "vue";
 import VSelector from "@/components/base/VSelector.vue";
 import VInput from "@/components/base/VInput.vue";
-import { commands } from "@/services/cmds";
+import VToggle from "@/components/base/VToggle.vue";
+import { commands, type GeneralConfig } from "@/services/cmds";
 import { useConfig } from "@/composables/useConfig";
-import { nonZeroU32 } from "@/composables/useConfig/schemas";
+import { boolean, nonZeroU32 } from "@/composables/useConfig/schemas";
 import {
   label,
   labelLanguage,
@@ -28,9 +29,11 @@ const selectLanguage = (index: number) =>
 
 const concurrency = ref("");
 const batchSize = ref("");
+const generalConfig = ref<GeneralConfig>();
 const { load, save, saveField } = useConfig(
   loadLabelLanguage,
   (general) => {
+    generalConfig.value = general;
     concurrency.value = String(general.concurrency ?? 10);
     batchSize.value = String(general.batchSize ?? 5);
   },
@@ -45,6 +48,17 @@ onMounted(load);
       class="option"
       :data="languageData"
       :methods="{ select: selectLanguage }"
+    />
+    <VToggle
+      v-if="generalConfig"
+      id="old-home-toggle"
+      :model-value="generalConfig.oldHome ?? false"
+      :label="label('oldHome')"
+      annotation="开启后使用旧版学习通主页；关闭后使用新版。下次点击 Home 或启动应用时生效。"
+      class="option"
+      @update:model-value="
+        saveField(commands.setGeneral, 'oldHome', $event, boolean)
+      "
     />
     <VInput
       id="model-concurrency"

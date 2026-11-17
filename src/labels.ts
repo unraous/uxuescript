@@ -14,6 +14,7 @@ const labels = {
   model: { en: "Model", zh: "模型" },
   modelConcurrency: { en: "Concurrency", zh: "请求并发数" },
   modelBatchSize: { en: "Batch Size", zh: "每批题数" },
+  oldHome: { en: "Old Chaoxing Home", zh: "旧版学习通主页" },
   endpoint: { en: "Endpoint", zh: "请求地址" },
   apiKey: { en: "API Key", zh: "API 密钥" },
   labelLanguage: { en: "Language", zh: "语言" },

@@ -160,6 +160,27 @@ describe("label language", () => {
     general.unmount();
   });
 
+  it("switches the home version while preserving other settings", async () => {
+    const general = mount(TheGeneralPanel);
+    await flushPromises();
+    const toggle = general.get("#old-home-toggle");
+    expect(toggle.attributes("aria-checked")).toBe("false");
+    await toggle.trigger("click");
+    await flushPromises();
+    expect(mocks.setGeneral).toHaveBeenLastCalledWith({
+      labelLanguage: "en",
+      oldHome: true,
+    });
+    expect(toggle.attributes("aria-checked")).toBe("true");
+    await toggle.trigger("click");
+    await flushPromises();
+    expect(mocks.setGeneral).toHaveBeenLastCalledWith({
+      labelLanguage: "en",
+      oldHome: false,
+    });
+    general.unmount();
+  });
+
   it("filters non-integer text while typing and permits clearing before replacement", async () => {
     const wrapper = mount(TheGeneralPanel);
     await flushPromises();

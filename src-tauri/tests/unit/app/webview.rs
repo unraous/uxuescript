@@ -1,5 +1,14 @@
 use super::*;
 
+#[test]
+fn selects_home_url_by_version() {
+    assert_eq!(select_home_url(false).as_str(), "https://i.chaoxing.com/");
+    assert_eq!(
+        select_home_url(true).as_str(),
+        "https://i.mooc.chaoxing.com/"
+    );
+}
+
 fn url(value: &str) -> Url {
     value.parse().expect("test URL should be valid")
 }

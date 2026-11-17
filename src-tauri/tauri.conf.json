@@ -52,7 +52,6 @@
   "version": "2.5.10",
   "plugins": {
     "uxuescript": {
-      "homeUrl": "https://i.mooc.chaoxing.com/",
       "msi": {
         "componentId": "UpdaterInstallMarker",
         "valueName": "UpdaterInstall",

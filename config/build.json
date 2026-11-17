@@ -6,8 +6,7 @@
     "author": "unraous",
     "title": "uXueScript",
     "identifier": "top.unraous.uxs",
-    "mock_identifier": "top.unraous.uxs.mock",
-    "home_url": "https://i.mooc.chaoxing.com/"
+    "mock_identifier": "top.unraous.uxs.mock"
   },
   "updater": {
     "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY2NDQyODU4QTM3NzU2N0EKUldSNlZuZWpXQ2hFWmlwbkVtWUVPdlhsaGxJc1VBY1V3cUswa2hRQktYYUcrRFBidE9GaGt4eXUK",

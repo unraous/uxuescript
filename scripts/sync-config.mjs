@@ -91,7 +91,6 @@ tauri.bundle.targets = profile === "mock" ? ["msi"] : "all";
 tauri.bundle.windows.wix.componentRefs = [config.msi.component_id];
 tauri.bundle.windows.wix.upgradeCode = msi.upgrade_code;
 tauri.plugins.uxuescript = {
-  homeUrl: config.app.home_url,
   msi: {
     componentId: config.msi.component_id,
     valueName: config.msi.value_name,
