@@ -210,6 +210,7 @@ export type Folio_Serialize = {
 
 export type GeneralConfig = {
 	labelLanguage?: LabelLanguage,
+	oldHome?: boolean,
 	concurrency?: number,
 	batchSize?: number,
 };

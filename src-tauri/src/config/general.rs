@@ -13,6 +13,7 @@ pub enum LabelLanguage {
 #[serde(default, rename_all = "camelCase")]
 pub struct GeneralConfig {
     pub label_language: LabelLanguage,
+    pub old_home: bool,
     #[specta(type = u32)]
     pub concurrency: std::num::NonZeroU32,
     #[specta(type = u32)]
@@ -23,6 +24,7 @@ impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
             label_language: LabelLanguage::default(),
+            old_home: false,
             concurrency: std::num::NonZeroU32::new(10).unwrap(),
             batch_size: std::num::NonZeroU32::new(5).unwrap(),
         }

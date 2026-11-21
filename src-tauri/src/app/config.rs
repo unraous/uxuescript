@@ -1,11 +1,9 @@
 use serde::Deserialize;
 use std::{collections::HashMap, sync::LazyLock};
-use tauri::Url;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
-    pub home_url: Url,
     pub msi: MsiConfig,
 }
 

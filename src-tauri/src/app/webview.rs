@@ -1,6 +1,3 @@
-use super::config::CONFIG;
-
-pub(crate) mod deepseek;
 use crate::core::{
     script::{include_script, load_on},
     url::{Type, classify},
@@ -11,8 +8,24 @@ use parking_lot::Mutex;
 use tauri::utils::config::BackgroundThrottlingPolicy;
 use tauri::{LogicalPosition, LogicalSize, Url, Webview, WebviewBuilder, WebviewUrl};
 
+pub(crate) mod deepseek;
+pub mod layer;
+
 fn is_deepseek_url(url: &Url) -> bool {
     url.host_str() == Some("chat.deepseek.com")
+}
+
+fn select_home_url(old_home: bool) -> Url {
+    let url = if old_home {
+        "https://i.mooc.chaoxing.com/"
+    } else {
+        "https://i.chaoxing.com/"
+    };
+    url.parse().expect("主页 URL 无效")
+}
+
+pub fn home_url() -> Url {
+    select_home_url(crate::config::CONFIG.general.lock().old_home)
 }
 
 #[derive(Default)]
@@ -86,7 +99,7 @@ pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn s
             logical_size,
         ),
         "chaoxing" => (
-            WebviewBuilder::new(label, WebviewUrl::External(CONFIG.home_url.clone()))
+            WebviewBuilder::new(label, WebviewUrl::External(home_url()))
                 .background_color((242, 244, 247).into())
                 .devtools(true)
                 .initialization_script(include_script!("webview-log.js"))

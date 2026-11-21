@@ -61,7 +61,6 @@ it("synchronizes one version into Cargo, package and Tauri", () => {
     bundle: { publisher: build.app.author },
     plugins: {
       uxuescript: {
-        homeUrl: build.app.home_url,
         msi: {
           valueName: build.msi.value_name,
           value: build.msi.value,
@@ -73,6 +72,9 @@ it("synchronizes one version into Cargo, package and Tauri", () => {
       },
     },
   });
+  expect(
+    JSON.parse(read("src-tauri/tauri.conf.json")).plugins.uxuescript,
+  ).not.toHaveProperty("homeUrl");
   const check = spawnSync(process.execPath, [
     "--check",
     join(output, "injected/chaoxing/course.js"),

@@ -29,9 +29,9 @@ export const themes = {
     mode: "light",
   },
   marigold: {
-    brand: "#89611e",
-    surface: "#f0d8a4",
-    surfaceLight: "#fff2d0",
+    brand: "#916900",
+    surface: "#f4f4f2",
+    surfaceLight: "#fafaf8",
     mode: "light",
   },
   cornflower: {

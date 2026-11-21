@@ -1,7 +1,7 @@
 [package]
 name = "uxuescript"
 default-run = "uxuescript"
-version = "2.5.10"
+version = "2.5.12"
 description = "A Chaoxing course assistant built with Tauri, Rust, and Vue, rewritten from uXuexitongJS."
 authors = ["unraous"]
 edition = "2024"
@@ -68,8 +68,10 @@ dotenv = "0.15.0"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 # The fullscreen message hook uses the unstable runtime plugin API.
 tauri-runtime-wry = "=2.12.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSView", "NSGraphics"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["NSArray", "NSDictionary", "NSObject", "NSString", "NSUserDefaults"] }

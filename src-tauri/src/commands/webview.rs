@@ -1,8 +1,7 @@
 /// 供主界面 [main] Webview 控制超星 [Chaoxing] Webview 的命令集。
 use super::CommandsResult;
 
-use crate::app::config::CONFIG;
-use crate::app::webview::UrlStack;
+use crate::app::webview::{UrlStack, home_url};
 
 use anyhow::anyhow;
 use tauri::{Manager, window};
@@ -30,7 +29,7 @@ pub fn can_go_forward(url_stack: tauri::State<UrlStack>) -> bool {
 #[uxs_commands::command]
 pub fn go_home(window: window::Window) -> CommandsResult<()> {
     stop_task(&window);
-    super::course_webview(&window)?.navigate(CONFIG.home_url.clone())?;
+    super::course_webview(&window)?.navigate(home_url())?;
     Ok(())
 }
 

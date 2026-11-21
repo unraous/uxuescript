@@ -91,8 +91,11 @@ pub fn listener(window: &tauri::Window, event: &tauri::WindowEvent) {
             api.prevent_close();
             tauri::async_runtime::spawn(close(window.clone()));
         }
-        WindowEvent::Destroyed if window.label() == "app" => {
-            log::debug!("主程序窗口已销毁，应用已关闭");
+        WindowEvent::Destroyed => {
+            window.state::<webview::layer::Layers>().remove(window);
+            if window.label() == "app" {
+                log::debug!("主程序窗口已销毁，应用已关闭");
+            }
         }
         WindowEvent::Resized(physical_size) => {
             if let Err(e) = resize_webviews(window, *physical_size) {
@@ -155,6 +158,9 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
     webview::init_on(&window, "chaoxing")?.hide()?;
     webview::init_on(&window, "chaoxing-mask")?.hide()?;
     let mask = webview::init_on(&window, "mask")?;
+    window
+        .state::<webview::layer::Layers>()
+        .register(&window, &["main", "chaoxing", "chaoxing-mask", "mask"]);
     let startup_started = Arc::new(AtomicBool::new(false));
     let startup_window = window.clone();
     mask.listen("mask-ready", move |_| {

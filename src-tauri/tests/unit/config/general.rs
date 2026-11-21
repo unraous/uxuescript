@@ -1,6 +1,15 @@
 use super::*;
 
 #[test]
+fn old_home_defaults_to_false_and_round_trips() {
+    let defaults: GeneralConfig = toml::from_str("labelLanguage = 'zh'").unwrap();
+    assert!(!defaults.old_home);
+    let config: GeneralConfig = toml::from_str("oldHome = true").unwrap();
+    let reloaded: GeneralConfig = toml::from_str(&toml::to_string(&config).unwrap()).unwrap();
+    assert!(reloaded.old_home);
+}
+
+#[test]
 fn label_language_defaults_and_round_trips() {
     let defaults: GeneralConfig = toml::from_str("").unwrap();
     assert_eq!(defaults.label_language, LabelLanguage::En);
