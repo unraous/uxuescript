@@ -55,9 +55,11 @@ Rust 命令声明是注册、TypeScript 绑定和应用命令权限的共同来�
 | --- | --- |
 | 版本、应用标识、更新端点及安装器共享值 | `config/build.json` 经同步脚本写入各构建配置 |
 | 应用显示信息、课程首页与安装器参数 | 运行时读取已同步的 Tauri 配置或包信息 |
-| 模型、课程选项、主题等用户偏好 | 加载到 Rust 配置状态，由命令修改并保存到本地 TOML |
+| 求解方式、模型、课程选项、主题等用户偏好 | 加载到 Rust 配置状态，由命令修改并保存到本地 TOML |
 
 界面操作先修改内存配置，显式保存和正常退出才写入磁盘。加载时补齐缺失的内置供应商；用户配置中的 `version` 用于升级迁移，不决定应用显示版本。升级时会刷新已有内置供应商的模型预设，并尝试按名称保留模型选择，自定义供应商不走此刷新。
+
+求解方式由独立的 [`SolverKind`](../../src-tauri/src/config/solver.rs) 保存，TOML 值为 `native_llm` 或 `deep_seek_web`；旧配置缺少该字段时默认 Native LLM。它不属于 `LLMProvider`，切换求解方式不会修改 Native 的供应商、模型、请求地址或 API Key。设置界面第一类为求解方式，[`TheSolverPanel`](../../src/components/TheConfigPanel/TheSolverPanel.vue) 顶部选择后通过生成的 `currentSolver / setSolver` 命令更新并回读内存；Native 分支继续使用原 API 面板，Web 分支显示“DeepSeek Web 已接入 · 开发预览”的静态标题与使用、限制说明，不表示实时连接状态，也不提供连接管理控件。
 
 设置界面通过 [`useConfig<T>`](../../src/composables/useConfig.ts) 统一提交与回填，每次操作结束后重新读取宿主配置，包括校验或命令失败的情况。数字输入使用 [Zod schema](../../src/composables/useConfig/schemas.ts) 转换和校验；通用请求参数保持非零 `u32` 范围，课程数字设置允许留空关闭。错误弹窗等待确认期间，界面仍会回填当前配置。
 
@@ -101,7 +103,13 @@ API Key 的日志格式化会脱敏，配置序列化仍保留明文。读取或
 
 题目从 JS 提取、IPC、Rust 到模型输入统一使用 `id / kind / stem / options / images` 字段；`id` 表示页面显示题号路径。填空额外携带实际空数 `blank_count`，从 DOM 空位容器或填写控件读取，不根据题干下划线猜测。超星公式图片带有可解析元数据时写入 `stem` 或 `options` 的公式占位文本，其他图片以 `[图片N]` 保留原位置，并由 `images` 提供地址；材料和题目的图片分别编号，后端下载后按所属材料或题号标注并发送多模态内容。模型答案使用 `index / explanation / content`，`index` 对应输入的 `id`，不在链路中转换中英文字段。
 
-三个入口统一调用 `solve_questions(payload: Folio)`。Rust 有字体时递归还原篇标题、材料与题目文字，无字体时直接分批求解；生产入口不解析整页 HTML。字体映射针对字形，不是整个字体文件的哈希；未匹配字符保留原样。章节测验开启人工核验时，在提交前等待用户确认；独立作业和逐题考试仅暂存，整卷预览考试提示用户自行保存和交卷。
+三个入口统一调用 `solve_questions(payload: Folio, allow_partial: bool)`，客户端参数与 `Vec<AnswerItem>` 回填契约不随求解方式改变；Tauri 注入应用管理的 B2 `RequestState`，不是客户端参数。Rust 的 [`quiz::solve`](../../src-tauri/src/core/quiz.rs) 在一次入口读取并固定 `SolverKind`，随后直接分流：Native LLM 有字体时递归还原篇标题、材料与题目文字，无字体时直传，检查空卷后读取供应商和通用配置并进入原模型求解；DeepSeek Web 通过 [`web.rs`](../../src-tauri/src/core/quiz/web.rs) 还原字体、读取一次通用每批题数，进入单一 [`web/deepseek.rs`](../../src-tauri/src/core/quiz/web/deepseek.rs) 求解器，不读取或校验 Native 供应商、模型、API Key，也不请求 Native API。切换设置只影响之后进入的求解，配置锁不会跨异步请求持有。
+
+Web 第一版只支持纯文本。发送第一批前递归检查整卷材料与题目的 `images` 必须为空，复用原 `batch::prepare` 完成题号、空数、材料链与拆批，再复用 `prompt` 的题型说明和组装，将 system 与所有文本 part 用两个换行拼为一条 text；全部批次 Prompt 都先组装成功，不下载图片或丢弃图片。批次串行调用 B2 文本请求，默认 120 秒，省略 thinking/webSearch 以保留网页设置。应用管理的请求状态只在目标页面成功调度 bootstrap 后保存实际 Webview handle，窗口 `Destroyed` 时释放；原文档门、BUSY 拒绝与应用生命周期隔离仍生效。首次请求固定宿主文档代次和 JS binding generation，后续批次遇到刷新或切会话停止，不在新绑定续跑，也不建立队列。
+
+仅 B2 `completed` 正文进入原严格答案解析，校验数量、题号、非空内容与空数并还原输入顺序；不摘取 Markdown/JSON 片段。`failed / uncertain / rejected / interrupted` 只交付脱敏的固定错误码、delivery、remote 与隔离状态，不把其正文当答案；格式错误统一报告 `INVALID_ANSWER`，不记录回答片段。Web 全任务 all-or-nothing：即使 `allow_partial=true`，也只有全部批次成功并通过校验才返回答案，任何失败立即停止且不向原回填返回部分结果。不自动 retry、回退 Native API 或清除 B2 quarantine；远端状态未知时仍须人工核对网页并重启应用。DeepSeek Debug 窗口仅在 Debug 构建中提供；使用前须自行登录并进入已有会话，保持输入框为空、无附件且未在生成，无需 Native API Key。真实学习通回填尚未完成验收，调用与验收条件见[测试说明](../../tests/README.md#deepseek-b3纯文本卷面求解)。
+
+Native 生产入口不解析整页 HTML。字体映射针对字形，不是整个字体文件的哈希；未匹配字符保留原样。章节测验开启人工核验时，在提交前等待用户确认；独立作业和逐题考试仅暂存，整卷预览考试提示用户自行保存和交卷。
 
 Prompt 由后端 [`prompt.rs`](../../src-tauri/src/core/quiz/llm/prompt.rs) 按变化频率拼装：通用约定和本批题型说明 → 可选课业背景 → 公共材料及其图片 → 本批题目及其图片。[`protocol.rs`](../../src-tauri/src/core/quiz/llm/protocol.rs) 负责分发，具体协议及请求模板归在 `protocol/`。十种题型的输入、输出规则与示例分别维护在 [`prompts/`](../../src-tauri/src/core/quiz/llm/prompts/)，只加入本批实际出现的类型，固定排列并去重；共用选项子题使用单选规则。课程名来自已采集的课程缓存，章节名来自课程导航，作业或试卷名来自已验证的页面标题（`.mark_title` 或 `.h2_subject`）；没有的信息省略。前端只用课程 ID 查询缓存，不将其作为模型背景。
 

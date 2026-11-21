@@ -14,6 +14,20 @@ fn url(value: &str) -> Url {
 }
 
 #[test]
+fn allows_only_the_deepseek_chat_host() {
+    assert!(is_deepseek_url(&url("https://chat.deepseek.com/")));
+    assert!(is_deepseek_url(&url(
+        "https://chat.deepseek.com/a/chat/session?from=home#messages"
+    )));
+    assert!(!is_deepseek_url(&url("https://auth.chat.deepseek.com/")));
+    assert!(!is_deepseek_url(&url(
+        "https://chat.deepseek.com.example.org/"
+    )));
+    assert!(!is_deepseek_url(&url("https://example.org/")));
+    assert!(!is_deepseek_url(&url("about:blank")));
+}
+
+#[test]
 fn ignores_blank_and_duplicate_current_urls() {
     let stack = UrlStack::default();
 

@@ -1,8 +1,8 @@
-mod answers;
-mod batch;
+pub(in crate::core::quiz) mod answers;
+pub(in crate::core::quiz) mod batch;
 mod media;
 mod pool;
-mod prompt;
+pub(in crate::core::quiz) mod prompt;
 mod protocol;
 
 use crate::config::{general::GeneralConfig, llm::LLMProvider};
