@@ -85,9 +85,15 @@ async fn solver_commands_update_memory_without_changing_native_configuration() {
     let (initial, selected, restored, native_preserved) = probe_with(&native, async {
         let before = serde_json::to_value(&CONFIG.llm).unwrap();
         let initial = crate::commands::config::current_solver();
-        crate::commands::config::set_solver(crate::config::solver::SolverKind::DeepSeekWeb);
+        crate::commands::config::select_solver(
+            crate::config::solver::SolverKind::DeepSeekWeb,
+            |_| {},
+        );
         let selected = crate::commands::config::current_solver();
-        crate::commands::config::set_solver(crate::config::solver::SolverKind::NativeLlm);
+        crate::commands::config::select_solver(
+            crate::config::solver::SolverKind::NativeLlm,
+            |_| {},
+        );
         let restored = crate::commands::config::current_solver();
         Ok((
             initial,

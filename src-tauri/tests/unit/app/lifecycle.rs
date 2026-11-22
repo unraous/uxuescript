@@ -134,14 +134,50 @@ async fn destroyed_window_invalidates_in_flight_and_queued_work() {
     assert!(first.is_err());
     assert!(queued.is_err());
     assert!(closed.load(Ordering::SeqCst));
-    for label in [
-        "main",
-        "chaoxing",
-        "chaoxing-mask",
-        "mask",
-        "deepseek",
-        "unknown",
-    ] {
+    for label in ["main", "chaoxing", "chaoxing-mask", "mask", "unknown"] {
         assert!(validate_dynamic(label).is_err());
+        assert!(validate_destroy(label).is_err());
     }
+    assert!(validate_dynamic("deepseek").is_ok());
+    assert!(validate_destroy("deepseek").is_err());
+}
+
+#[tokio::test]
+async fn concurrent_spawn_waits_for_complete_prepare_and_reuses_the_view() {
+    let state = WindowState::default();
+    let view = Mutex::new(None);
+    let creates = AtomicUsize::new(0);
+    let prepares = AtomicUsize::new(0);
+    let entered = tokio::sync::Notify::new();
+    let release = tokio::sync::Notify::new();
+    let spawn = || {
+        spawn_entry(
+            &state,
+            || Ok(*view.lock()),
+            || {
+                creates.fetch_add(1, Ordering::SeqCst);
+                *view.lock() = Some(7);
+                Ok(7)
+            },
+            |_| async {
+                if prepares.fetch_add(1, Ordering::SeqCst) == 0 {
+                    entered.notify_one();
+                    release.notified().await;
+                }
+                Ok(())
+            },
+            |_| async { panic!("successful prepare must not roll back") },
+        )
+    };
+    let second = async {
+        entered.notified().await;
+        assert!(state.operation.try_lock().is_err());
+        release.notify_one();
+        spawn().await
+    };
+    let (first, second) = tokio::join!(spawn(), second);
+    assert_eq!(first.unwrap(), 7);
+    assert_eq!(second.unwrap(), 7);
+    assert_eq!(creates.load(Ordering::SeqCst), 1);
+    assert_eq!(prepares.load(Ordering::SeqCst), 2);
 }

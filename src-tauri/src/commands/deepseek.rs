@@ -43,9 +43,11 @@ pub async fn deepseek_generate_text(
     if !is_local_main(&caller) {
         return Err(anyhow::anyhow!("DeepSeek 诊断仅允许本地 main Webview").into());
     }
-    let deepseek = caller
-        .get_webview("deepseek")
-        .ok_or_else(|| anyhow::anyhow!("DeepSeek 调试 Webview 未打开"))?;
+    let window = caller.window();
+    let deepseek = window
+        .state::<crate::app::webview::solvers::WebSolverViews>()
+        .ensure(&window, crate::config::solver::SolverKind::DeepSeekWeb)
+        .await?;
     state
         .generate(&deepseek, &text, Options { timeout_ms, thinking, web_search })
         .await

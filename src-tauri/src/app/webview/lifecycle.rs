@@ -71,13 +71,17 @@ fn validate_dynamic(label: &str) -> Result<()> {
         "main" | "chaoxing" | "chaoxing-mask" | "mask" => {
             anyhow::bail!("静态 WebView [{label}] 不允许动态创建或销毁")
         }
-        // B still needs instance-scoped RequestState/Observer and detach support.
-        "deepseek" => anyhow::bail!("DeepSeek 动态生命周期尚未开放"),
+        "deepseek" => Ok(()),
         _ => anyhow::bail!("未开放的动态 WebView 标签: {label}"),
     }
 }
 
-fn existing(window: &Window, label: &str) -> Result<Option<Webview>> {
+fn validate_destroy(label: &str) -> Result<()> {
+    validate_dynamic(label)?;
+    anyhow::bail!("DeepSeek 在 B1 中运行期间保留，独立销毁需等待实例隔离")
+}
+
+pub(super) fn existing(window: &Window, label: &str) -> Result<Option<Webview>> {
     let view = window.get_webview(label);
     if let Some(view) = &view {
         ensure!(
@@ -88,10 +92,11 @@ fn existing(window: &Window, label: &str) -> Result<Option<Webview>> {
     Ok(view)
 }
 
-// Stage A exposes no production target yet. Future dynamic call sites must use
-// these entry points, rather than calling the creation factory or close directly.
-#[allow(dead_code)]
-pub(crate) async fn spawn(window: &Window, label: &str) -> Result<Webview> {
+pub(crate) async fn spawn<F, P>(window: &Window, label: &str, prepare: F) -> Result<Webview>
+where
+    F: Fn(Window, Webview) -> P + Send + Sync + 'static,
+    P: Future<Output = Result<()>> + Send,
+{
     validate_dynamic(label)?;
     let state = window.state::<Lifecycle>().window(window)?;
     let window = window.clone();
@@ -104,21 +109,25 @@ pub(crate) async fn spawn(window: &Window, label: &str) -> Result<Webview> {
         let label = label.as_str();
         spawn_entry(
             &state,
-            || existing(&window, &label),
-            || super::create_on(&window, &label, true).map_err(|error| anyhow!(error.to_string())),
-            |view: Webview| async move {
-                layers.add_entry(&view).await?;
-                let (position, size) = super::placement_on(&window, &label)
-                    .map_err(|error| anyhow!(error.to_string()))?;
-                // Repeating this also recovers a staged child if rollback close
-                // failed earlier, including resizes skipped while it was staged.
-                // No visibility toggle or document reload occurs.
-                view.set_size(size)?;
-                view.set_position(position)?;
-                Ok(())
+            || existing(window, label),
+            || super::create_on(window, label, true).map_err(|error| anyhow!(error.to_string())),
+            |view: Webview| {
+                let prepared = prepare(window.clone(), view.clone());
+                async move {
+                    layers.add_entry(&view).await?;
+                    prepared.await?;
+                    let (position, size) = super::placement_on(&window, &label)
+                        .map_err(|error| anyhow!(error.to_string()))?;
+                    // Repeating this also recovers a staged child if rollback close
+                    // failed earlier, including resizes skipped while it was staged.
+                    // No visibility toggle or document reload occurs.
+                    view.set_size(size)?;
+                    view.set_position(position)?;
+                    Ok(())
+                }
             },
             |view: Webview| async move {
-                view.close()?;
+                super::rollback_created(&view)?;
                 layers.remove_entry(&window, &label).await;
                 Ok(())
             },
@@ -132,7 +141,7 @@ pub(crate) async fn spawn(window: &Window, label: &str) -> Result<Webview> {
 
 #[allow(dead_code)]
 pub(crate) async fn destroy(window: &Window, label: &str) -> Result<()> {
-    validate_dynamic(label)?;
+    validate_destroy(label)?;
     let state = window.state::<Lifecycle>().window(window)?;
     let window = window.clone();
     let label = label.to_owned();
@@ -181,7 +190,7 @@ where
         if created {
             if let Err(rollback) = close(view.clone()).await {
                 return Err(anyhow!(
-                    "{error:#}; 关闭新 WebView 回滚失败: {rollback:#}; 实例保留，可重试创建或销毁"
+                    "{error:#}; 关闭新 WebView 回滚失败: {rollback:#}; 需检查实例状态后恢复"
                 ));
             }
         }

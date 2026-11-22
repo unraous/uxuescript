@@ -24,16 +24,21 @@ Rust 宿主拥有窗口、配置和共享状态；Vue 界面通过生成的 IPC 
 | `chaoxing` | 学习通页面与课程自动化 |
 | `mask` | 全窗口开屏、确认、退出和更新下载展示 |
 | `chaoxing-mask` | 覆盖课程区域的启动确认 |
+| `deepseek` | 在 app 窗口按需创建并保留的后台 Web Solver |
 
-窗口与各 WebView 在开屏前已创建，课程页也已开始导航。遮罩监听就绪后显示窗口，动画再显示内容；显示内容不触发课程页重新加载。课程确认与全窗口确认分别处理，课程导航开始时结束旧页面的确认。
+窗口与四个静态 WebView 在开屏前已创建，课程页也已开始导航。遮罩监听就绪后显示窗口，动画再显示内容；显示内容不触发课程页重新加载。课程确认与全窗口确认分别处理，课程导航开始时结束旧页面的确认。
 
 所有 WebView 禁用后台节流策略（macOS 14 及以上生效）；Windows 使用 WebView2 后台运行参数。系统休眠及页面自身的暂停行为仍可能中断任务。
 
 课程视图使用默认浏览数据存储，命令通过 `chaoxing` 标签获取该 WebView。
 
-动态子 WebView 的内部入口为 `webview/lifecycle.rs` 的 `spawn / destroy`；`init_on` 保留为创建工厂，四个静态视图仍按原顺序初始化。生命周期按窗口串行协调，实例存在性以 Tauri 为准，层级登记归 `Layers`；窗口销毁同步使协调状态失效并清理登记，在途创建检查失效后回滚。新实例先在窗口外以实际尺寸创建，原生归位到现有视图之后再恢复预定位置，不切换页面可见性；登记与原生操作失败会返回错误，回滚关闭也失败时保留两段诊断，允许后续创建重试或销毁清理。关闭成功采用 Tauri 的派发及管理器移除语义，不保证原生资源已同步释放。
+动态子 WebView 的内部入口为 `webview/lifecycle.rs` 的 `spawn / destroy`；`init_on` 保留为创建工厂，四个静态视图仍按原顺序初始化。生命周期按窗口串行协调，实例存在性以 Tauri 为准，层级登记归 `Layers`；窗口销毁同步使协调状态失效并清理登记，在途创建检查失效后回滚。新实例先在窗口外以实际尺寸创建，原生归位到现有视图之后再恢复预定位置，不切换页面可见性；登记与原生操作失败会返回错误，回滚关闭也失败时保留两段诊断，后续恢复须遵循目标视图的创建和销毁策略。关闭成功采用 Tauri 的派发及管理器移除语义，不保证原生资源已同步释放。
 
-阶段 A 尚无开放的生产动态标签：`main / chaoxing / chaoxing-mask / mask` 属于静态初始化；DeepSeek 的全局请求状态、不可逆 Observer 关闭及依赖 Window Destroyed 的解绑尚未改造，因此暂时拒绝动态创建和销毁。调试窗的既有 DeepSeek 初始化保持原样，后续开放标签时必须先完成其业务状态的实例化与解绑。
+`main / chaoxing / chaoxing-mask / mask` 保留静态初始化。B1 由 `webview/solvers.rs::WebSolverViews::ensure` 串行完成 DeepSeek 首次创建与后台归位；Lifecycle 在离屏创建、Layers 登记后等待业务归位，再恢复课程区域几何。最终前后顺序为 `mask > chaoxing-mask > chaoxing > deepseek > main`。DeepSeek 与课程页和课程遮罩共用几何计算，不以隐藏页面维持后台运行。
+
+启动从已加载配置恢复 Web Solver，`set_solver` 更新内存后直接异步预加载；持久化仍由 `save_config` 或退出完成，保存失败与预加载结果分别处理。课程求解与仅本地 main 可用的 debug 文本诊断在发请求前 await ensure，不依赖预加载成功，也不将创建完成当作 Adapter 或登录就绪。Native 模式不创建页面，切回 Native 保留既有 DeepSeek；本阶段禁止其独立销毁。
+
+DeepSeek 继续共用 RequestState，最终 detach 和 Observer 的不可逆关闭仅发生在 app Window Destroyed。每次创建的轻量准入门在回滚关闭时封住旧页面的导航及加载回调；未绑定的失败可重试，已绑定后回滚会保留原始错误并要求重启，不自动重建或 reset。正常 app 退出单独标记。独立销毁与安全重建仍依赖后续 B2 的实例隔离。
 
 章节课堂任务读取卡片生成的链接，在课程主视图打开回看；播放器结束后直接导航回进入课堂前的课程页，由平台重新加载任务点状态。后端在内存中记录本次刷课是否运行，并在课堂结束触发返回时发放一次性恢复凭证；课程页消费凭证后跳过启动确认并重新读取任务。若平台尚未标记刚播放的课堂完成，则等待标记，不重复打开课堂。完成、取消或使用课程工具栏导航时清除状态。回看结束事件和任务点更新的实际时序仍需在平台验证。
 
@@ -107,11 +112,11 @@ API Key 的日志格式化会脱敏，配置序列化仍保留明文。读取或
 
 题目从 JS 提取、IPC、Rust 到模型输入统一使用 `id / kind / stem / options / images` 字段；`id` 表示页面显示题号路径。填空额外携带实际空数 `blank_count`，从 DOM 空位容器或填写控件读取，不根据题干下划线猜测。超星公式图片带有可解析元数据时写入 `stem` 或 `options` 的公式占位文本，其他图片以 `[图片N]` 保留原位置，并由 `images` 提供地址；材料和题目的图片分别编号，后端下载后按所属材料或题号标注并发送多模态内容。模型答案使用 `index / explanation / content`，`index` 对应输入的 `id`，不在链路中转换中英文字段。
 
-三个入口统一调用 `solve_questions(payload: Folio, allow_partial: bool)`，客户端参数与 `Vec<AnswerItem>` 回填契约不随求解方式改变；Tauri 注入应用管理的 B2 `RequestState`，不是客户端参数。Rust 的 [`quiz::solve`](../../src-tauri/src/core/quiz.rs) 在一次入口读取并固定 `SolverKind`，随后直接分流：Native LLM 有字体时递归还原篇标题、材料与题目文字，无字体时直传，检查空卷后读取供应商和通用配置并进入原模型求解；DeepSeek Web 通过 [`web.rs`](../../src-tauri/src/core/quiz/web.rs) 还原字体、读取一次通用每批题数，进入单一 [`web/deepseek.rs`](../../src-tauri/src/core/quiz/web/deepseek.rs) 求解器，不读取或校验 Native 供应商、模型、API Key，也不请求 Native API。切换设置只影响之后进入的求解，配置锁不会跨异步请求持有。
+三个入口统一调用 `solve_questions(payload: Folio, allow_partial: bool)`，客户端参数与 `Vec<AnswerItem>` 回填契约不随求解方式改变；Tauri 注入应用管理的 B2 `RequestState`，不是客户端参数。命令入口读取并固定本次 `SolverKind`，Web 分支先等待 ensure 完成，再由 Rust 的 [`quiz::solve_with_solver`](../../src-tauri/src/core/quiz.rs) 按该选择分流：Native LLM 有字体时递归还原篇标题、材料与题目文字，无字体时直传，检查空卷后读取供应商和通用配置并进入原模型求解；DeepSeek Web 通过 [`web.rs`](../../src-tauri/src/core/quiz/web.rs) 还原字体、读取一次通用每批题数，进入单一 [`web/deepseek.rs`](../../src-tauri/src/core/quiz/web/deepseek.rs) 求解器，不读取或校验 Native 供应商、模型、API Key，也不请求 Native API。切换设置只影响之后进入的求解，配置锁不会跨异步请求持有。
 
 Web 第一版只支持纯文本。发送第一批前递归检查整卷材料与题目的 `images` 必须为空，复用原 `batch::prepare` 完成题号、空数、材料链与拆批，再复用 `prompt` 的题型说明和组装，将 system 与所有文本 part 用两个换行拼为一条 text；全部批次 Prompt 都先组装成功，不下载图片或丢弃图片。批次串行调用 B2 文本请求，默认 120 秒，省略 thinking/webSearch 以保留网页设置。应用管理的请求状态只在目标页面成功调度 bootstrap 后保存实际 Webview handle，窗口 `Destroyed` 时释放；原文档门、BUSY 拒绝与应用生命周期隔离仍生效。首次请求固定宿主文档代次和 JS binding generation，后续批次遇到刷新或切会话停止，不在新绑定续跑，也不建立队列。
 
-仅 B2 `completed` 正文进入原严格答案解析，校验数量、题号、非空内容与空数并还原输入顺序；不摘取 Markdown/JSON 片段。`failed / uncertain / rejected / interrupted` 只交付脱敏的固定错误码、delivery、remote 与隔离状态，不把其正文当答案；格式错误统一报告 `INVALID_ANSWER`，不记录回答片段。Web 全任务 all-or-nothing：即使 `allow_partial=true`，也只有全部批次成功并通过校验才返回答案，任何失败立即停止且不向原回填返回部分结果。不自动 retry、回退 Native API 或清除 B2 quarantine；远端状态未知时仍须人工核对网页并重启应用。DeepSeek Debug 窗口仅在 Debug 构建中提供；使用前须自行登录并进入已有会话，保持输入框为空、无附件且未在生成，无需 Native API Key。真实学习通回填尚未完成验收，调用与验收条件见[测试说明](../../tests/README.md#deepseek-b3纯文本卷面求解)。
+仅 B2 `completed` 正文进入原严格答案解析，校验数量、题号、非空内容与空数并还原输入顺序；不摘取 Markdown/JSON 片段。`failed / uncertain / rejected / interrupted` 只交付脱敏的固定错误码、delivery、remote 与隔离状态，不把其正文当答案；格式错误统一报告 `INVALID_ANSWER`，不记录回答片段。Web 全任务 all-or-nothing：即使 `allow_partial=true`，也只有全部批次成功并通过校验才返回答案，任何失败立即停止且不向原回填返回部分结果。不自动 retry、回退 Native API 或清除 B2 quarantine；远端状态未知时仍须人工核对网页并重启应用。DeepSeek 页面在主 app 窗口后台按需加载并复用已有登录状态；使用前须有有效会话，保持输入框为空、无附件且未在生成，无需 Native API Key。B1 暂无前台登录或查看入口。真实学习通回填尚未完成验收，调用与验收条件见[测试说明](../../tests/README.md#deepseek-b3纯文本卷面求解)。
 
 Native 生产入口不解析整页 HTML。字体映射针对字形，不是整个字体文件的哈希；未匹配字符保留原样。章节测验开启人工核验时，在提交前等待用户确认；独立作业和逐题考试仅暂存，整卷预览考试提示用户自行保存和交卷。
 

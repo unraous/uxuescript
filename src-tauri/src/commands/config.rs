@@ -23,8 +23,17 @@ pub fn current_solver() -> SolverKind {
 }
 
 #[uxs_commands::command]
-pub fn set_solver(kind: SolverKind) {
+pub fn set_solver(window: tauri::Window, kind: SolverKind) {
+    select_solver(kind, |solver| {
+        crate::app::webview::solvers::preload(window, solver)
+    });
+}
+
+// Like other setters, selection updates memory. save_config (or exit) persists
+// it independently; a save failure never implies that preload did not happen.
+pub(crate) fn select_solver(kind: SolverKind, preload: impl FnOnce(SolverKind)) {
     *CONFIG.solver.lock() = kind;
+    preload(kind);
 }
 
 /// Return the selected color theme for the main and mask WebViews.

@@ -1,6 +1,43 @@
 use super::*;
 
 #[tokio::test]
+async fn solver_priorities_preserve_static_order_and_retry_failed_native_move() {
+    let mut order: Vec<_> = ["mask", "chaoxing-mask", "chaoxing", "main"]
+        .into_iter()
+        .map(|label| Entry {
+            label: label.into(),
+            layer: 0,
+        })
+        .collect();
+    add_order(&mut order, "deepseek", |_| async { Ok(()) })
+        .await
+        .unwrap();
+    let mut moved = Vec::new();
+    for (label, priority) in crate::app::webview::solvers::BACKGROUND_ORDER {
+        let result = update_order(&mut order, label, priority, |anchor| {
+            moved.push((label, anchor));
+            async { anyhow::bail!("native move failed") }
+        })
+        .await;
+        assert_eq!(result.is_err(), label == "deepseek");
+    }
+    assert_eq!(moved, [("deepseek", Some("chaoxing".into()))]);
+    assert_eq!(order.last().unwrap().label, "deepseek");
+    for (label, priority) in crate::app::webview::solvers::BACKGROUND_ORDER {
+        update_order(&mut order, label, priority, |_| async { Ok(()) })
+            .await
+            .unwrap();
+    }
+    assert_eq!(
+        order
+            .iter()
+            .map(|entry| entry.label.as_str())
+            .collect::<Vec<_>>(),
+        ["mask", "chaoxing-mask", "chaoxing", "deepseek", "main"]
+    );
+}
+
+#[tokio::test]
 async fn dynamic_entries_move_before_registering_and_keep_static_order() {
     let mut order: Vec<_> = ["mask", "chaoxing-mask", "chaoxing", "main"]
         .into_iter()

@@ -26,7 +26,9 @@ cargo test --workspace --locked
 
 ## DeepSeek B1：加载、绑定与只读诊断
 
-B1 仅接通 debug 构建中的原生 `deepseek-debug` Window 与子 `deepseek` Webview，不接通题目求解。文档创建时，只在顶层且精确 `https://chat.deepseek.com` origin 中执行原样外部 IIFE；加载完成后执行内部 `deepseek-web-bootstrap`（源码 `injected/deepseek-web/bootstrap.js`）。JavaScript 唯一管理实例创建、初始化和清理；Rust 每轮用 `Webview::eval_with_callback` 读取同步 JSON 快照，不把异步工作的调度当作初始化完成。
+B1 将 `deepseek` 按需创建在主 `app` Window 中，移除了独立调试窗。Native 启动不创建，DeepSeek 配置启动或选择时异步预加载；生成入口仍会等待创建和后台归位。切换 Native 保留页面，不支持独立销毁重建。文档创建时，只在顶层且精确 `https://chat.deepseek.com` origin 中执行原样外部 IIFE；加载完成后执行内部 `deepseek-web-bootstrap`（源码 `injected/deepseek-web/bootstrap.js`）。JavaScript 唯一管理 Adapter 实例创建、初始化和清理；Rust 每轮用 `Webview::eval_with_callback` 读取同步 JSON 快照，不把异步工作的调度当作初始化完成。
+
+Rust 聚合用例还覆盖完整创建归位的并发串行、原生层级失败重试、课程区共用几何、DeepSeek 可创建但禁止独立销毁、未绑定回滚阻止旧回调、已绑定回滚粘性拒绝重建及正常 app 退出。最终层级应为 `mask > chaoxing-mask > chaoxing > deepseek > main`。这些用例不证明 Windows WebView2 遮挡后的真实后台生成行为；页面加载、已有 Session、遮罩、放大缩小及最大化恢复须另行桌面验收。
 
 指定本地检查：
 
@@ -38,7 +40,7 @@ cargo test --manifest-path src-tauri/Cargo.toml -p uxuescript app::webview --loc
 
 源码 JS 用例使用受控 Promise 和模拟的公开 Adapter API，验证 await、拒绝、仅 `PAGE_NOT_READY` 的 10 秒/250ms 有界重试、同实例失败重试、重复入口、SPA 路径失效、快速 A→B→A、等待旧初始化及 owned dispose 后重新创建、外部实例不被接管、路径前缀大小写及销毁清理。原样外部 IIFE 的 VM 用例验证全局 API 作用域；Rust 用例验证交付条件块、同步 JSON 解析、诊断脱敏、观测代次、导航/关闭取消以及晚回调和超时。这些检查不是 WebView2、DeepSeek 真实 DOM 或登录验收；共享工作区生成/编译必须先协调时点，不与其他配置或绑定生成并行。
 
-真实桌面验收须由操作者在已登录的调试窗执行，不自动认证、不发送 prompt、不调用模型：
+真实桌面验收须由操作者在 app 窗口内的 DeepSeek WebView 执行，不自动认证、不发送 prompt、不调用模型；B1 不提供前台查看入口：
 
 | 场景                                         | 必须核对的事实                                                                                                            |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -48,9 +50,9 @@ cargo test --manifest-path src-tauri/Cargo.toml -p uxuescript app::webview --loc
 | 非空输入、附件或已有生成                     | 保留相应初始化错误，不清空输入、不点击 Stop；手动处理后通过刷新或切换路径重新绑定                                         |
 | SPA 切换及快速返回原路径                     | 同文档 JS history/popstate 变化后 Rust 必须继续采样；每次捕获的路径改变使旧绑定永久失效，等旧 await 和 owned dispose 收尾后 fresh create，旧结果不能恢复有效性 |
 | 整页导航或刷新                               | 允许的原生 NavigationStarting 立即取消旧观测，不等 ContentLoading；被主机过滤拒绝的 URL 保留当前观测。旧回调不能发布新页状态，新文档仍走独立加载链 |
-| 关闭调试窗                                   | 原生 Window 的 `Destroyed` 取消观测；在途 eval 回调晚到也不记录旧状态，不影响主窗口退出流程                               |
+| 关闭 app 窗口                                 | 原生 Window 的 `Destroyed` 取消观测并最终 detach；在途 eval 回调晚到也不记录旧状态；切回 Native 不执行此清理                |
 
-可在调试窗控制台同步读取 `globalThis.__UXS_DEEPSEEK_B1__.snapshot()`；其中 `initialization` 明确区分 `not_started` / `pending` / `fulfilled` / `rejected`。`generation` 是既有 JS 同文档失效代次，初始为 0，只在捕获路径变化或销毁时推进，重复读取不会推进。Rust 日志的 `document` 是宿主导航观测代次，`binding_generation` 是快照中的 JS 代次，两者不能混同；即使两次成功重绑的其余 `ready` 字段相同，JS 代次变化也会产生新的脱敏日志。`ready` / `valid` 已约束成功绑定代次等于当前 JS 代次，因此新代次的有效快照可以证明发生重新绑定。
+可在 DeepSeek WebView 控制台同步读取 `globalThis.__UXS_DEEPSEEK_B1__.snapshot()`；其中 `initialization` 明确区分 `not_started` / `pending` / `fulfilled` / `rejected`。`generation` 是既有 JS 同文档失效代次，初始为 0，只在捕获路径变化或销毁时推进，重复读取不会推进。Rust 日志的 `document` 是宿主导航观测代次，`binding_generation` 是快照中的 JS 代次，两者不能混同；即使两次成功重绑的其余 `ready` 字段相同，JS 代次变化也会产生新的脱敏日志。`ready` / `valid` 已约束成功绑定代次等于当前 JS 代次，因此新代次的有效快照可以证明发生重新绑定。
 
 默认 Adapter 的初始化通常很快，1 秒宿主采样可能跨过短暂的 `pending`，不要求每次都在日志中看到它。`valid` 只证明成功初始化的缓存 Session 与当前准确路径匹配，不证明认证或 DOM 此刻仍然就绪。Rust 只在诊断变化时记录日志，单轮读取最多等待 2 秒；日志不得包含 UUID、含 UUID 的完整 URL、认证信息、输入或对话内容。
 
@@ -94,7 +96,7 @@ pnpm exec vitest run tests/scripts/deepseek-bootstrap.test.js
 
 三个合并核心场景验证真实 Prompt 管线、材料引用与乱序 JSON 恢复；后批格式错误/uncertain 不重试也不返回部分答案；整卷后段题图、材料图与不支持题型在发送前拒绝。命令用例继续验证 Web 不访问 Native 配置或 API、空卷校验，以及 Native 三协议正常入口。受控生成只替代网页请求，不替代实际批处理、Prompt 或答案解析；这些本地验证不能证明真实 DOM、模型格式或学习通回填。
 
-设置面板显示“DeepSeek Web 已接入 · 开发预览”的静态能力说明，不表示实时连接或就绪状态。使用前须在仅 Debug 构建提供的 DeepSeek Debug 窗口自行登录并进入已有会话，保持输入框为空、无附件且未在生成；无需 Native API Key，仅支持纯文本，真实学习通回填尚未完成验收。`tests/components/TheSolverPanel.test.ts` 的现有中英提示场景核对标题、使用条件与限制，仍保留 Native 控件和切换行为验证。
+设置面板显示“DeepSeek Web 已接入 · 开发预览”的静态能力说明，不表示实时连接或就绪状态。DeepSeek 页面在主 app 窗口后台按需加载并复用已有登录状态；使用前须有有效会话，保持输入框为空、无附件且未在生成。B1 暂无前台登录或查看入口；无需 Native API Key，仅支持纯文本，真实学习通回填尚未完成验收。`tests/components/TheSolverPanel.test.ts` 的现有中英提示场景核对标题、使用条件与限制，仍保留 Native 控件和切换行为验证。
 
 真实验收须在已登录、已有 UUID 会话且 B1 ready/valid 的前提下，由操作者明确选择现有 DeepSeek Web 求解方式。也可由操作者在同一**本地 main** DevTools 显式选择并调用原命令（不是远程 DeepSeek 页）：
 

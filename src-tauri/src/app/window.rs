@@ -14,8 +14,8 @@ use std::{
     time::Duration,
 };
 use tauri::{
-    Emitter, Listener, LogicalPosition, LogicalSize, Manager, PhysicalSize, WindowBuilder,
-    WindowEvent, image::Image, webview::Webview, window::Window,
+    Emitter, Listener, LogicalSize, Manager, PhysicalSize, WindowBuilder, WindowEvent,
+    image::Image, webview::Webview, window::Window,
 };
 
 /// 执行窗口关闭前的应用状态刷新与持久化收尾工作
@@ -44,11 +44,6 @@ async fn notify_exit_animation(window: &Window) {
 async fn close(window: Window) {
     log::debug!("执行程序收尾工作，即将关闭应用");
     prepare_exit(&window).await;
-    if let Some(deepseek) = window.app_handle().get_window("deepseek-debug") {
-        if let Err(error) = deepseek.destroy() {
-            log::error!("销毁 DeepSeek 调试窗口失败: {error}");
-        }
-    }
     window.destroy().ok();
 }
 
@@ -76,13 +71,7 @@ fn resize(webview: &Webview, size: LogicalSize<f64>) -> Result<()> {
             return Ok(());
         }
     }
-    let (pos, size) = match webview.label() {
-        "chaoxing" | "chaoxing-mask" => (
-            LogicalPosition::new(size.width * 0.51, size.height * 0.46),
-            LogicalSize::new(size.width * 0.48, size.height * 0.48),
-        ),
-        _ => (LogicalPosition::new(0.0, 0.0), size),
-    };
+    let (pos, size) = webview::placement(webview.label(), size);
     webview.set_position(pos)?;
     webview.set_size(size)?;
     Ok(())
@@ -106,6 +95,12 @@ pub fn listener(window: &tauri::Window, event: &tauri::WindowEvent) {
             tauri::async_runtime::spawn(close(window.clone()));
         }
         WindowEvent::Destroyed => {
+            if window.label() == "app" {
+                window
+                    .state::<webview::deepseek::request::RequestState>()
+                    .creation
+                    .destroyed();
+            }
             window
                 .state::<webview::lifecycle::Lifecycle>()
                 .destroyed(window);
@@ -197,17 +192,9 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
         }
     });
 
-    if cfg!(debug_assertions) {
-        // 调试窗体与主应用分离；关闭它时只销毁自身，不执行主应用的退出收尾。
-        let deepseek_window = WindowBuilder::new(app, "deepseek-debug")
-            .title("DeepSeek Debug")
-            .inner_size(1200.0, 900.0)
-            .build()?;
-        deepseek_window
-            .state::<webview::lifecycle::Lifecycle>()
-            .register_window(&deepseek_window);
-        webview::init_on(&deepseek_window, "deepseek")?;
-    }
+    // Config was loaded from disk before init; release its lock before preload.
+    let solver = *CONFIG.solver.lock();
+    webview::solvers::preload(window.clone(), solver);
 
     log::info!("初始化应用窗口成功");
 

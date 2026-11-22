@@ -6,11 +6,12 @@ use crate::core::{
 use anyhow::anyhow;
 use parking_lot::Mutex;
 use tauri::utils::config::BackgroundThrottlingPolicy;
-use tauri::{LogicalPosition, LogicalSize, Url, Webview, WebviewBuilder, WebviewUrl};
+use tauri::{LogicalPosition, LogicalSize, Manager, Url, Webview, WebviewBuilder, WebviewUrl};
 
 pub(crate) mod deepseek;
 pub mod layer;
 pub(crate) mod lifecycle;
+pub(crate) mod solvers;
 
 fn is_deepseek_url(url: &Url) -> bool {
     url.host_str() == Some("chat.deepseek.com")
@@ -89,13 +90,20 @@ fn placement_on(
 ) -> Result<(LogicalPosition<f64>, LogicalSize<f64>), Box<dyn std::error::Error>> {
     let logical_size: LogicalSize<f64> =
         LogicalSize::from_physical(window.inner_size()?, window.scale_factor()?);
-    Ok(match label {
-        "chaoxing" | "chaoxing-mask" => (
+    Ok(placement(label, logical_size))
+}
+
+pub(super) fn placement(
+    label: &str,
+    logical_size: LogicalSize<f64>,
+) -> (LogicalPosition<f64>, LogicalSize<f64>) {
+    match label {
+        "chaoxing" | "chaoxing-mask" | "deepseek" => (
             LogicalPosition::new(logical_size.width * 0.51, logical_size.height * 0.46),
             LogicalSize::new(logical_size.width * 0.48, logical_size.height * 0.48),
         ),
         _ => (LogicalPosition::new(0.0, 0.0), logical_size),
-    })
+    }
 }
 
 fn create_on(
@@ -140,7 +148,7 @@ fn create_on(
                 .devtools(true),
                 // 当前只允许聊天主机；手动登录若跳转到其他主机，再按实际导航补充。
                 is_deepseek_url,
-            )
+            )?
         }
         _ => return Err(anyhow!("未知的Webview标签").into()),
     };
@@ -153,7 +161,7 @@ fn create_on(
         size.width,
         size.height
     );
-    Ok(window.add_child(
+    let result = window.add_child(
         builder.background_throttling(BackgroundThrottlingPolicy::Disabled),
         // Dynamic children are created outside the window until their native
         // stacking order is committed, avoiding a flash over the masks without
@@ -164,7 +172,28 @@ fn create_on(
             position
         },
         size,
-    )?)
+    );
+    if label == "deepseek" && result.is_err() {
+        let requests = window.state::<deepseek::request::RequestState>();
+        requests
+            .creation
+            .rollback(|| Ok(()), || requests.cancel_creation())?;
+    }
+    Ok(result?)
+}
+
+// Factory rollback pairs configuration's page callbacks with native close.
+// Lifecycle retains the general resource rollback/unregistration sequence.
+fn rollback_created(view: &Webview) -> anyhow::Result<()> {
+    if view.label() == "deepseek" {
+        let requests = view.state::<deepseek::request::RequestState>();
+        requests.creation.rollback(
+            || view.close().map_err(Into::into),
+            || requests.cancel_creation(),
+        )
+    } else {
+        view.close().map_err(Into::into)
+    }
 }
 
 #[cfg(test)]

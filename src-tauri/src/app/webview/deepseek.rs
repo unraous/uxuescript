@@ -1,3 +1,4 @@
+mod creation;
 pub(crate) mod request;
 
 use crate::core::script::include_script;
@@ -300,18 +301,22 @@ async fn observe(
     }
 }
 
-fn load_on(webview: Webview, payload: PageLoadPayload<'_>, requests: &request::RequestState) {
+fn load_on(
+    webview: Webview,
+    payload: PageLoadPayload<'_>,
+    requests: &request::RequestState,
+) -> bool {
     let observer = &requests.observer;
     if payload.event() == PageLoadEvent::Started {
         observer.cancel();
-        return;
+        return false;
     }
     if !is_target_url(payload.url()) {
         observer.cancel();
-        return;
+        return false;
     }
     let Some((epoch, cancelled)) = observer.begin() else {
-        return;
+        return false;
     };
     let token =
         serde_json::to_string(&requests.document_token(epoch)).expect("document token JSON");
@@ -319,12 +324,15 @@ fn load_on(webview: Webview, payload: PageLoadPayload<'_>, requests: &request::R
         "{}\n;(() => {{ const controller = globalThis.__UXS_DEEPSEEK_B1__; if (controller && !controller.bindDocument({token})) console.warn('[uXS DeepSeek B2] document DOCUMENT_BIND_REJECTED'); }})();",
         include_script!("deepseek-web-bootstrap.js")
     );
-    if webview.eval(&bootstrap).is_err() {
+    let attached = if webview.eval(&bootstrap).is_err() {
         log::warn!("DeepSeek B1 document={epoch} BOOTSTRAP_EVAL_DISPATCH_FAILED");
+        false
     } else {
         requests.attach(webview.clone());
-    }
+        true
+    };
     tauri::async_runtime::spawn(observe(webview, observer.clone(), epoch, cancelled));
+    attached
 }
 
 fn navigation_handler(
@@ -345,8 +353,9 @@ pub(super) fn configure(
     window: &Window,
     builder: WebviewBuilder<Wry>,
     allow_navigation: fn(&Url) -> bool,
-) -> WebviewBuilder<Wry> {
+) -> anyhow::Result<WebviewBuilder<Wry>> {
     let observer = window.state::<request::RequestState>().observer.clone();
+    let attempt = window.state::<request::RequestState>().creation.begin()?;
     let app = window.app_handle().clone();
     let closing = app.clone();
     window.on_window_event(move |event| {
@@ -354,12 +363,14 @@ pub(super) fn configure(
             closing.state::<request::RequestState>().detach();
         }
     });
-    builder
+    let navigation = navigation_handler(observer.clone(), allow_navigation);
+    let navigation_attempt = attempt.clone();
+    Ok(builder
         .initialization_script(adapter_initialization_script())
-        .on_navigation(navigation_handler(observer.clone(), allow_navigation))
+        .on_navigation(move |url| navigation_attempt.navigate(|| navigation(url)))
         .on_page_load(move |webview, payload| {
-            load_on(webview, payload, &app.state::<request::RequestState>());
-        })
+            attempt.loaded(|| load_on(webview, payload, &app.state::<request::RequestState>()));
+        }))
 }
 
 #[cfg(test)]

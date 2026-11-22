@@ -22,6 +22,17 @@ pub async fn solve(
     requests: &RequestState,
 ) -> Result<Vec<AnswerItem>> {
     let solver = *CONFIG.solver.lock();
+    solve_with_solver(solver, payload, allow_partial, requests).await
+}
+
+/// The command snapshots selection before ensuring native resources; keep that
+/// choice through routing even if settings change while the view is created.
+pub(crate) async fn solve_with_solver(
+    solver: SolverKind,
+    payload: Folio,
+    allow_partial: bool,
+    requests: &RequestState,
+) -> Result<Vec<AnswerItem>> {
     match solver {
         SolverKind::NativeLlm => {
             let decrypted = decrypt(payload);

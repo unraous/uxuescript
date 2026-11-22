@@ -126,8 +126,8 @@ describe("solver configuration", () => {
       "DeepSeek Web integrated · Development preview",
     );
     expect(notice.findAll("p").map((paragraph) => paragraph.text())).toEqual([
-      "In DeepSeek Debug, sign in manually and open an existing chat with an empty input, no attachments, and no generation in progress. No Native API Key needed.",
-      "Text only. The DeepSeek Debug window is available only in Debug builds. Real Chaoxing answer filling has not completed acceptance testing.",
+      "Reuses an existing sign-in session. A valid DeepSeek chat with an empty input, no attachments, and no generation in progress is required. No Native API Key needed.",
+      "Text only. The page loads on demand in the main window background. B1 has no foreground view for sign-in or inspection yet. Real Chaoxing answer filling has not completed acceptance testing.",
     ]);
     expect(mocks.saveConfig).not.toHaveBeenCalled();
     expect(mocks.healthy).not.toHaveBeenCalled();
@@ -233,8 +233,8 @@ describe("solver configuration", () => {
     const notice = wrapper.get(".web-solver-notice");
     expect(notice.text()).toContain("DeepSeek Web 已接入 · 开发预览");
     expect(notice.findAll("p").map((paragraph) => paragraph.text())).toEqual([
-      "请在 DeepSeek Debug 自行登录并进入已有会话，保持输入框为空、无附件且未在生成。无需 Native API Key。",
-      "仅支持纯文本；DeepSeek Debug 窗口仅在 Debug 构建中提供。真实学习通回填尚未完成验收。",
+      "复用已有登录状态，需有可用的 DeepSeek 会话，且输入框为空、无附件、未在生成。无需 Native API Key。",
+      "仅支持纯文本；页面在主窗口后台按需加载，B1 暂无前台登录或查看入口。真实学习通回填尚未完成验收。",
     ]);
   });
 });

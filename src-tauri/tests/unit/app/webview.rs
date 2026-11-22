@@ -1,6 +1,22 @@
 use super::*;
 
 #[test]
+fn course_views_share_creation_and_resize_geometry() {
+    for size in [
+        LogicalSize::new(1920.0, 1080.0),
+        LogicalSize::new(800.0, 600.0),
+    ] {
+        let expected = (
+            LogicalPosition::new(size.width * 0.51, size.height * 0.46),
+            LogicalSize::new(size.width * 0.48, size.height * 0.48),
+        );
+        for label in ["chaoxing", "chaoxing-mask", "deepseek"] {
+            assert_eq!(placement(label, size), expected);
+        }
+    }
+}
+
+#[test]
 fn selects_home_url_by_version() {
     assert_eq!(select_home_url(false).as_str(), "https://i.chaoxing.com/");
     assert_eq!(

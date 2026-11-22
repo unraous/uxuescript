@@ -18,6 +18,7 @@ use tauri::Webview;
 use tokio::sync::oneshot;
 
 pub struct RequestState {
+    pub(crate) creation: super::creation::Creations,
     pub(super) observer: Arc<Observer>,
     nonce: String,
     counter: AtomicU64,
@@ -34,6 +35,7 @@ impl Default for RequestState {
             .expect("system clock after UNIX epoch")
             .as_nanos();
         Self {
+            creation: super::creation::Creations::default(),
             observer: Arc::new(Observer::default()),
             nonce: format!("{}-{startup:x}", std::process::id()),
             counter: AtomicU64::new(1),
@@ -112,6 +114,12 @@ pub(super) fn interrupt(page: &mut super::Page) {
 }
 
 impl RequestState {
+    // Rollback only cancels work; Observer.close remains exclusive to final
+    // parent Window Destroyed. B1 never resets that terminal state.
+    pub(crate) fn cancel_creation(&self) {
+        self.observer.cancel();
+    }
+
     pub(super) fn attach(&self, webview: Webview) {
         // 与 Destroyed 同一文档门，避免关闭后迟到的 load 保留句柄。
         let page = self.observer.0.lock();
