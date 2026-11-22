@@ -57,6 +57,7 @@ pub fn run() {
         .manage(UrlStack::default())
         .manage(app::webview::deepseek::request::RequestState::default())
         .manage(Layers::default())
+        .manage(app::webview::lifecycle::Lifecycle::default())
         .manage(CourseMetaMap::default())
         .manage(TaskSession::default())
         .manage(Confirmations::default())

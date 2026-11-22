@@ -62,6 +62,20 @@ pub async fn prepare_exit(window: &Window) {
 }
 
 fn resize(webview: &Webview, size: LogicalSize<f64>) -> Result<()> {
+    if !matches!(
+        webview.label(),
+        "main" | "chaoxing" | "chaoxing-mask" | "mask"
+    ) {
+        let position = webview.position()?;
+        let current_size = webview.size()?;
+        // The dynamic factory stages children entirely outside the window until
+        // native stacking is committed. A resize must not expose them early.
+        if i64::from(position.x) + i64::from(current_size.width) < 0
+            && i64::from(position.y) + i64::from(current_size.height) < 0
+        {
+            return Ok(());
+        }
+    }
     let (pos, size) = match webview.label() {
         "chaoxing" | "chaoxing-mask" => (
             LogicalPosition::new(size.width * 0.51, size.height * 0.46),
@@ -92,7 +106,9 @@ pub fn listener(window: &tauri::Window, event: &tauri::WindowEvent) {
             tauri::async_runtime::spawn(close(window.clone()));
         }
         WindowEvent::Destroyed => {
-            window.state::<webview::layer::Layers>().remove(window);
+            window
+                .state::<webview::lifecycle::Lifecycle>()
+                .destroyed(window);
             if window.label() == "app" {
                 log::debug!("主程序窗口已销毁，应用已关闭");
             }
@@ -154,6 +170,10 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
         .icon(Image::from_bytes(include_bytes!("../../icons/icon.ico"))?)?
         .build()?;
 
+    window
+        .state::<webview::lifecycle::Lifecycle>()
+        .register_window(&window);
+
     webview::init_on(&window, "main")?.hide()?;
     webview::init_on(&window, "chaoxing")?.hide()?;
     webview::init_on(&window, "chaoxing-mask")?.hide()?;
@@ -183,6 +203,9 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
             .title("DeepSeek Debug")
             .inner_size(1200.0, 900.0)
             .build()?;
+        deepseek_window
+            .state::<webview::lifecycle::Lifecycle>()
+            .register_window(&deepseek_window);
         webview::init_on(&deepseek_window, "deepseek")?;
     }
 
