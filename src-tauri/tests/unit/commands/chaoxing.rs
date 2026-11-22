@@ -215,8 +215,9 @@ async fn native_solver_keeps_all_protocols_on_the_solve_questions_entry() {
         let (url, request) = serve(200, body).await;
         let result = probe_with(
             &provider(protocol, url),
-            super::solve_questions_with(
-                &super::super::deepseek::RequestState::default(),
+            super::solve_questions_for(
+                crate::config::solver::SolverKind::NativeLlm,
+                None,
                 solver_payload(),
                 false,
             ),

@@ -17,8 +17,9 @@ use std::{
 use tauri::Webview;
 use tokio::sync::oneshot;
 
+static NEXT_INSTANCE: AtomicU64 = AtomicU64::new(1);
+
 pub struct RequestState {
-    pub(crate) creation: super::creation::Creations,
     pub(super) observer: Arc<Observer>,
     nonce: String,
     counter: AtomicU64,
@@ -35,9 +36,12 @@ impl Default for RequestState {
             .expect("system clock after UNIX epoch")
             .as_nanos();
         Self {
-            creation: super::creation::Creations::default(),
             observer: Arc::new(Observer::default()),
-            nonce: format!("{}-{startup:x}", std::process::id()),
+            nonce: format!(
+                "{}-{startup:x}-{}",
+                std::process::id(),
+                NEXT_INSTANCE.fetch_add(1, Ordering::Relaxed)
+            ),
             counter: AtomicU64::new(1),
             target: Mutex::new(None),
         }
@@ -185,16 +189,6 @@ impl RequestState {
             },
             cancelled,
         ))
-    }
-
-    pub(crate) async fn generate(
-        &self,
-        webview: &Webview,
-        text: &str,
-        options: Options,
-    ) -> Result<Generation, &'static str> {
-        self.generate_bound(webview, text, options, &TextBinding::default())
-            .await
     }
 
     async fn generate_bound(

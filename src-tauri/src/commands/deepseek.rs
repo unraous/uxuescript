@@ -1,6 +1,9 @@
 pub use crate::app::webview::deepseek::request::{Generation, RequestState};
-use crate::{app::webview::deepseek::request::Options, commands::CommandsResult};
-use tauri::{Manager, State, Webview};
+use crate::{
+    app::webview::deepseek::request::{Options, TextBinding},
+    commands::CommandsResult,
+};
+use tauri::{Manager, Webview};
 
 fn is_local_main(caller: &Webview) -> bool {
     if caller.label() != "main" || caller.window().label() != "app" {
@@ -31,7 +34,6 @@ fn is_local_main(caller: &Webview) -> bool {
 #[uxs_commands::command]
 pub async fn deepseek_generate_text(
     caller: Webview,
-    state: State<'_, RequestState>,
     text: String,
     timeout_ms: Option<u32>,
     thinking: Option<bool>,
@@ -44,14 +46,16 @@ pub async fn deepseek_generate_text(
         return Err(anyhow::anyhow!("DeepSeek 诊断仅允许本地 main Webview").into());
     }
     let window = caller.window();
-    let deepseek = window
+    let requests = window
         .state::<crate::app::webview::solvers::WebSolverViews>()
         .ensure(&window, crate::config::solver::SolverKind::DeepSeekWeb)
         .await?;
-    state
-        .generate(&deepseek, &text, Options { timeout_ms, thinking, web_search })
+    requests
+        .generate_text(&text, Options { timeout_ms, thinking, web_search }, &TextBinding::default())
         .await
         .map_err(|code| {
+            // ensure 已确认原生实例存在；尚未 attach 表示页面仍未就绪。
+            let code = if code == "WEBVIEW_NOT_OPEN" { "DOCUMENT_NOT_READY" } else { code };
             let message = match code {
                 "QUARANTINED" => "DeepSeek 远端状态未知，已隔离后续发送。请手动核对网页并重启应用；不保证远端已停止。",
                 "BUSY" => "DeepSeek 已有请求在途或结果尚未确认，本次未调度生成",

@@ -30,6 +30,8 @@ B1 将 `deepseek` 按需创建在主 `app` Window 中，移除了独立调试窗
 
 Rust 聚合用例还覆盖完整创建归位的并发串行、原生层级失败重试、课程区共用几何、DeepSeek 可创建但禁止独立销毁、未绑定回滚阻止旧回调、已绑定回滚粘性拒绝重建及正常 app 退出。最终层级应为 `mask > chaoxing-mask > chaoxing > deepseek > main`。这些用例不证明 Windows WebView2 遮挡后的真实后台生成行为；页面加载、已有 Session、遮罩、放大缩小及最大化恢复须另行桌面验收。
 
+两个实际生成入口在源码中消费 `ensure` 返回的同一实例状态；同一定向 Rust 检查验证预约、load 回调与受控消费者共享同一 `Arc<RequestState>`，新预约分配不同 Arc，旧回调和旧回滚不影响新实例；未绑定 close 失败保留原 Arc，绑定后回滚保持粘性拒绝；父 Window Destroyed 无论是否创建过实例都封住预约并最终关闭 Observer。`solvers` 的受控归位用例核对并发等待、取消调用方后继续持有创建门，以及完整归位结束后才发布原生 Ready。它替代的是原生归位步骤，不能证明 WebView2、真实 Session 或后台生成已通过。
+
 指定本地检查：
 
 ```powershell

@@ -38,7 +38,9 @@ Rust 宿主拥有窗口、配置和共享状态；Vue 界面通过生成的 IPC 
 
 启动从已加载配置恢复 Web Solver，`set_solver` 更新内存后直接异步预加载；持久化仍由 `save_config` 或退出完成，保存失败与预加载结果分别处理。课程求解与仅本地 main 可用的 debug 文本诊断在发请求前 await ensure，不依赖预加载成功，也不将创建完成当作 Adapter 或登录就绪。Native 模式不创建页面，切回 Native 保留既有 DeepSeek；本阶段禁止其独立销毁。
 
-DeepSeek 继续共用 RequestState，最终 detach 和 Observer 的不可逆关闭仅发生在 app Window Destroyed。每次创建的轻量准入门在回滚关闭时封住旧页面的导航及加载回调；未绑定的失败可重试，已绑定后回滚会保留原始错误并要求重启，不自动重建或 reset。正常 app 退出单独标记。独立销毁与安全重建仍依赖后续 B2 的实例隔离。
+`WebSolverViews` 的唯一创建槽拥有当前 attempt，每次新预约同时分配一份 `Arc<RequestState>`，以该 Arc 作为实例身份。创建工厂、导航/加载回调、attach 与失败回滚都持有这一 attempt；诊断命令与课程求解从 ensure 返回同一 Arc，不再注册 App-managed RequestState。ensure 的串行任务在调用方取消后仍完成归位或失败收尾，只有 Lifecycle 完成层级、几何与窗口存活检查后才发布原生 Ready；这不表示 Adapter 或登录就绪。
+
+最终 detach 和 Observer 的不可逆关闭仅发生在 app Window Destroyed，销毁前未创建过实例也会永久封住后续预约。未绑定且关闭成功的失败可重新预约新 Arc；未绑定但关闭失败时保留原 attempt，后续只能对同一个原生子视图重试归位。已绑定后回滚会保留原始错误并要求重启；原生子视图与预约身份不一致也明确拒绝恢复。旧回调及旧回滚只作用于旧 Arc，不会修改新槽。切回 Native 保留页面；实例隔离不开放独立销毁、重建或 reset。
 
 章节课堂任务读取卡片生成的链接，在课程主视图打开回看；播放器结束后直接导航回进入课堂前的课程页，由平台重新加载任务点状态。后端在内存中记录本次刷课是否运行，并在课堂结束触发返回时发放一次性恢复凭证；课程页消费凭证后跳过启动确认并重新读取任务。若平台尚未标记刚播放的课堂完成，则等待标记，不重复打开课堂。完成、取消或使用课程工具栏导航时清除状态。回看结束事件和任务点更新的实际时序仍需在平台验证。
 
@@ -112,9 +114,9 @@ API Key 的日志格式化会脱敏，配置序列化仍保留明文。读取或
 
 题目从 JS 提取、IPC、Rust 到模型输入统一使用 `id / kind / stem / options / images` 字段；`id` 表示页面显示题号路径。填空额外携带实际空数 `blank_count`，从 DOM 空位容器或填写控件读取，不根据题干下划线猜测。超星公式图片带有可解析元数据时写入 `stem` 或 `options` 的公式占位文本，其他图片以 `[图片N]` 保留原位置，并由 `images` 提供地址；材料和题目的图片分别编号，后端下载后按所属材料或题号标注并发送多模态内容。模型答案使用 `index / explanation / content`，`index` 对应输入的 `id`，不在链路中转换中英文字段。
 
-三个入口统一调用 `solve_questions(payload: Folio, allow_partial: bool)`，客户端参数与 `Vec<AnswerItem>` 回填契约不随求解方式改变；Tauri 注入应用管理的 B2 `RequestState`，不是客户端参数。命令入口读取并固定本次 `SolverKind`，Web 分支先等待 ensure 完成，再由 Rust 的 [`quiz::solve_with_solver`](../../src-tauri/src/core/quiz.rs) 按该选择分流：Native LLM 有字体时递归还原篇标题、材料与题目文字，无字体时直传，检查空卷后读取供应商和通用配置并进入原模型求解；DeepSeek Web 通过 [`web.rs`](../../src-tauri/src/core/quiz/web.rs) 还原字体、读取一次通用每批题数，进入单一 [`web/deepseek.rs`](../../src-tauri/src/core/quiz/web/deepseek.rs) 求解器，不读取或校验 Native 供应商、模型、API Key，也不请求 Native API。切换设置只影响之后进入的求解，配置锁不会跨异步请求持有。
+三个入口统一调用 `solve_questions(payload: Folio, allow_partial: bool)`，客户端参数与 `Vec<AnswerItem>` 回填契约不随求解方式改变；Web 分支从 `ensure` 获取该实例的 `Arc<RequestState>`，请求状态不是客户端参数。命令入口读取并固定本次 `SolverKind`，Web 分支先等待 ensure 完成，再由 Rust 的 [`quiz::solve_with_solver`](../../src-tauri/src/core/quiz.rs) 按该选择分流：Native LLM 有字体时递归还原篇标题、材料与题目文字，无字体时直传，检查空卷后读取供应商和通用配置并进入原模型求解；DeepSeek Web 通过 [`web.rs`](../../src-tauri/src/core/quiz/web.rs) 还原字体、读取一次通用每批题数，进入单一 [`web/deepseek.rs`](../../src-tauri/src/core/quiz/web/deepseek.rs) 求解器，不读取或校验 Native 供应商、模型、API Key，也不请求 Native API。切换设置只影响之后进入的求解，配置锁不会跨异步请求持有。
 
-Web 第一版只支持纯文本。发送第一批前递归检查整卷材料与题目的 `images` 必须为空，复用原 `batch::prepare` 完成题号、空数、材料链与拆批，再复用 `prompt` 的题型说明和组装，将 system 与所有文本 part 用两个换行拼为一条 text；全部批次 Prompt 都先组装成功，不下载图片或丢弃图片。批次串行调用 B2 文本请求，默认 120 秒，省略 thinking/webSearch 以保留网页设置。应用管理的请求状态只在目标页面成功调度 bootstrap 后保存实际 Webview handle，窗口 `Destroyed` 时释放；原文档门、BUSY 拒绝与应用生命周期隔离仍生效。首次请求固定宿主文档代次和 JS binding generation，后续批次遇到刷新或切会话停止，不在新绑定续跑，也不建立队列。
+Web 第一版只支持纯文本。发送第一批前递归检查整卷材料与题目的 `images` 必须为空，复用原 `batch::prepare` 完成题号、空数、材料链与拆批，再复用 `prompt` 的题型说明和组装，将 system 与所有文本 part 用两个换行拼为一条 text；全部批次 Prompt 都先组装成功，不下载图片或丢弃图片。批次串行调用 B2 文本请求，默认 120 秒，省略 thinking/webSearch 以保留网页设置。该实例的请求状态只在目标页面成功调度 bootstrap 后保存实际 Webview handle，窗口 `Destroyed` 时释放；原文档门、BUSY 拒绝与应用生命周期隔离仍生效。首次请求固定宿主文档代次和 JS binding generation，后续批次遇到刷新或切会话停止，不在新绑定续跑，也不建立队列。
 
 仅 B2 `completed` 正文进入原严格答案解析，校验数量、题号、非空内容与空数并还原输入顺序；不摘取 Markdown/JSON 片段。`failed / uncertain / rejected / interrupted` 只交付脱敏的固定错误码、delivery、remote 与隔离状态，不把其正文当答案；格式错误统一报告 `INVALID_ANSWER`，不记录回答片段。Web 全任务 all-or-nothing：即使 `allow_partial=true`，也只有全部批次成功并通过校验才返回答案，任何失败立即停止且不向原回填返回部分结果。不自动 retry、回退 Native API 或清除 B2 quarantine；远端状态未知时仍须人工核对网页并重启应用。DeepSeek 页面在主 app 窗口后台按需加载并复用已有登录状态；使用前须有有效会话，保持输入框为空、无附件且未在生成，无需 Native API Key。B1 暂无前台登录或查看入口。真实学习通回填尚未完成验收，调用与验收条件见[测试说明](../../tests/README.md#deepseek-b3纯文本卷面求解)。
 

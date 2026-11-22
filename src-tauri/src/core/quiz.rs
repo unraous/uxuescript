@@ -22,7 +22,7 @@ pub async fn solve(
     requests: &RequestState,
 ) -> Result<Vec<AnswerItem>> {
     let solver = *CONFIG.solver.lock();
-    solve_with_solver(solver, payload, allow_partial, requests).await
+    solve_with_solver(solver, payload, allow_partial, Some(requests)).await
 }
 
 /// The command snapshots selection before ensuring native resources; keep that
@@ -31,7 +31,7 @@ pub(crate) async fn solve_with_solver(
     solver: SolverKind,
     payload: Folio,
     allow_partial: bool,
-    requests: &RequestState,
+    requests: Option<&RequestState>,
 ) -> Result<Vec<AnswerItem>> {
     match solver {
         SolverKind::NativeLlm => {
@@ -52,7 +52,10 @@ pub(crate) async fn solve_with_solver(
             llm::solve(&provider, decrypted, general, allow_partial).await
         }
         // Web 第一版只交付整卷成功结果；allow_partial 仅沿用 Native 语义。
-        SolverKind::DeepSeekWeb => web::solve(payload, requests).await,
+        SolverKind::DeepSeekWeb => {
+            let requests = requests.ok_or_else(|| anyhow::anyhow!("DeepSeek 实例未就绪"))?;
+            web::solve(payload, requests).await
+        }
     }
 }
 

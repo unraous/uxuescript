@@ -55,7 +55,6 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .on_window_event(window::listener)
         .manage(UrlStack::default())
-        .manage(app::webview::deepseek::request::RequestState::default())
         .manage(Layers::default())
         .manage(app::webview::lifecycle::Lifecycle::default())
         .manage(app::webview::solvers::WebSolverViews::default())

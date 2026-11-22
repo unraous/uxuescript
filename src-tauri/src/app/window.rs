@@ -97,8 +97,7 @@ pub fn listener(window: &tauri::Window, event: &tauri::WindowEvent) {
         WindowEvent::Destroyed => {
             if window.label() == "app" {
                 window
-                    .state::<webview::deepseek::request::RequestState>()
-                    .creation
+                    .state::<webview::solvers::WebSolverViews>()
                     .destroyed();
             }
             window

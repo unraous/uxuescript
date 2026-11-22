@@ -5,8 +5,9 @@ use crate::core::{
 
 use anyhow::anyhow;
 use parking_lot::Mutex;
+use std::sync::Arc;
 use tauri::utils::config::BackgroundThrottlingPolicy;
-use tauri::{LogicalPosition, LogicalSize, Manager, Url, Webview, WebviewBuilder, WebviewUrl};
+use tauri::{LogicalPosition, LogicalSize, Url, Webview, WebviewBuilder, WebviewUrl};
 
 pub(crate) mod deepseek;
 pub mod layer;
@@ -81,7 +82,7 @@ impl UrlStack {
 }
 
 pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn std::error::Error>> {
-    create_on(window, label, false)
+    create_on(window, label, false, None)
 }
 
 fn placement_on(
@@ -110,6 +111,7 @@ fn create_on(
     window: &tauri::Window,
     label: &str,
     staged: bool,
+    attempt: Option<Arc<deepseek::creation::Attempt>>,
 ) -> Result<Webview, Box<dyn std::error::Error>> {
     log::debug!("开始初始化Webview [{}]", label);
     let (position, size) = placement_on(window, label)?;
@@ -148,6 +150,7 @@ fn create_on(
                 .devtools(true),
                 // 当前只允许聊天主机；手动登录若跳转到其他主机，再按实际导航补充。
                 is_deepseek_url,
+                attempt.ok_or_else(|| anyhow!("DeepSeek 创建缺少实例预约"))?,
             )?
         }
         _ => return Err(anyhow!("未知的Webview标签").into()),
@@ -173,24 +176,14 @@ fn create_on(
         },
         size,
     );
-    if label == "deepseek" && result.is_err() {
-        let requests = window.state::<deepseek::request::RequestState>();
-        requests
-            .creation
-            .rollback(|| Ok(()), || requests.cancel_creation())?;
-    }
     Ok(result?)
 }
 
 // Factory rollback pairs configuration's page callbacks with native close.
 // Lifecycle retains the general resource rollback/unregistration sequence.
-fn rollback_created(view: &Webview) -> anyhow::Result<()> {
+fn rollback_created(view: &Webview, attempt: &deepseek::creation::Attempt) -> anyhow::Result<()> {
     if view.label() == "deepseek" {
-        let requests = view.state::<deepseek::request::RequestState>();
-        requests.creation.rollback(
-            || view.close().map_err(Into::into),
-            || requests.cancel_creation(),
-        )
+        attempt.rollback(|| view.close().map_err(Into::into))
     } else {
         view.close().map_err(Into::into)
     }

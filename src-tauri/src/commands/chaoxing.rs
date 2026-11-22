@@ -61,18 +61,21 @@ mod tests;
 #[uxs_commands::command(webview = "chaoxing")]
 pub async fn solve_questions(
     window: tauri::Window,
-    state: tauri::State<'_, super::deepseek::RequestState>,
     payload: Folio,
     allow_partial: bool,
 ) -> CommandsResult<Vec<AnswerItem>> {
     let solver = *CONFIG.solver.lock();
-    if solver == crate::config::solver::SolverKind::DeepSeekWeb {
-        window
-            .state::<crate::app::webview::solvers::WebSolverViews>()
-            .ensure(&window, solver)
-            .await?;
-    }
-    solve_questions_for(solver, state.inner(), payload, allow_partial).await
+    let requests = if solver == crate::config::solver::SolverKind::DeepSeekWeb {
+        Some(
+            window
+                .state::<crate::app::webview::solvers::WebSolverViews>()
+                .ensure(&window, solver)
+                .await?,
+        )
+    } else {
+        None
+    };
+    solve_questions_for(solver, requests.as_deref(), payload, allow_partial).await
 }
 
 /// 生产入口与本地协议验证共用业务调用，不要求测试构造 Tauri Runtime。
@@ -83,12 +86,12 @@ pub(crate) async fn solve_questions_with(
     allow_partial: bool,
 ) -> CommandsResult<Vec<AnswerItem>> {
     let solver = *CONFIG.solver.lock();
-    solve_questions_for(solver, requests, payload, allow_partial).await
+    solve_questions_for(solver, Some(requests), payload, allow_partial).await
 }
 
 async fn solve_questions_for(
     solver: crate::config::solver::SolverKind,
-    requests: &super::deepseek::RequestState,
+    requests: Option<&super::deepseek::RequestState>,
     payload: Folio,
     allow_partial: bool,
 ) -> CommandsResult<Vec<AnswerItem>> {

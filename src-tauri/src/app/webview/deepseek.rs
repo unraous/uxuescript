@@ -1,4 +1,4 @@
-mod creation;
+pub(crate) mod creation;
 pub(crate) mod request;
 
 use crate::core::script::include_script;
@@ -6,7 +6,7 @@ use parking_lot::Mutex;
 use serde::Deserialize;
 use std::{sync::Arc, time::Duration};
 use tauri::webview::{PageLoadEvent, PageLoadPayload};
-use tauri::{Manager, Url, Webview, WebviewBuilder, Window, WindowEvent, Wry};
+use tauri::{Url, Webview, WebviewBuilder, Window, WindowEvent, Wry};
 use tokio::sync::oneshot;
 
 pub(super) fn is_target_url(url: &Url) -> bool {
@@ -353,14 +353,14 @@ pub(super) fn configure(
     window: &Window,
     builder: WebviewBuilder<Wry>,
     allow_navigation: fn(&Url) -> bool,
+    attempt: Arc<creation::Attempt>,
 ) -> anyhow::Result<WebviewBuilder<Wry>> {
-    let observer = window.state::<request::RequestState>().observer.clone();
-    let attempt = window.state::<request::RequestState>().creation.begin()?;
-    let app = window.app_handle().clone();
-    let closing = app.clone();
+    attempt.check_active()?;
+    let observer = attempt.observer();
+    let closing = attempt.clone();
     window.on_window_event(move |event| {
         if matches!(event, WindowEvent::Destroyed) {
-            closing.state::<request::RequestState>().detach();
+            closing.destroyed();
         }
     });
     let navigation = navigation_handler(observer.clone(), allow_navigation);
@@ -369,7 +369,7 @@ pub(super) fn configure(
         .initialization_script(adapter_initialization_script())
         .on_navigation(move |url| navigation_attempt.navigate(|| navigation(url)))
         .on_page_load(move |webview, payload| {
-            attempt.loaded(|| load_on(webview, payload, &app.state::<request::RequestState>()));
+            attempt.loaded(|requests| load_on(webview, payload, requests));
         }))
 }
 

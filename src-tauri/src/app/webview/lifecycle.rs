@@ -78,7 +78,7 @@ fn validate_dynamic(label: &str) -> Result<()> {
 
 fn validate_destroy(label: &str) -> Result<()> {
     validate_dynamic(label)?;
-    anyhow::bail!("DeepSeek 在 B1 中运行期间保留，独立销毁需等待实例隔离")
+    anyhow::bail!("DeepSeek 在运行期间保留，本阶段不支持独立销毁")
 }
 
 pub(super) fn existing(window: &Window, label: &str) -> Result<Option<Webview>> {
@@ -92,7 +92,12 @@ pub(super) fn existing(window: &Window, label: &str) -> Result<Option<Webview>> 
     Ok(view)
 }
 
-pub(crate) async fn spawn<F, P>(window: &Window, label: &str, prepare: F) -> Result<Webview>
+pub(crate) async fn spawn<F, P>(
+    window: &Window,
+    label: &str,
+    attempt: Arc<super::deepseek::creation::Attempt>,
+    prepare: F,
+) -> Result<Webview>
 where
     F: Fn(Window, Webview) -> P + Send + Sync + 'static,
     P: Future<Output = Result<()>> + Send,
@@ -107,10 +112,19 @@ where
         let layers = &*layer_state;
         let window = &window;
         let label = label.as_str();
+        let rollback_attempt = attempt.clone();
         spawn_entry(
             &state,
             || existing(window, label),
-            || super::create_on(window, label, true).map_err(|error| anyhow!(error.to_string())),
+            || match super::create_on(window, label, true, Some(attempt.clone())) {
+                Ok(view) => Ok(view),
+                Err(error) => {
+                    // Configuration can install callbacks before add_child fails;
+                    // invalidate that exact attempt even when no handle is returned.
+                    attempt.rollback(|| Ok(()))?;
+                    Err(anyhow!(error.to_string()))
+                }
+            },
             |view: Webview| {
                 let prepared = prepare(window.clone(), view.clone());
                 async move {
@@ -126,10 +140,13 @@ where
                     Ok(())
                 }
             },
-            |view: Webview| async move {
-                super::rollback_created(&view)?;
-                layers.remove_entry(&window, &label).await;
-                Ok(())
+            |view: Webview| {
+                let rollback_attempt = rollback_attempt.clone();
+                async move {
+                    super::rollback_created(&view, &rollback_attempt)?;
+                    layers.remove_entry(&window, &label).await;
+                    Ok(())
+                }
             },
         )
         .await
