@@ -52,7 +52,12 @@ export async function buildScripts({
       },
     ];
     if (entry === "core.js") {
-      const readable = { ...outputs[0], entryFileNames: entry, minify: false };
+      const readable = {
+        ...outputs[0],
+        entryFileNames: entry,
+        minify: false,
+        topLevelVar: false,
+      };
       outputs.push(readable);
       outputs.push({
         ...readable,
@@ -98,7 +103,11 @@ export async function buildScripts({
         minify: false,
         reportCompressedSize: false,
         watch: watch ? {} : null,
-        rolldownOptions: { input: "virtual:uxs-entry", output: outputs },
+        rolldownOptions: {
+          input: "virtual:uxs-entry",
+          experimental: { attachDebugInfo: "none" },
+          output: outputs,
+        },
       },
     });
     if (watch) {

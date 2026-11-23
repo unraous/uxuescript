@@ -97,7 +97,7 @@ Windows 用户可选择 MSI 安装包或便携 EXE；macOS Apple Silicon 用户�
 
 ## 独立脚本
 
-[安装油猴脚本](https://github.com/unraous/uxuescript/releases/latest/download/uxuescript.user.js) · [下载 core.js](https://github.com/unraous/uxuescript/releases/latest/download/core.js) · [查看源码](injected/chaoxing/course.js)
+[Greasy Fork 安装油猴脚本](https://greasyfork.org/zh-CN/scripts/606856-uxuescript) · [GitHub 安装油猴脚本](https://github.com/unraous/uxuescript/releases/latest/download/uxuescript.user.js) · [下载 core.js](https://github.com/unraous/uxuescript/releases/latest/download/core.js) · [查看源码](injected/chaoxing/course.js)
 
 安装油猴脚本后，进入课程学习页面会自动询问是否启动。也可以将 `core.js` 的完整内容复制到课程页面的浏览器控制台执行。两种方式均支持已实现的视频、音频和 PDF 任务，包括可识别的视频内互动题与批注自动继续学习。
 
