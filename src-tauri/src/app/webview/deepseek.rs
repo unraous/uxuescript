@@ -2,6 +2,9 @@ pub(crate) mod authentication;
 pub(crate) mod creation;
 mod local;
 pub(crate) mod request;
+mod style;
+
+pub(crate) use style::sync_scrollbar;
 
 use crate::core::script::include_script;
 use parking_lot::Mutex;
@@ -360,6 +363,7 @@ fn load_on(
         observer.cancel();
         return false;
     }
+    sync_scrollbar(&webview);
     let mut bootstrapped = false;
     observer.begin_observe(|epoch, cancelled| {
         let token = serde_json::to_string(&requests.document_token(epoch))

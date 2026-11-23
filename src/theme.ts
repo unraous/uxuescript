@@ -176,6 +176,17 @@ async function syncMask() {
     emitTo("mask", "theme-colors-changed", update),
     emitTo("chaoxing-mask", "theme-colors-changed", update),
   ]);
+  await syncSolverScrollbar();
+}
+
+/** Read the final palette in native code after the root's color transitions settle. */
+export async function syncSolverScrollbar(): Promise<void> {
+  await Promise.allSettled(
+    document.documentElement
+      .getAnimations()
+      .map((animation) => animation.finished),
+  );
+  await emitTo("app", "theme-colors-changed", null);
 }
 
 /** Apply partial color overrides immediately; unspecified colors keep their current values. */

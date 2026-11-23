@@ -77,7 +77,7 @@ onUnmounted(() => {
     />
     <div
       v-else
-      class="web-solver-notice"
+      class="web-solver-notice custom-scrollbar"
     >
       <h2>{{ label("webSolverPreviewTitle") }}</h2>
       <p>{{ label("webSolverUsage") }}</p>

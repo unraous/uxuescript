@@ -172,6 +172,12 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
     webview::init_on(&window, "chaoxing")?.hide()?;
     webview::init_on(&window, "chaoxing-mask")?.hide()?;
     let mask = webview::init_on(&window, "mask")?;
+    let theme_window = window.clone();
+    window.listen("theme-colors-changed", move |_| {
+        if let Some(deepseek) = theme_window.get_webview("deepseek") {
+            webview::deepseek::sync_scrollbar(&deepseek);
+        }
+    });
     window
         .state::<webview::layer::Layers>()
         .register(&window, &["main", "chaoxing", "chaoxing-mask", "mask"]);
