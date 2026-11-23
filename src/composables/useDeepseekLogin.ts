@@ -22,6 +22,7 @@ export function useDeepseekLogin(enabled: () => boolean) {
   let guideDeadline = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let unlisten: UnlistenFn | undefined;
+  let unlistenAuthentication: UnlistenFn | undefined;
   let switches = Promise.resolve();
   let viewRevision = 0;
   const current = (token: number) => !disposed && enabled() && token === epoch;
@@ -114,7 +115,11 @@ export function useDeepseekLogin(enabled: () => boolean) {
         } else schedule(token, checkingDeadline, 1000);
       } else if (result.status === "unauthenticated") {
         if (!guided) {
-          if (!(await switchView("deepseek", token))) return;
+          if (
+            view.value !== "deepseek" &&
+            !(await switchView("deepseek", token))
+          )
+            return;
           guided = true;
           guideDeadline = Date.now() + 5 * 60_000;
         }
@@ -212,11 +217,22 @@ export function useDeepseekLogin(enabled: () => boolean) {
     );
     if (disposed) release();
     else unlisten = release;
+    const releaseAuthentication = await listen(
+      "deepseek-authentication-changed",
+      () => {
+        // The document/credential marker only invalidates a cached answer.
+        // The existing server query still decides the actual sign-in state.
+        if (!disposed && enabled()) retry();
+      },
+    );
+    if (disposed) releaseAuthentication();
+    else unlistenAuthentication = releaseAuthentication;
   });
   onUnmounted(() => {
     stop();
     disposed = true;
     unlisten?.();
+    unlistenAuthentication?.();
   });
 
   return { status, diagnostic, view, busy, retry, toggle };

@@ -8,7 +8,7 @@ use parking_lot::Mutex;
 use serde::Deserialize;
 use std::{sync::Arc, time::Duration};
 use tauri::webview::{PageLoadEvent, PageLoadPayload};
-use tauri::{Url, Webview, WebviewBuilder, Window, Wry};
+use tauri::{Emitter, Url, Webview, WebviewBuilder, Window, Wry};
 use tokio::sync::oneshot;
 
 pub(super) fn is_target_url(url: &Url) -> bool {
@@ -37,6 +37,7 @@ enum Readout {
 struct Snapshot {
     schema_version: u32,
     generation: u64,
+    authentication_revision: u64,
     api_available: bool,
     adapter_version: Option<String>,
     phase: Phase,
@@ -115,6 +116,17 @@ fn parse_readout(raw: &str) -> Result<Readout, &'static str> {
 }
 
 impl Readout {
+    fn authentication_changed(&self, previous: &mut Option<u64>) -> bool {
+        let Self::Snapshot { snapshot } = self else {
+            return false;
+        };
+        if *previous == Some(snapshot.authentication_revision) {
+            return false;
+        }
+        *previous = Some(snapshot.authentication_revision);
+        true
+    }
+
     fn is_warning(&self) -> bool {
         match self {
             Self::Snapshot { snapshot } => snapshot.phase == Phase::Failed,
@@ -286,6 +298,9 @@ async fn observe(
     mut cancelled: oneshot::Receiver<()>,
 ) {
     let mut previous = None;
+    // A fresh observer owns one document, so revision zero also invalidates
+    // main's previous document identity after a full navigation or reload.
+    let mut authentication_revision = None;
     while observer.is_current(epoch) {
         let result = read_snapshot(&webview, &mut cancelled).await;
         if result == Err(ReadFailure::Cancelled) {
@@ -299,6 +314,14 @@ async fn observe(
                 Err(ReadFailure::EvalDispatchFailed) => Err("EVAL_DISPATCH_FAILED"),
                 Err(ReadFailure::Cancelled) => unreachable!(),
             };
+            if next
+                .as_ref()
+                .is_ok_and(|readout| readout.authentication_changed(&mut authentication_revision))
+            {
+                if let Err(error) = webview.emit_to("main", "deepseek-authentication-changed", ()) {
+                    log::warn!("DeepSeek authentication event failed: {error}");
+                }
+            }
             if previous.as_ref() != Some(&next) {
                 let warning = next.as_ref().map_or(true, Readout::is_warning);
                 let summary = match &next {

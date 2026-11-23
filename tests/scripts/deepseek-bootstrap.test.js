@@ -116,9 +116,12 @@ beforeEach(() => {
     ],
   });
   const events = new EventTarget();
+  const localStorage = window.localStorage;
+  localStorage.clear();
   page = /** @type {typeof page} */ (
     /** @type {unknown} */ ({
       location: new URL(`https://chat.deepseek.com${firstPath}`),
+      localStorage,
       get top() {
         return page;
       },
@@ -154,6 +157,30 @@ beforeEach(() => {
   vi.stubGlobal("window", page);
   registered = null;
   warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+});
+
+it("samples credential changes with the existing route timer without issuing auth queries or rebinding", async () => {
+  const owned = adapter();
+  const api = installApi([owned]);
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  main();
+  await settle();
+  expect(snapshot().authenticationRevision).toBe(0);
+  page.localStorage.setItem("userToken", JSON.stringify("private-token"));
+  // Snapshot remains read-only; only the document's existing timer samples.
+  expect(snapshot().authenticationRevision).toBe(0);
+  await vi.advanceTimersByTimeAsync(250);
+  expect(snapshot().authenticationRevision).toBe(1);
+  page.localStorage.removeItem("userToken");
+  await vi.advanceTimersByTimeAsync(250);
+  expect(snapshot().authenticationRevision).toBe(2);
+  await vi.advanceTimersByTimeAsync(500);
+  expect(snapshot().authenticationRevision).toBe(2);
+  expect(snapshot().generation).toBe(0);
+  expect(api.createDeepSeekAdapter).toHaveBeenCalledOnce();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(JSON.stringify(snapshot())).not.toContain("private-token");
 });
 
 afterEach(async () => {

@@ -40,6 +40,7 @@ fn snapshot_json() -> serde_json::Value {
         "snapshot": {
             "schemaVersion": 1,
             "generation": 0,
+            "authenticationRevision": 0,
             "apiAvailable": true,
             "adapterVersion": "0.1.0",
             "phase": "initializing",
@@ -52,6 +53,30 @@ fn snapshot_json() -> serde_json::Value {
             "pageNotReadyTimedOut": false
         }
     })
+}
+
+#[test]
+fn auth_invalidation_emits_for_each_new_document_and_credential_revision_only() {
+    let mut first_document = None;
+    let mut value = ready_snapshot_json();
+    let first = parse_readout(&value.to_string()).unwrap();
+    assert!(first.authentication_changed(&mut first_document));
+    assert!(!first.authentication_changed(&mut first_document));
+    // Route rebinds and failed samples are unrelated to login state.
+    value["snapshot"]["generation"] = 1.into();
+    assert!(
+        !parse_readout(&value.to_string())
+            .unwrap()
+            .authentication_changed(&mut first_document)
+    );
+    assert!(!Readout::ReadFailed.authentication_changed(&mut first_document));
+    value["snapshot"]["authenticationRevision"] = 1.into();
+    let changed = parse_readout(&value.to_string()).unwrap();
+    assert!(changed.authentication_changed(&mut first_document));
+    assert!(!changed.authentication_changed(&mut first_document));
+    // A whole-document reload starts its own revision at zero and must notify.
+    let mut next_document = None;
+    assert!(first.authentication_changed(&mut next_document));
 }
 
 fn ready_snapshot_json() -> serde_json::Value {

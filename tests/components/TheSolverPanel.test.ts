@@ -26,11 +26,20 @@ const mocks = vi.hoisted(() => ({
   activateChaoxingView: vi.fn<typeof commands.activateChaoxingView>(),
   setGeneral: vi.fn<typeof commands.setGeneral>(),
   error: vi.fn<typeof showError>(),
+  authenticationChanged: undefined as (() => void) | undefined,
 }));
 vi.mock("@/services/cmds", () => ({ commands: mocks }));
 vi.mock("@/services/errors", () => ({ showError: mocks.error }));
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: vi.fn(async () => () => {}),
+  listen: vi.fn(async (event: string, callback: () => void) => {
+    if (event === "deepseek-authentication-changed") {
+      mocks.authenticationChanged = callback;
+      return () => {
+        mocks.authenticationChanged = undefined;
+      };
+    }
+    return () => {};
+  }),
 }));
 enableAutoUnmount(afterEach);
 
@@ -46,6 +55,9 @@ const mountConfig = () =>
   });
 
 beforeEach(async () => {
+  mocks.authenticationChanged = undefined;
+  mocks.deepseekAuthentication.mockReset();
+  mocks.currentWebview.mockReset();
   let solver: SolverKind = "native_llm";
   let provider: LLMProvider = {
     name: "Saved Provider",
@@ -94,6 +106,77 @@ beforeEach(async () => {
 });
 
 describe("solver configuration", () => {
+  it("invalidates the displayed sign-in after remote logout and guides the next login only once", async () => {
+    vi.useFakeTimers();
+    try {
+      const wrapper = mountConfig();
+      await flushPromises();
+      wrapper
+        .getComponent<typeof VSelector>(".solver-selector")
+        .props("methods")
+        .select(1);
+      await flushPromises();
+      await wrapper.get(".solver-view-button").trigger("click");
+      await flushPromises();
+      expect(mocks.activateDeepseekView).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(mocks.deepseekAuthentication).toHaveBeenCalledOnce();
+      mocks.currentWebview.mockResolvedValue("deepseek");
+      mocks.deepseekAuthentication.mockResolvedValueOnce({
+        status: "unauthenticated",
+        diagnostic: null,
+      });
+      expect(mocks.authenticationChanged).toBeTypeOf("function");
+      mocks.authenticationChanged?.();
+      await flushPromises();
+      expect(wrapper.get(".login-status").text()).toContain("sign in");
+      expect(wrapper.find(".solver-view-button").exists()).toBe(false);
+      expect(mocks.activateDeepseekView).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(2000);
+      await flushPromises();
+      expect(wrapper.get(".login-status").text()).toContain("Signed in");
+      expect(mocks.activateChaoxingView).toHaveBeenCalledOnce();
+      await wrapper.get(".solver-view-button").trigger("click");
+      await flushPromises();
+      mocks.authenticationChanged?.();
+      await flushPromises();
+      expect(mocks.activateChaoxingView).toHaveBeenCalledOnce();
+      expect(mocks.saveConfig).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects an authenticated result from before a credential invalidation", async () => {
+    let finish!: (result: {
+      status: "authenticated";
+      diagnostic: null;
+    }) => void;
+    mocks.deepseekAuthentication.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const wrapper = mountConfig();
+    await flushPromises();
+    wrapper
+      .getComponent<typeof VSelector>(".solver-selector")
+      .props("methods")
+      .select(1);
+    await flushPromises();
+    mocks.deepseekAuthentication.mockResolvedValue({
+      status: "unauthenticated",
+      diagnostic: null,
+    });
+    mocks.authenticationChanged?.();
+    await flushPromises();
+    finish({ status: "authenticated", diagnostic: null });
+    await flushPromises();
+    expect(wrapper.get(".login-status").text()).toContain("sign in");
+    expect(wrapper.find(".solver-view-button").exists()).toBe(false);
+    expect(mocks.activateChaoxingView).not.toHaveBeenCalled();
+  });
   it("retains a retry when the authoritative view query fails", async () => {
     mocks.currentWebview.mockRejectedValueOnce(new Error("view lookup failed"));
     const wrapper = mountConfig();

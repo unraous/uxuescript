@@ -27,6 +27,7 @@ describe("DeepSeek explicit server authentication evidence", () => {
     vi.stubGlobal("fetch", fetch);
   });
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
@@ -81,6 +82,22 @@ describe("DeepSeek explicit server authentication evidence", () => {
     expect(fetch.mock.calls[0][1].headers).toEqual({});
   });
 
+  it("keeps unavailable credential storage unknown without breaking bootstrap or repeatedly logging", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("Storage disabled", "SecurityError");
+    });
+    const slot = createAuthenticationCheck();
+    slot.observeCredentials();
+    slot.observeCredentials();
+    expect(slot.revision()).toBe(0);
+    expect(warning).toHaveBeenCalledOnce();
+    const id = slot.start();
+    await vi.waitFor(() => expect(slot.read(id).status).toBe("unknown"));
+    expect(fetch).not.toHaveBeenCalled();
+    slot.close();
+  });
+
   it.each(["{bad json", JSON.stringify({ value: "secret", __version: "1" })])(
     "does not query with malformed storage",
     async (raw) => {
@@ -113,6 +130,37 @@ describe("DeepSeek explicit server authentication evidence", () => {
     expect(slot.start()).toBe(first + 1);
     slot.close();
     expect(slot.read(first + 1).status).toBe("unknown");
+  });
+
+  it("invalidates pending credentials and prevents an old completion from replacing the new query", async () => {
+    /** @type {((value: ReturnType<typeof response>) => void)[]} */
+    const finish = [];
+    fetch.mockImplementation(
+      () => new Promise((resolve) => finish.push(resolve)),
+    );
+    window.localStorage.setItem("userToken", JSON.stringify("first-token"));
+    const slot = createAuthenticationCheck();
+    slot.observeCredentials();
+    const old = slot.start();
+    window.localStorage.removeItem("userToken");
+    slot.observeCredentials();
+    expect(slot.revision()).toBe(1);
+    expect(fetch.mock.calls[0][1].signal.aborted).toBe(true);
+    // Restore the old raw value too: equality at response time alone cannot
+    // distinguish an A -> logout -> A identity change.
+    window.localStorage.setItem("userToken", JSON.stringify("first-token"));
+    slot.observeCredentials();
+    const current = slot.start();
+    finish[0](response(authenticated));
+    // Drain fetch, response.json, query completion, and the slot callback.
+    for (let index = 0; index < 8; index++) await Promise.resolve();
+    expect(slot.read(old).status).not.toBe("authenticated");
+    expect(slot.read(current).status).toBe("checking");
+    finish[1](response({ code: 40002 }));
+    await vi.waitFor(() =>
+      expect(slot.read(current).status).not.toBe("checking"),
+    );
+    slot.close();
   });
 
   it("aborts its bounded request and does not publish after document close", async () => {

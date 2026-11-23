@@ -11,7 +11,7 @@ import { createAuthenticationCheck } from "./authentication.js";
  * @typedef {{VERSION: string, createDeepSeekAdapter(): Adapter, getDeepSeekAdapterInstance(): Adapter|null}} AdapterApi
  * @typedef {"waiting_path"|"initializing"|"waiting_page"|"ready"|"invalidated"|"disposing"|"failed"|"destroyed"} Phase
  * @typedef {"not_started"|"pending"|"fulfilled"|"rejected"} Initialization
- * @typedef {{schemaVersion: number, generation: number, apiAvailable: boolean, adapterVersion: string|null, phase: Phase, initialization: Initialization, attempts: number, pathBindable: boolean, sessionPresent: boolean, sessionState: "none"|"valid"|"invalid"|"unbound", errorCode: string|null, pageNotReadyTimedOut: boolean}} Snapshot
+ * @typedef {{schemaVersion: number, generation: number, authenticationRevision: number, apiAvailable: boolean, adapterVersion: string|null, phase: Phase, initialization: Initialization, attempts: number, pathBindable: boolean, sessionPresent: boolean, sessionState: "none"|"valid"|"invalid"|"unbound", errorCode: string|null, pageNotReadyTimedOut: boolean}} Snapshot
  * @typedef {{documentToken: string, bindingGeneration: number, requestId: string}} Identity
  * @typedef {Identity & {text: string, options?: Options}} Envelope
  * @typedef {{requestId: string, status: "completed", content: string, durationMs: number}|{requestId: string, status: "failed"|"uncertain"|"rejected", error: RequestError, durationMs: number}} Result
@@ -336,6 +336,7 @@ export function main() {
     return {
       schemaVersion: 1,
       generation,
+      authenticationRevision: authentication.revision(),
       apiAvailable,
       adapterVersion: apiAvailable ? api.VERSION : null,
       phase: !destroyed && currentPath !== pathname ? "invalidated" : phase,
@@ -519,8 +520,14 @@ export function main() {
   history.pushState = pushState;
   history.replaceState = replaceState;
   host.__UXS_DEEPSEEK_B1__ = {
-    startAuthenticationCheck: authentication.start,
-    readAuthenticationCheck: authentication.read,
+    startAuthenticationCheck() {
+      authentication.observeCredentials();
+      return authentication.start();
+    },
+    readAuthenticationCheck(id) {
+      authentication.observeCredentials();
+      return authentication.read(id);
+    },
     snapshot,
     bindDocument,
     start,
@@ -528,7 +535,10 @@ export function main() {
     cancel,
     ack,
   };
-  const routePoll = window.setInterval(observePath, 250);
+  const routePoll = window.setInterval(() => {
+    authentication.observeCredentials();
+    observePath();
+  }, 250);
   window.addEventListener("pagehide", destroy, { once: true });
   window.addEventListener("popstate", observePath);
   request();

@@ -62,6 +62,23 @@ export async function queryAuthentication(signal) {
 /** One document-owned, single-flight query slot; it does not poll the server. */
 export function createAuthenticationCheck() {
   let id = 0;
+  let revision = 0;
+  let storageReadFailed = false;
+  // Storage-denied pages previously returned unknown from the query. Sampling
+  // must preserve that behavior rather than preventing the bootstrap entirely.
+  function readCredential() {
+    try {
+      const raw = window.localStorage.getItem("userToken");
+      storageReadFailed = false;
+      return raw;
+    } catch {
+      if (!storageReadFailed)
+        console.warn("[uXS DeepSeek authentication] AUTH_STORAGE_READ_FAILED");
+      storageReadFailed = true;
+      return undefined;
+    }
+  }
+  let credential = readCredential();
   let pending = false;
   let closed = false;
   /** @type {AbortController|null} */
@@ -69,16 +86,35 @@ export function createAuthenticationCheck() {
   /** @type {Authentication} */
   let result = { status: "checking", diagnostic: null };
   return {
+    revision() {
+      return revision;
+    },
+    // Bootstrap's existing route timer observes local identity changes; this
+    // does not query the server or export the stored credential.
+    observeCredentials() {
+      if (closed) return;
+      const next = readCredential();
+      if (next === credential) return;
+      credential = next;
+      revision++;
+      id++;
+      abort?.abort();
+      pending = false;
+      result = { status: "checking", diagnostic: "CREDENTIAL_CHANGED" };
+    },
     start() {
       if (closed || pending) return id;
       id++;
       pending = true;
+      const current = id;
       result = { status: "checking", diagnostic: null };
       abort = new AbortController();
-      const timer = window.setTimeout(() => abort?.abort(), 8000);
-      void queryAuthentication(abort.signal).then((next) => {
+      const request = abort;
+      const timer = window.setTimeout(() => request.abort(), 8000);
+      void queryAuthentication(request.signal).then((next) => {
         window.clearTimeout(timer);
-        if (!closed) result = next;
+        if (closed || current !== id) return;
+        result = next;
         pending = false;
       });
       return id;
