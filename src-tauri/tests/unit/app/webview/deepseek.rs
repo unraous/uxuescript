@@ -298,3 +298,60 @@ async fn callback_wait_has_a_deadline_and_reports_a_dropped_callback() {
         Err(ReadFailure::CallbackDropped)
     );
 }
+
+#[tokio::test]
+async fn local_drain_tracks_every_observer_and_preserves_unfinished_handles_on_timeout() {
+    let state = request::RequestState::default();
+    let (release, held) = oneshot::channel();
+    assert!(state.observer.begin_observe(|_, cancelled| {
+        tauri::async_runtime::JoinHandle::Tokio(tokio::spawn(async move {
+            let _ = cancelled.await;
+            let _ = held.await;
+        }))
+    }));
+    assert!(state.observer.begin_observe(|_, cancelled| {
+        tauri::async_runtime::JoinHandle::Tokio(tokio::spawn(async move {
+            let _ = cancelled.await;
+        }))
+    }));
+    state.close_local();
+    assert!(
+        !state
+            .observer
+            .begin_observe(|_, _| panic!("closed observer must not start"))
+    );
+    let error = state
+        .drain_local(Duration::from_millis(5))
+        .await
+        .unwrap_err();
+    assert!(error.downcast_ref::<request::DrainTimeout>().is_some());
+    assert!(!state.observer.0.lock().local.observers.is_empty());
+    release.send(()).unwrap();
+    state.drain_local(Duration::from_secs(1)).await.unwrap();
+    assert!(state.observer.0.lock().local.observers.is_empty());
+}
+
+#[tokio::test]
+async fn observer_panic_and_abort_remain_failed_on_repeated_drains() {
+    for abort in [false, true] {
+        let state = request::RequestState::default();
+        assert!(state.observer.begin_observe(|_, _| {
+            let task = tokio::spawn(async move {
+                if abort {
+                    std::future::pending::<()>().await;
+                } else {
+                    panic!("controlled observer panic");
+                }
+            });
+            if abort {
+                task.abort();
+            }
+            tauri::async_runtime::JoinHandle::Tokio(task)
+        }));
+        state.close_local();
+        for _ in 0..2 {
+            let error = state.drain_local(Duration::from_secs(1)).await.unwrap_err();
+            assert!(error.to_string().contains("did not exit normally"));
+        }
+    }
+}

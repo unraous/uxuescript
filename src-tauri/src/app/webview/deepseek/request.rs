@@ -1,4 +1,5 @@
 mod contract;
+pub(crate) use super::local::{DrainTimeout, LocalDrained};
 use super::{
     Observer, ReadFailure, Readout, SessionState, parse_readout, read_snapshot, wait_for_callback,
 };
@@ -15,7 +16,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tauri::Webview;
-use tokio::sync::oneshot;
+use tokio::sync::{Notify, oneshot};
 
 static NEXT_INSTANCE: AtomicU64 = AtomicU64::new(1);
 
@@ -24,6 +25,7 @@ pub struct RequestState {
     nonce: String,
     counter: AtomicU64,
     target: Mutex<Option<Webview>>,
+    local_changed: Notify,
 }
 
 /// 一份文本求解固定首次观测的宿主文档与 JS 绑定，不跨会话继续后续批次。
@@ -44,6 +46,7 @@ impl Default for RequestState {
             ),
             counter: AtomicU64::new(1),
             target: Mutex::new(None),
+            local_changed: Notify::new(),
         }
     }
 }
@@ -105,6 +108,8 @@ impl Drop for Flight<'_> {
         if !self.finished {
             let _ = self.finish(self.was_dispatched());
         }
+        self.state.observer.0.lock().local.generating -= 1;
+        self.state.local_changed.notify_waiters();
     }
 }
 
@@ -118,23 +123,69 @@ pub(super) fn interrupt(page: &mut super::Page) {
 }
 
 impl RequestState {
-    // Rollback only cancels work; Observer.close remains exclusive to final
-    // parent Window Destroyed. B1 never resets that terminal state.
-    pub(crate) fn cancel_creation(&self) {
-        self.observer.cancel();
-    }
-
-    pub(super) fn attach(&self, webview: Webview) {
+    pub(super) fn attach(&self, webview: Webview) -> bool {
         // 与 Destroyed 同一文档门，避免关闭后迟到的 load 保留句柄。
         let page = self.observer.0.lock();
         if !page.closed {
             *self.target.lock() = Some(webview);
+            true
+        } else {
+            false
         }
     }
 
     pub(super) fn detach(&self) {
+        self.close_local();
+    }
+
+    pub(crate) fn close_local(&self) {
         self.observer.close();
         self.target.lock().take();
+    }
+
+    /// Polled by Attempt's single shared termination task; its callers share the result.
+    /// A timed-out/cancelled drain leaves pending handles here for a later retry.
+    pub(crate) async fn drain_local(&self, timeout: Duration) -> anyhow::Result<LocalDrained> {
+        anyhow::ensure!(
+            self.observer.0.lock().closed,
+            "DeepSeek 本地终结前必须关闭请求准入"
+        );
+        let drain = async {
+            loop {
+                let changed = self.local_changed.notified();
+                tokio::pin!(changed);
+                // Register before inspecting the count; completion between inspection
+                // and waiting must not lose the last Flight's notification.
+                changed.as_mut().enable();
+                let outcome = std::future::poll_fn(|cx| {
+                    use std::{future::Future, task::Poll};
+                    let changed = changed.as_mut().poll(cx).is_ready();
+                    let mut page = self.observer.0.lock();
+                    if let Some(result) = page.local.poll_drained(cx) {
+                        Poll::Ready(Some(result))
+                    } else if changed {
+                        Poll::Ready(None)
+                    } else {
+                        Poll::Pending
+                    }
+                })
+                .await;
+                if let Some(result) = outcome {
+                    return result;
+                }
+            }
+        };
+        match tokio::time::timeout(timeout, drain).await {
+            Ok(result) => result,
+            Err(_) => {
+                let page = self.observer.0.lock();
+                Err(DrainTimeout {
+                    generating: page.local.generating,
+                    observers: page.local.observers.len(),
+                }
+                .into())
+            }
+        }
     }
 
     pub(crate) async fn generate_text(
@@ -143,15 +194,33 @@ impl RequestState {
         options: Options,
         binding: &TextBinding,
     ) -> Result<Generation, &'static str> {
-        let webview = { self.target.lock().clone() };
-        let Some(webview) = webview else {
+        if self.target.lock().is_none() {
             return Err(if self.observer.0.lock().quarantined {
                 "QUARANTINED"
             } else {
                 "WEBVIEW_NOT_OPEN"
             });
-        };
-        self.generate_bound(&webview, text, options, binding).await
+        }
+        let timeout = options.timeout_ms.unwrap_or(120_000);
+        if text.trim().is_empty() || !(1_000..=600_000).contains(&timeout) {
+            return Err("INVALID_REQUEST");
+        }
+        let (mut flight, mut cancelled) = self.claim()?;
+        // This inner future borrows Flight. Its target clone is therefore dropped
+        // before Flight confirms completion, on both return and cancellation.
+        async {
+            let webview = self.target.lock().clone().ok_or("DOCUMENT_INTERRUPTED")?;
+            self.generate_bound(
+                &webview,
+                text,
+                options,
+                binding,
+                &mut flight,
+                &mut cancelled,
+            )
+            .await
+        }
+        .await
     }
 
     pub(super) fn document_token(&self, epoch: u64) -> String {
@@ -179,6 +248,7 @@ impl RequestState {
             stop: Some(stop),
             dispatched: false,
         });
+        page.local.generating += 1;
         Ok((
             Flight {
                 state: self,
@@ -197,23 +267,15 @@ impl RequestState {
         text: &str,
         options: Options,
         binding: &TextBinding,
+        flight: &mut Flight<'_>,
+        cancelled: &mut oneshot::Receiver<()>,
     ) -> Result<Generation, &'static str> {
         let timeout = options.timeout_ms.unwrap_or(120_000);
-        if text.trim().is_empty() || !(1_000..=600_000).contains(&timeout) {
-            return Err("INVALID_REQUEST");
-        }
-        let (mut flight, mut cancelled) = self.claim()?;
         let deadline =
             tokio::time::Instant::now() + Duration::from_millis(u64::from(timeout) + 5_000);
         let result = self
             .run(
-                webview,
-                &mut flight,
-                &mut cancelled,
-                text,
-                &options,
-                binding,
-                deadline,
+                webview, flight, cancelled, text, &options, binding, deadline,
             )
             .await;
         let result = match result {
@@ -221,7 +283,7 @@ impl RequestState {
                 if flight.finish(result.needs_quarantine()).is_ok() {
                     result
                 } else {
-                    self.interrupted(&flight, "DOCUMENT_INTERRUPTED")
+                    self.interrupted(flight, "DOCUMENT_INTERRUPTED")
                 }
             }
             Err(code) if flight.was_dispatched() => {
@@ -235,7 +297,7 @@ impl RequestState {
                     }
                 }
                 let _ = flight.finish(true);
-                self.interrupted(&flight, code)
+                self.interrupted(flight, code)
             }
             Err(code) => {
                 let _ = flight.finish(false);

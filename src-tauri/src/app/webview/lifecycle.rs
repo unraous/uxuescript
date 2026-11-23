@@ -118,12 +118,9 @@ where
             || existing(window, label),
             || match super::create_on(window, label, true, Some(attempt.clone())) {
                 Ok(view) => Ok(view),
-                Err(error) => {
-                    // Configuration can install callbacks before add_child fails;
-                    // invalidate that exact attempt even when no handle is returned.
-                    attempt.rollback(|| Ok(()))?;
-                    Err(anyhow!(error.to_string()))
-                }
+                // The owner classifies failure using evidence recorded immediately
+                // before add_child. No returned handle is not proof of retirement.
+                Err(error) => Err(anyhow!(error.to_string())),
             },
             |view: Webview| {
                 let prepared = prepare(window.clone(), view.clone());

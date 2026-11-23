@@ -92,6 +92,39 @@ async fn navigation_ends_a_dispatched_request_and_late_completion_cannot_unlock_
     assert_eq!(state.claim().err(), Some("QUARANTINED"));
     // 关闭目标释放 handle，但远端未知的隔离事实不能被 missing target 覆盖。
     state.detach();
-    let result = state.generate_text("text", Options::default(), &TextBinding::default()).await;
+    let result = state
+        .generate_text("text", Options::default(), &TextBinding::default())
+        .await;
     assert_eq!(result.err(), Some("QUARANTINED"));
+}
+
+#[tokio::test]
+async fn local_drain_waits_for_outer_flight_drop_and_never_reopens_the_gate() {
+    let state = RequestState::default();
+    state.observer.begin().unwrap();
+    let (mut flight, mut cancelled) = state.claim().unwrap();
+    flight.mark_dispatched().unwrap();
+    state.close_local();
+    cancelled.try_recv().unwrap();
+    assert!(state.claim().is_err());
+    assert_eq!(flight.finish(false), Err("DOCUMENT_INTERRUPTED"));
+    assert!(state.observer.0.lock().request.is_none());
+    // An empty request slot is not evidence that the generating future and its
+    // target clone have exited. The outer Flight still owns that obligation.
+    let error = state
+        .drain_local(Duration::from_millis(5))
+        .await
+        .unwrap_err();
+    assert!(error.downcast_ref::<DrainTimeout>().is_some());
+    let drain = state.drain_local(Duration::from_secs(1));
+    let release = async {
+        tokio::task::yield_now().await;
+        drop(flight);
+    };
+    let (result, ()) = tokio::join!(drain, release);
+    result.unwrap();
+    state.close_local();
+    assert!(state.claim().is_err());
+    assert!(state.observer.begin().is_none());
+    state.drain_local(Duration::from_secs(1)).await.unwrap();
 }

@@ -150,7 +150,9 @@ fn create_on(
                 .devtools(true),
                 // 当前只允许聊天主机；手动登录若跳转到其他主机，再按实际导航补充。
                 is_deepseek_url,
-                attempt.ok_or_else(|| anyhow!("DeepSeek 创建缺少实例预约"))?,
+                attempt
+                    .clone()
+                    .ok_or_else(|| anyhow!("DeepSeek 创建缺少实例预约"))?,
             )?
         }
         _ => return Err(anyhow!("未知的Webview标签").into()),
@@ -164,6 +166,9 @@ fn create_on(
         size.width,
         size.height
     );
+    if let Some(attempt) = &attempt {
+        attempt.native_creation_started()?;
+    }
     let result = window.add_child(
         builder.background_throttling(BackgroundThrottlingPolicy::Disabled),
         // Dynamic children are created outside the window until their native
@@ -176,7 +181,11 @@ fn create_on(
         },
         size,
     );
-    Ok(result?)
+    let view = result?;
+    if let Some(attempt) = &attempt {
+        attempt.native_created();
+    }
+    Ok(view)
 }
 
 // Factory rollback pairs configuration's page callbacks with native close.

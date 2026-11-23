@@ -14,7 +14,6 @@ use tauri::{Manager, Webview, Window};
 
 #[derive(Clone, Default)]
 pub(crate) struct WebSolverViews {
-    operation: Arc<tokio::sync::Mutex<()>>,
     creations: Arc<Creations>,
 }
 
@@ -44,14 +43,15 @@ impl WebSolverViews {
         );
         ensure!(window.label() == "app", "Web Solver 只能创建在 app 窗口中");
         let window = window.clone();
+        let creations = self.creations.clone();
         self.ensure_with(move |attempt, fresh| async move {
             // An active attempt can only reuse its existing native child. A new
             // reservation must not adopt a child carrying another Arc's callbacks.
             let existing = lifecycle::existing(&window, "deepseek")?;
-            ensure!(
-                existing.is_none() == fresh,
-                "DeepSeek 原生实例与创建身份不一致，无法安全恢复；请重启应用"
-            );
+            if existing.is_none() != fresh {
+                creations.identity_failed(&attempt);
+                anyhow::bail!("DeepSeek 原生实例与创建身份不一致，无法安全恢复；请重启应用");
+            }
             let preparing = attempt.clone();
             lifecycle::spawn(&window, "deepseek", attempt, move |window, view| {
                 background(window, view, preparing.clone())
@@ -67,16 +67,35 @@ impl WebSolverViews {
         F: FnOnce(Arc<Attempt>, bool) -> P + Send + 'static,
         P: Future<Output = Result<()>> + Send,
     {
+        self.creations.check()?;
+        if let Some(attempt) = self.creations.current()? {
+            if let Ok(requests) = attempt.requests_if_ready() {
+                return Ok(requests);
+            }
+        }
         let owner = self.clone();
         // Cancellation of a command/preload waiter must not release the admission
         // lock or strand its reservation before native placement and Ready publication.
         tokio::spawn(async move {
-            let _operation = owner.operation.lock().await;
+            let _operation = loop {
+                let stopped = owner.creations.stopped();
+                tokio::pin!(stopped);
+                stopped.as_mut().enable();
+                owner.creations.check()?;
+                tokio::select! {
+                    operation = owner.creations.operation.lock() => break operation,
+                    _ = stopped => {}
+                }
+            };
             let (attempt, fresh) = match owner.creations.current()? {
                 Some(attempt) => (attempt, false),
                 None => (owner.creations.begin()?, true),
             };
+            if let Ok(requests) = attempt.requests_if_ready() {
+                return Ok(requests);
+            }
             if let Err(error) = prepare(attempt.clone(), fresh).await {
+                owner.creations.creation_failed(&attempt);
                 if let Err(gate) = owner.creations.check() {
                     return Err(error.context(format!("{gate:#}")));
                 }
@@ -86,6 +105,23 @@ impl WebSolverViews {
         })
         .await
         .context("Web Solver 实例创建任务异常结束")?
+    }
+
+    // Internal B3-B seam: closing gates local work but does not close a native
+    // child, remove Layers, release the slot or permit another generation.
+    #[allow(dead_code)]
+    pub(crate) fn current_attempt(&self) -> Result<Option<Arc<Attempt>>> {
+        self.creations.owned()
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn begin_close(&self, attempt: &Arc<Attempt>) -> Result<()> {
+        self.creations.begin_close(attempt)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn retry_cleanup(&self, attempt: &Arc<Attempt>) -> Result<()> {
+        self.creations.retry_cleanup(attempt)
     }
 }
 

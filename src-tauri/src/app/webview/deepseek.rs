@@ -1,4 +1,5 @@
 pub(crate) mod creation;
+mod local;
 pub(crate) mod request;
 
 use crate::core::script::include_script;
@@ -6,7 +7,7 @@ use parking_lot::Mutex;
 use serde::Deserialize;
 use std::{sync::Arc, time::Duration};
 use tauri::webview::{PageLoadEvent, PageLoadPayload};
-use tauri::{Url, Webview, WebviewBuilder, Window, WindowEvent, Wry};
+use tauri::{Url, Webview, WebviewBuilder, Window, Wry};
 use tokio::sync::oneshot;
 
 pub(super) fn is_target_url(url: &Url) -> bool {
@@ -154,6 +155,7 @@ struct Page {
     loaded: bool,
     request: Option<request::InFlight>,
     quarantined: bool,
+    local: local::Activities,
 }
 
 fn invalidate(page: &mut Page) {
@@ -166,16 +168,35 @@ fn invalidate(page: &mut Page) {
 }
 
 impl Observer {
+    #[cfg(test)]
     fn begin(&self) -> Option<(u64, oneshot::Receiver<()>)> {
         let mut page = self.0.lock();
+        Self::begin_page(&mut page)
+    }
+
+    fn begin_page(page: &mut Page) -> Option<(u64, oneshot::Receiver<()>)> {
         if page.closed {
             return None;
         }
-        invalidate(&mut page);
+        invalidate(page);
         page.loaded = true;
         let (stop, cancelled) = oneshot::channel();
         page.stop = Some(stop);
         Some((page.generation, cancelled))
+    }
+
+    fn begin_observe(
+        &self,
+        start: impl FnOnce(u64, oneshot::Receiver<()>) -> tauri::async_runtime::JoinHandle<()>,
+    ) -> bool {
+        let mut page = self.0.lock();
+        let Some((epoch, cancelled)) = Self::begin_page(&mut page) else {
+            return false;
+        };
+        // Registration and close share the document gate; no late load can
+        // create an observer after close or leave an unregistered task behind.
+        page.local.observers.push(start(epoch, cancelled));
+        true
     }
 
     fn cancel(&self) {
@@ -315,24 +336,21 @@ fn load_on(
         observer.cancel();
         return false;
     }
-    let Some((epoch, cancelled)) = observer.begin() else {
-        return false;
-    };
-    let token =
-        serde_json::to_string(&requests.document_token(epoch)).expect("document token JSON");
-    let bootstrap = format!(
-        "{}\n;(() => {{ const controller = globalThis.__UXS_DEEPSEEK_B1__; if (controller && !controller.bindDocument({token})) console.warn('[uXS DeepSeek B2] document DOCUMENT_BIND_REJECTED'); }})();",
-        include_script!("deepseek-web-bootstrap.js")
-    );
-    let attached = if webview.eval(&bootstrap).is_err() {
-        log::warn!("DeepSeek B1 document={epoch} BOOTSTRAP_EVAL_DISPATCH_FAILED");
-        false
-    } else {
-        requests.attach(webview.clone());
-        true
-    };
-    tauri::async_runtime::spawn(observe(webview, observer.clone(), epoch, cancelled));
-    attached
+    let mut bootstrapped = false;
+    observer.begin_observe(|epoch, cancelled| {
+        let token = serde_json::to_string(&requests.document_token(epoch))
+            .expect("document token JSON");
+        let bootstrap = format!(
+            "{}\n;(() => {{ const controller = globalThis.__UXS_DEEPSEEK_B1__; if (controller && !controller.bindDocument({token})) console.warn('[uXS DeepSeek B2] document DOCUMENT_BIND_REJECTED'); }})();",
+            include_script!("deepseek-web-bootstrap.js")
+        );
+        bootstrapped = webview.eval(&bootstrap).is_ok();
+        if !bootstrapped {
+            log::warn!("DeepSeek B1 document={epoch} BOOTSTRAP_EVAL_DISPATCH_FAILED");
+        }
+        tauri::async_runtime::spawn(observe(webview.clone(), observer.clone(), epoch, cancelled))
+    });
+    bootstrapped && requests.attach(webview)
 }
 
 fn navigation_handler(
@@ -350,19 +368,13 @@ fn navigation_handler(
 }
 
 pub(super) fn configure(
-    window: &Window,
+    _window: &Window,
     builder: WebviewBuilder<Wry>,
     allow_navigation: fn(&Url) -> bool,
     attempt: Arc<creation::Attempt>,
 ) -> anyhow::Result<WebviewBuilder<Wry>> {
     attempt.check_active()?;
     let observer = attempt.observer();
-    let closing = attempt.clone();
-    window.on_window_event(move |event| {
-        if matches!(event, WindowEvent::Destroyed) {
-            closing.destroyed();
-        }
-    });
     let navigation = navigation_handler(observer.clone(), allow_navigation);
     let navigation_attempt = attempt.clone();
     Ok(builder

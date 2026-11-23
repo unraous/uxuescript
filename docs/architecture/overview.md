@@ -38,9 +38,13 @@ Rust 宿主拥有窗口、配置和共享状态；Vue 界面通过生成的 IPC 
 
 启动从已加载配置恢复 Web Solver，`set_solver` 更新内存后直接异步预加载；持久化仍由 `save_config` 或退出完成，保存失败与预加载结果分别处理。课程求解与仅本地 main 可用的 debug 文本诊断在发请求前 await ensure，不依赖预加载成功，也不将创建完成当作 Adapter 或登录就绪。Native 模式不创建页面，切回 Native 保留既有 DeepSeek；本阶段禁止其独立销毁。
 
-`WebSolverViews` 的唯一创建槽拥有当前 attempt，每次新预约同时分配一份 `Arc<RequestState>`，以该 Arc 作为实例身份。创建工厂、导航/加载回调、attach 与失败回滚都持有这一 attempt；诊断命令与课程求解从 ensure 返回同一 Arc，不再注册 App-managed RequestState。ensure 的串行任务在调用方取消后仍完成归位或失败收尾，只有 Lifecycle 完成层级、几何与窗口存活检查后才发布原生 Ready；这不表示 Adapter 或登录就绪。
+`WebSolverViews` 的唯一创建槽拥有当前 attempt，每次新预约同时分配一份 `Arc<RequestState>`；Attempt Arc 是实例身份，并拥有该 RequestState Arc。创建工厂、导航/加载回调、attach 与失败回滚都持有这一 attempt；诊断命令与课程求解从 ensure 返回同一 Arc，不再注册 App-managed RequestState。ensure 的串行任务在调用方取消后仍完成归位或失败收尾，只有 Lifecycle 完成层级、几何与窗口存活检查后才发布原生 Ready；这不表示 Adapter 或登录就绪。
 
-最终 detach 和 Observer 的不可逆关闭仅发生在 app Window Destroyed，销毁前未创建过实例也会永久封住后续预约。未绑定且关闭成功的失败可重新预约新 Arc；未绑定但关闭失败时保留原 attempt，后续只能对同一个原生子视图重试归位。已绑定后回滚会保留原始错误并要求重启；原生子视图与预约身份不一致也明确拒绝恢复。旧回调及旧回滚只作用于旧 Arc，不会修改新槽。切回 Native 保留页面；实例隔离不开放独立销毁、重建或 reset。
+Solver 生命周期由 `Phase::{Creating, Ready, Closing, Failed(Failure)}` 表达，空槽才表示 Absent；宿主 `OwnerState::{Open, Ended}` 独立管理。`bound` 保留页面曾绑定的历史事实，原生创建资源证据单独区分尚未提交、已提交但结果未确认和已获得 child。只有尚未提交原生创建的失败可以关闭旧回调并释放槽；提交后失败或回滚 `close() == Ok(())` 均不证明原生退役，因此保留原 Attempt。未绑定且 close 失败时仍可对同一个 child 重试归位；绑定后回滚、创建结果未确认或身份不一致则稳定失败。Ready ensure 直接复用同一 RequestState，不重复原生归位。切回 Native 保留页面，不开放独立销毁或同 label 重建。
+
+内部 B3-B 接口为 `WebSolverViews::current_attempt()` 取得唯一槽的 Arc，再 `begin_close(&attempt)` 和 `attempt.drain_local().await`；创建中直接拒绝独立关闭，Closing 重复调用共享一次终结任务。短锁顺序为 Current → Attempt → Observer Page → target：先关闭 Page 请求门并清除 target，再发布 Closing，已拿到 RequestState 的调用者也无法重新 claim。终结任务独立于等待者，监督生成 Future 与全部 observe 任务退出；5 秒期限内未完成或任务异常会记录错误并发布 Failed，生成或 observe drain 超时允许显式 `retry_cleanup` 继续等待同 Attempt，observe 异常及其他无法证明安全的失败只能随宿主终结处理；宿主终结时等待在途创建超时也属于此类失败。LocalDrained 成功后仍为 Closing，不删除 Layers、不清槽，也不证明原生资源已销毁。
+
+app Window Destroyed 是唯一宿主终结入口，永久设置 Ended、同步封住当前请求及观察入口，随后后台等待在途创建协调操作退出，释放操作锁后再 drain；事件线程不等待异步终结，也不再要求已经销毁的父窗口 close child。每 Attempt 不注册永久 Destroyed 监听；宿主首次销毁会对此前本地 drain 超时再做一次最终等待，重复 Destroyed 不重复启动任务。排队 ensure 会被终结通知唤醒并检查唯一权威状态；旧加载回调和回滚仅作用于自己的 Arc，不能修改下一代。原生 teardown barrier、退役后 Layers 清理及槽释放属于 B3-B，当前没有生产实现。
 
 章节课堂任务读取卡片生成的链接，在课程主视图打开回看；播放器结束后直接导航回进入课堂前的课程页，由平台重新加载任务点状态。后端在内存中记录本次刷课是否运行，并在课堂结束触发返回时发放一次性恢复凭证；课程页消费凭证后跳过启动确认并重新读取任务。若平台尚未标记刚播放的课堂完成，则等待标记，不重复打开课堂。完成、取消或使用课程工具栏导航时清除状态。回看结束事件和任务点更新的实际时序仍需在平台验证。
 
