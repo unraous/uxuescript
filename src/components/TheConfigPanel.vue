@@ -49,6 +49,7 @@ watch(
       <div class="container">
         <Transition :name="transitionName"
           ><TheSolverPanel
+            :active="configPanel.activeIndex === 0"
             v-show="configPanel.activeIndex === 0"
             id="config-panel-0"
             role="tabpanel"

@@ -44,7 +44,7 @@ cargo test --manifest-path src-tauri/Cargo.toml -p uxuescript app::webview --loc
 
 源码 JS 用例使用受控 Promise 和模拟的公开 Adapter API，验证 await、拒绝、仅 `PAGE_NOT_READY` 的 10 秒/250ms 有界重试、同实例失败重试、重复入口、SPA 路径失效、快速 A→B→A、等待旧初始化及 owned dispose 后重新创建、外部实例不被接管、路径前缀大小写及销毁清理。原样外部 IIFE 的 VM 用例验证全局 API 作用域；Rust 用例验证交付条件块、同步 JSON 解析、诊断脱敏、观测代次、导航/关闭取消以及晚回调和超时。这些检查不是 WebView2、DeepSeek 真实 DOM 或登录验收；共享工作区生成/编译必须先协调时点，不与其他配置或绑定生成并行。
 
-真实桌面验收须由操作者在 app 窗口内的 DeepSeek WebView 执行，不自动认证、不发送 prompt、不调用模型；B1 不提供前台查看入口：
+真实桌面验收须由操作者在 app 窗口内的 DeepSeek WebView 执行，不自动认证、不发送 prompt、不调用模型；选择 DeepSeek Web 后只读检查登录，确认未登录时显示登录引导，已登录后通过左侧辅助按钮查看。首次登录自动返回、原保存按钮、显示、焦点、遮罩及后台运行按[Windows 手动验收清单](manual/webview-switching.md)检查：
 
 | 场景                                         | 必须核对的事实                                                                                                            |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -100,7 +100,7 @@ pnpm exec vitest run tests/scripts/deepseek-bootstrap.test.js
 
 三个合并核心场景验证真实 Prompt 管线、材料引用与乱序 JSON 恢复；后批格式错误/uncertain 不重试也不返回部分答案；整卷后段题图、材料图与不支持题型在发送前拒绝。命令用例继续验证 Web 不访问 Native 配置或 API、空卷校验，以及 Native 三协议正常入口。受控生成只替代网页请求，不替代实际批处理、Prompt 或答案解析；这些本地验证不能证明真实 DOM、模型格式或学习通回填。
 
-设置面板显示“DeepSeek Web 已接入 · 开发预览”的静态能力说明，不表示实时连接或就绪状态。DeepSeek 页面在主 app 窗口后台按需加载并复用已有登录状态；使用前须有有效会话，保持输入框为空、无附件且未在生成。B1 暂无前台登录或查看入口；无需 Native API Key，仅支持纯文本，真实学习通回填尚未完成验收。`tests/components/TheSolverPanel.test.ts` 的现有中英提示场景核对标题、使用条件与限制，仍保留 Native 控件和切换行为验证。
+设置面板显示“DeepSeek Web 已接入 · 开发预览”的静态能力说明，不表示实时连接或就绪状态。DeepSeek 页面在主 app 窗口后台按需加载并复用已有登录状态；生成前须有有效会话，保持输入框为空、无附件且未在生成。左侧认证引导和页面查看独立于保存，切回课程保留页面和后台任务；无需 Native API Key，仅支持纯文本，真实学习通回填尚未完成验收。`tests/components/TheSolverPanel.test.ts` 核对原中英提示、保存事件、认证四态、一次性自动返回及旧检查失效；`deepseek-authentication.test.js` 验证官方身份接口的归一化、超时和凭据变化，Rust 用例检查导航代次隔离。这些受控结果不代表真实账号登录或自动隐藏已通过。
 
 真实验收须在已登录、已有 UUID 会话且 B1 ready/valid 的前提下，由操作者明确选择现有 DeepSeek Web 求解方式。也可由操作者在同一**本地 main** DevTools 显式选择并调用原命令（不是远程 DeepSeek 页）：
 

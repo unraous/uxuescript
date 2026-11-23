@@ -45,6 +45,8 @@ export const commands = {
 	/**  将内存中的全局配置持久化保存至本地文件。 */
 	saveConfig: () => __TAURI_INVOKE<null>("save_config"),
 	paths: () => __TAURI_INVOKE<PathsConfig>("paths"),
+	/**  Only the local configuration UI may start the read-only identity query. */
+	deepseekAuthentication: () => __TAURI_INVOKE<Authentication>("deepseek_authentication"),
 	/**  开发诊断沿正常生成管线注册，非 debug 构建在入口拒绝；启动流程不发请求。 */
 	deepseekGenerateText: (text: string, timeoutMs: number | null, thinking: boolean | null, webSearch: boolean | null) => __TAURI_INVOKE<Generation>("deepseek_generate_text", { text, timeoutMs, thinking, webSearch }),
 	/**  显示调用方对应的确认遮罩，并在退出动画及隐藏完成后返回选择。 */
@@ -90,6 +92,9 @@ export const commands = {
 	downloadUpdate: (rid: number) => __TAURI_INVOKE<boolean>("download_update", { rid }),
 	/**  取消仍处于下载阶段的更新任务；进入安装阶段后返回 false。 */
 	cancelUpdateDownload: () => __TAURI_INVOKE<boolean>("cancel_update_download"),
+	activateDeepseekView: () => __TAURI_INVOKE<ViewActivation>("activate_deepseek_view"),
+	activateChaoxingView: () => __TAURI_INVOKE<ViewActivation>("activate_chaoxing_view"),
+	currentWebview: () => __TAURI_INVOKE<ActiveView>("current_webview"),
 	setZoom: (scale: number | null) => __TAURI_INVOKE<null>("set_zoom", { scale }),
 	canGoBack: () => __TAURI_INVOKE<boolean>("can_go_back"),
 	canGoForward: () => __TAURI_INVOKE<boolean>("can_go_forward"),
@@ -105,6 +110,8 @@ export const commands = {
 };
 
 /* Types */
+export type ActiveView = "chaoxing" | "deepseek";
+
 export type AnswerItem = {
 	index: string,
 	explanation: string,
@@ -118,6 +125,13 @@ export type AnswerItem = {
  *  防止在日志中直接打印密钥明文。
  */
 export type ApiKey = string;
+
+export type Authentication = {
+	status: AuthenticationStatus,
+	diagnostic: string | null,
+};
+
+export type AuthenticationStatus = "checking" | "authenticated" | "unauthenticated" | "unknown";
 
 export type ChapterProgressPayload = {
 	title: string,
@@ -308,5 +322,10 @@ export type UpdateInfo = {
 	rid: number,
 	version: string,
 	body: string | null,
+};
+
+export type ViewActivation = {
+	view: ActiveView,
+	focusError: string | null,
 };
 

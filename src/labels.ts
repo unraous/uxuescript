@@ -19,6 +19,25 @@ const labels = {
   apiKey: { en: "API Key", zh: "API 密钥" },
   labelLanguage: { en: "Language", zh: "语言" },
   tabSolver: { en: "Solver", zh: "求解方式" },
+  deepseekChecking: {
+    en: "Checking DeepSeek sign-in…",
+    zh: "正在检查 DeepSeek 登录状态……",
+  },
+  deepseekLoginGuide: {
+    en: "Please sign in to DeepSeek on the right. The course page will return automatically after sign-in.",
+    zh: "请在右侧登录 DeepSeek，登录完成后将自动返回课程页面。",
+  },
+  deepseekAuthenticated: {
+    en: "Signed in. You can view the solver page.",
+    zh: "已登录，可查看求解器页面。",
+  },
+  deepseekAuthUnknown: {
+    en: "Unable to confirm DeepSeek sign-in. Retry to check again.",
+    zh: "暂时无法确认 DeepSeek 登录状态，请重试。",
+  },
+  showSolverPage: { en: "Show solver page", zh: "显示求解器页面" },
+  returnToCoursePage: { en: "Return to course page", zh: "返回课程页面" },
+  retry: { en: "Retry", zh: "重试" },
   webSolverPreviewTitle: {
     en: "DeepSeek Web integrated · Development preview",
     zh: "DeepSeek Web 已接入 · 开发预览",
@@ -28,8 +47,8 @@ const labels = {
     zh: "复用已有登录状态，需有可用的 DeepSeek 会话，且输入框为空、无附件、未在生成。无需 Native API Key。",
   },
   webSolverLimitations: {
-    en: "Text only. The page loads on demand in the main window background. B1 has no foreground view for sign-in or inspection yet. Real Chaoxing answer filling has not completed acceptance testing.",
-    zh: "仅支持纯文本；页面在主窗口后台按需加载，B1 暂无前台登录或查看入口。真实学习通回填尚未完成验收。",
+    en: "Text only. Sign-in is checked when selected. After sign-in, use the button below to view the page; returning to the course keeps it running in the background. Real Chaoxing answer filling has not completed acceptance testing.",
+    zh: "仅支持纯文本；选择后检查登录状态，登录后可通过下方按钮查看网页，返回课程后仍在后台运行。真实学习通回填尚未完成验收。",
   },
   tabCourse: { en: "Course", zh: "课程" },
   tabTheme: { en: "Theme", zh: "主题" },

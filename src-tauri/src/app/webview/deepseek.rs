@@ -1,3 +1,4 @@
+pub(crate) mod authentication;
 pub(crate) mod creation;
 mod local;
 pub(crate) mod request;

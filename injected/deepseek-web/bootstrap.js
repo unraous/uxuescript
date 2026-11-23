@@ -1,4 +1,5 @@
 import { wait } from "@injected/utils/async.js";
+import { createAuthenticationCheck } from "./authentication.js";
 
 /**
  * @typedef {"not_sent"|"unknown"|"confirmed"} Delivery
@@ -17,7 +18,7 @@ import { wait } from "@injected/utils/async.js";
  * @typedef {Identity & {kind: "accepted"}|{kind: "rejected", code: string}} StartAck
  * @typedef {Identity & ({kind: "pending"}|{kind: "terminal", result: Result}|{kind: "interrupted", code: string})|{kind: "rejected", code: string}} Readout
  * @typedef {{identity: Identity, adapter: Adapter, sessionId: string, startedAt: number, readout: Readout, cancelling: boolean}} Slot
- * @typedef {{snapshot(): Snapshot, bindDocument(token: string): boolean, start(envelope: Envelope): StartAck, read(identity: Identity): Readout, cancel(identity: Identity): boolean, ack(identity: Identity): boolean}} Controller
+ * @typedef {{snapshot(): Snapshot, bindDocument(token: string): boolean, start(envelope: Envelope): StartAck, read(identity: Identity): Readout, cancel(identity: Identity): boolean, ack(identity: Identity): boolean, startAuthenticationCheck(): number, readAuthenticationCheck(id: number): import("./authentication.js").Authentication}} Controller
  * @typedef {typeof globalThis & {DeepSeekWebAdapter?: AdapterApi, __UXS_DEEPSEEK_B1__?: Controller}} Host
  */
 
@@ -102,6 +103,7 @@ export function main() {
   if (host.__UXS_DEEPSEEK_B1__) return;
 
   const api = host.DeepSeekWebAdapter;
+  const authentication = createAuthenticationCheck();
   const apiAvailable = Boolean(
     api &&
     typeof api.createDeepSeekAdapter === "function" &&
@@ -485,6 +487,7 @@ export function main() {
   function destroy() {
     if (destroyed) return;
     destroyed = true;
+    authentication.close();
     generation++;
     if (slot) interrupt(slot, "DOCUMENT_DESTROYED");
     phase = "destroyed";
@@ -516,6 +519,8 @@ export function main() {
   history.pushState = pushState;
   history.replaceState = replaceState;
   host.__UXS_DEEPSEEK_B1__ = {
+    startAuthenticationCheck: authentication.start,
+    readAuthenticationCheck: authentication.read,
     snapshot,
     bindDocument,
     start,

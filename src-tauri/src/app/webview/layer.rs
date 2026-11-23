@@ -38,6 +38,28 @@ impl Layers {
         self.0.lock().remove(window.label());
     }
 
+    /// Read the committed order, including same-priority insertion order.
+    /// A missing dynamic child is expected before its first ensure.
+    pub(super) async fn is_above(
+        &self,
+        window: &tauri::Window,
+        label: &str,
+        anchor: &str,
+    ) -> Result<bool> {
+        let order = self
+            .order(window)
+            .context("窗口的 WebView 层级尚未初始化或已结束")?;
+        let order = order.lock().await;
+        let anchor = order
+            .iter()
+            .position(|entry| entry.label == anchor)
+            .with_context(|| format!("WebView [{anchor}] 未登记层级"))?;
+        Ok(order
+            .iter()
+            .position(|entry| entry.label == label)
+            .is_some_and(|index| index < anchor))
+    }
+
     /// Dynamic views start behind all existing siblings, without reordering them.
     pub(super) async fn add_entry(&self, webview: &Webview) -> Result<()> {
         let window = webview.window();

@@ -12,10 +12,19 @@ use anyhow::{Context, Result, ensure};
 use std::{future::Future, sync::Arc};
 use tauri::{Manager, Webview, Window};
 
+mod view;
+pub(crate) use view::{ActiveView, ViewActivation};
+
 #[derive(Clone, Default)]
 pub(crate) struct WebSolverViews {
     creations: Arc<Creations>,
+    // Creation's operation lock is acquired by ensure itself; activation must
+    // serialize the larger ensure -> layer -> focus transaction separately.
+    activation: Arc<tokio::sync::Mutex<()>>,
 }
+
+pub(super) const BACKGROUND_LAYER: i32 = 1;
+pub(super) const FOREGROUND_LAYER: i32 = 3;
 
 // Static front to back, then the solver. Static views keep their relative order. Set those
 // priorities before raising DeepSeek from Lifecycle's initial backmost position.
@@ -24,7 +33,7 @@ pub(super) const BACKGROUND_ORDER: [(&str, i32); 5] = [
     ("chaoxing-mask", 3),
     ("chaoxing", 2),
     ("main", 0),
-    ("deepseek", 1),
+    ("deepseek", BACKGROUND_LAYER),
 ];
 
 impl WebSolverViews {

@@ -36,6 +36,12 @@ Rust 宿主拥有窗口、配置和共享状态；Vue 界面通过生成的 IPC 
 
 `main / chaoxing / chaoxing-mask / mask` 保留静态初始化。B1 由 `webview/solvers.rs::WebSolverViews::ensure` 串行完成 DeepSeek 首次创建与后台归位；Lifecycle 在离屏创建、Layers 登记后等待业务归位，再恢复课程区域几何。最终前后顺序为 `mask > chaoxing-mask > chaoxing > deepseek > main`。DeepSeek 与课程页和课程遮罩共用几何计算，不以隐藏页面维持后台运行。
 
+DeepSeek 页面查看入口位于左侧求解器配置，独立于原有保存按钮；右侧保留课程原控制条。DeepSeek 前台使用 layer 3，按同层新者在前的规则形成 `mask > deepseek > chaoxing-mask > chaoxing > main`；切回超星恢复 DeepSeek layer 1。`solvers/view.rs` 的 FIFO 操作锁覆盖 ensure、Layers 原生提交和焦点请求，获得锁后由独立任务完成，不因 IPC 等待者取消而中断；创建锁仍由 ensure 管理。切换不关闭、重新导航或重置实例，也不更改 SolverKind。当前显示状态从 Layers 顺序派生，提交后仅向 main 发送 `active-webview-changed`；查询支持重挂载同步。激活返回已提交的视图及独立的 `focusError`，Vue 先同步显示再提示焦点失败；焦点调用成功只表示派发成功，实际输入交互须[手动验收](../../tests/manual/webview-switching.md)。
+
+选择 DeepSeek Web 后立即进行只读认证检查，不依赖保存。现有 Adapter 的 UUID 路径检查及 ready/valid 只证明会话绑定条件，不能证明登录；文档内认证模块因此通过同源 `GET /api/v0/users/current` 查询服务端，沿用官网 `userToken` 存储编码和 Bearer 头，仅完整成功身份响应判已登录，明确 `40002 / 40003` 判未登录，其余响应、网络异常与超时判未知。Token、用户资料及响应正文始终留在远程 WebView，不回传或记录；查询同文档共享在途工作、单次限时 8 秒，宿主通过 Observer 代次拒绝导航/关闭后的迟到结果。依据为 2026-11-23 核对的[官方前端资产](https://fe-static.deepseek.com/chat/static/main.07dbace284.js)（SHA256 `ADF8152E1670607C68489483AB14B7AA0B119E39F3E31E29F273A6A3EEB939F9`）；这是网页内部接口，若上游改变则安全返回未知，不用 DOM 猜测补偿。
+
+仅确认未登录时自动显示页面，当前有效引导确认已登录后只自动返回课程一次；已登录的普通检查不抢前台，之后手动查看不受重复结果影响。组件拥有登录引导的代次和定时器：页面加载重试约 15 秒，登录引导约每 2 秒查询一次、最多约 5 分钟，未知/错误后停止并提供重试。求解器选择按序提交，点击时即使旧引导失效；切其他求解器、离开配置子页或卸载时取消旧检查并排队恢复课程，旧激活仍在 IPC 时也不能抢回最终显示。仅 authenticated 状态显示辅助按钮，不改原保存事件、位置或样式。认证成功与 Adapter 可生成仍是不同事实。
+
 启动从已加载配置恢复 Web Solver，`set_solver` 更新内存后直接异步预加载；持久化仍由 `save_config` 或退出完成，保存失败与预加载结果分别处理。课程求解与仅本地 main 可用的 debug 文本诊断在发请求前 await ensure，不依赖预加载成功，也不将创建完成当作 Adapter 或登录就绪。Native 模式不创建页面，切回 Native 保留既有 DeepSeek；本阶段禁止其独立销毁。
 
 `WebSolverViews` 的唯一创建槽拥有当前 attempt，每次新预约同时分配一份 `Arc<RequestState>`；Attempt Arc 是实例身份，并拥有该 RequestState Arc。创建工厂、导航/加载回调、attach 与失败回滚都持有这一 attempt；诊断命令与课程求解从 ensure 返回同一 Arc，不再注册 App-managed RequestState。ensure 的串行任务在调用方取消后仍完成归位或失败收尾，只有 Lifecycle 完成层级、几何与窗口存活检查后才发布原生 Ready；这不表示 Adapter 或登录就绪。
@@ -122,7 +128,7 @@ API Key 的日志格式化会脱敏，配置序列化仍保留明文。读取或
 
 Web 第一版只支持纯文本。发送第一批前递归检查整卷材料与题目的 `images` 必须为空，复用原 `batch::prepare` 完成题号、空数、材料链与拆批，再复用 `prompt` 的题型说明和组装，将 system 与所有文本 part 用两个换行拼为一条 text；全部批次 Prompt 都先组装成功，不下载图片或丢弃图片。批次串行调用 B2 文本请求，默认 120 秒，省略 thinking/webSearch 以保留网页设置。该实例的请求状态只在目标页面成功调度 bootstrap 后保存实际 Webview handle，窗口 `Destroyed` 时释放；原文档门、BUSY 拒绝与应用生命周期隔离仍生效。首次请求固定宿主文档代次和 JS binding generation，后续批次遇到刷新或切会话停止，不在新绑定续跑，也不建立队列。
 
-仅 B2 `completed` 正文进入原严格答案解析，校验数量、题号、非空内容与空数并还原输入顺序；不摘取 Markdown/JSON 片段。`failed / uncertain / rejected / interrupted` 只交付脱敏的固定错误码、delivery、remote 与隔离状态，不把其正文当答案；格式错误统一报告 `INVALID_ANSWER`，不记录回答片段。Web 全任务 all-or-nothing：即使 `allow_partial=true`，也只有全部批次成功并通过校验才返回答案，任何失败立即停止且不向原回填返回部分结果。不自动 retry、回退 Native API 或清除 B2 quarantine；远端状态未知时仍须人工核对网页并重启应用。DeepSeek 页面在主 app 窗口后台按需加载并复用已有登录状态；使用前须有有效会话，保持输入框为空、无附件且未在生成，无需 Native API Key。B1 暂无前台登录或查看入口。真实学习通回填尚未完成验收，调用与验收条件见[测试说明](../../tests/README.md#deepseek-b3纯文本卷面求解)。
+仅 B2 `completed` 正文进入原严格答案解析，校验数量、题号、非空内容与空数并还原输入顺序；不摘取 Markdown/JSON 片段。`failed / uncertain / rejected / interrupted` 只交付脱敏的固定错误码、delivery、remote 与隔离状态，不把其正文当答案；格式错误统一报告 `INVALID_ANSWER`，不记录回答片段。Web 全任务 all-or-nothing：即使 `allow_partial=true`，也只有全部批次成功并通过校验才返回答案，任何失败立即停止且不向原回填返回部分结果。不自动 retry、回退 Native API 或清除 B2 quarantine；远端状态未知时仍须人工核对网页并重启应用。DeepSeek 页面在主 app 窗口后台按需加载并复用已有登录状态；使用前须有有效会话，保持输入框为空、无附件且未在生成，无需 Native API Key。可通过控制条的超星 / DeepSeek 按钮查看或登录，切回超星保留后台任务。真实学习通回填尚未完成验收，调用与验收条件见[测试说明](../../tests/README.md#deepseek-b3纯文本卷面求解)。
 
 Native 生产入口不解析整页 HTML。字体映射针对字形，不是整个字体文件的哈希；未匹配字符保留原样。章节测验开启人工核验时，在提交前等待用户确认；独立作业和逐题考试仅暂存，整卷预览考试提示用户自行保存和交卷。
 

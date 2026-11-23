@@ -5,7 +5,26 @@ use crate::{
 };
 use tauri::{Manager, Webview};
 
-fn is_local_main(caller: &Webview) -> bool {
+pub use crate::app::webview::deepseek::authentication::Authentication;
+
+/// Only the local configuration UI may start the read-only identity query.
+#[uxs_commands::command]
+pub async fn deepseek_authentication(caller: Webview) -> CommandsResult<Authentication> {
+    if !is_local_main(&caller) {
+        return Err(anyhow::anyhow!("DeepSeek 登录检查仅允许本地 main Webview").into());
+    }
+    let window = caller.window();
+    let requests = window
+        .state::<crate::app::webview::solvers::WebSolverViews>()
+        .ensure(&window, crate::config::solver::SolverKind::DeepSeekWeb)
+        .await?;
+    let webview = window
+        .get_webview("deepseek")
+        .ok_or_else(|| anyhow::anyhow!("未找到 DeepSeek Webview"))?;
+    Ok(crate::app::webview::deepseek::authentication::query(&requests, &webview).await)
+}
+
+pub(super) fn is_local_main(caller: &Webview) -> bool {
     if caller.label() != "main" || caller.window().label() != "app" {
         return false;
     }

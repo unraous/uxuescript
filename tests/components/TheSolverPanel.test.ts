@@ -20,11 +20,18 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn<typeof commands.confirm>(),
   saveConfig: vi.fn<typeof commands.saveConfig>(),
   general: vi.fn<typeof commands.general>(),
+  deepseekAuthentication: vi.fn<typeof commands.deepseekAuthentication>(),
+  currentWebview: vi.fn<typeof commands.currentWebview>(),
+  activateDeepseekView: vi.fn<typeof commands.activateDeepseekView>(),
+  activateChaoxingView: vi.fn<typeof commands.activateChaoxingView>(),
   setGeneral: vi.fn<typeof commands.setGeneral>(),
   error: vi.fn<typeof showError>(),
 }));
 vi.mock("@/services/cmds", () => ({ commands: mocks }));
 vi.mock("@/services/errors", () => ({ showError: mocks.error }));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async () => () => {}),
+}));
 enableAutoUnmount(afterEach);
 
 const mountConfig = () =>
@@ -70,10 +77,138 @@ beforeEach(async () => {
   mocks.confirm.mockResolvedValue(true);
   mocks.general.mockResolvedValue({ labelLanguage: "en" });
   mocks.error.mockResolvedValue(undefined);
+  mocks.deepseekAuthentication.mockResolvedValue({
+    status: "authenticated",
+    diagnostic: null,
+  });
+  mocks.currentWebview.mockResolvedValue("chaoxing");
+  mocks.activateDeepseekView.mockResolvedValue({
+    view: "deepseek",
+    focusError: null,
+  });
+  mocks.activateChaoxingView.mockResolvedValue({
+    view: "chaoxing",
+    focusError: null,
+  });
   await loadLabelLanguage();
 });
 
 describe("solver configuration", () => {
+  it("retains a retry when the authoritative view query fails", async () => {
+    mocks.currentWebview.mockRejectedValueOnce(new Error("view lookup failed"));
+    const wrapper = mountConfig();
+    await flushPromises();
+    wrapper
+      .getComponent<typeof VSelector>(".solver-selector")
+      .props("methods")
+      .select(1);
+    await flushPromises();
+    expect(wrapper.get(".login-status").text()).toContain("view lookup failed");
+    expect(mocks.deepseekAuthentication).not.toHaveBeenCalled();
+    await wrapper.get(".login-retry").trigger("click");
+    await flushPromises();
+    expect(
+      wrapper.get(".solver-view-button").attributes("disabled"),
+    ).toBeUndefined();
+    expect(mocks.activateDeepseekView).not.toHaveBeenCalled();
+  });
+  it("guides a confirmed sign-out before saving, returns once after login and preserves manual viewing", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.deepseekAuthentication.mockResolvedValueOnce({
+        status: "unauthenticated",
+        diagnostic: null,
+      });
+      const wrapper = mountConfig();
+      await flushPromises();
+      expect(mocks.deepseekAuthentication).not.toHaveBeenCalled();
+      wrapper
+        .getComponent<typeof VSelector>(".solver-selector")
+        .props("methods")
+        .select(1);
+      await flushPromises();
+      expect(mocks.deepseekAuthentication).toHaveBeenCalledOnce();
+      expect(mocks.activateDeepseekView).toHaveBeenCalledOnce();
+      expect(wrapper.get(".login-status").text()).toContain("sign in");
+      expect(wrapper.find(".solver-view-button").exists()).toBe(false);
+      expect(mocks.saveConfig).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(2000);
+      await flushPromises();
+      expect(mocks.activateChaoxingView).toHaveBeenCalledOnce();
+      expect(wrapper.get(".solver-view-button").attributes("aria-label")).toBe(
+        "Show solver page",
+      );
+      await wrapper.get(".solver-view-button").trigger("click");
+      await flushPromises();
+      expect(wrapper.get(".solver-view-button").attributes("aria-label")).toBe(
+        "Return to course page",
+      );
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(mocks.activateChaoxingView).toHaveBeenCalledOnce();
+      await wrapper.get(".solver-view-button").trigger("click");
+      await flushPromises();
+      expect(mocks.activateChaoxingView).toHaveBeenCalledTimes(2);
+      await wrapper.get('.save-button [aria-label="Save"]').trigger("click");
+      expect(mocks.saveConfig).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps unknown authentication distinct from sign-out, retries safely and restores course on deselection", async () => {
+    mocks.deepseekAuthentication.mockResolvedValueOnce({
+      status: "unknown",
+      diagnostic: "NETWORK_ERROR",
+    });
+    const wrapper = mountConfig();
+    await flushPromises();
+    wrapper
+      .getComponent<typeof VSelector>(".solver-selector")
+      .props("methods")
+      .select(1);
+    await flushPromises();
+    expect(mocks.activateDeepseekView).not.toHaveBeenCalled();
+    expect(wrapper.get(".login-status").text()).toContain("NETWORK_ERROR");
+    await wrapper.get(".login-retry").trigger("click");
+    await flushPromises();
+    expect(wrapper.find(".solver-view-button").exists()).toBe(true);
+    expect(mocks.activateDeepseekView).not.toHaveBeenCalled();
+    await wrapper.get(".solver-view-button").trigger("click");
+    await flushPromises();
+    wrapper
+      .getComponent<typeof VSelector>(".solver-selector")
+      .props("methods")
+      .select(0);
+    await flushPromises();
+    expect(wrapper.find(".solver-view-button").exists()).toBe(false);
+    expect(mocks.activateChaoxingView).toHaveBeenCalledOnce();
+  });
+
+  it("ignores late login checks after leaving the v-show panel or selecting another solver", async () => {
+    let finish!: (value: {
+      status: "unauthenticated";
+      diagnostic: null;
+    }) => void;
+    mocks.deepseekAuthentication.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const wrapper = mountConfig();
+    await flushPromises();
+    wrapper
+      .getComponent<typeof VSelector>(".solver-selector")
+      .props("methods")
+      .select(1);
+    await flushPromises();
+    await wrapper.get("#config-tab-1").trigger("click");
+    finish({ status: "unauthenticated", diagnostic: null });
+    await flushPromises();
+    expect(mocks.activateDeepseekView).not.toHaveBeenCalled();
+    expect(mocks.saveConfig).not.toHaveBeenCalled();
+  });
+
   it("extends the first category and keeps the Native API controls", async () => {
     const wrapper = mountConfig();
     await flushPromises();
@@ -125,9 +260,11 @@ describe("solver configuration", () => {
     expect(notice.text()).toContain(
       "DeepSeek Web integrated · Development preview",
     );
-    expect(notice.findAll("p").map((paragraph) => paragraph.text())).toEqual([
+    expect(
+      notice.findAll(":scope > p").map((paragraph) => paragraph.text()),
+    ).toEqual([
       "Reuses an existing sign-in session. A valid DeepSeek chat with an empty input, no attachments, and no generation in progress is required. No Native API Key needed.",
-      "Text only. The page loads on demand in the main window background. B1 has no foreground view for sign-in or inspection yet. Real Chaoxing answer filling has not completed acceptance testing.",
+      "Text only. Sign-in is checked when selected. After sign-in, use the button below to view the page; returning to the course keeps it running in the background. Real Chaoxing answer filling has not completed acceptance testing.",
     ]);
     expect(mocks.saveConfig).not.toHaveBeenCalled();
     expect(mocks.healthy).not.toHaveBeenCalled();
@@ -232,9 +369,11 @@ describe("solver configuration", () => {
     ).toBe("求解方式");
     const notice = wrapper.get(".web-solver-notice");
     expect(notice.text()).toContain("DeepSeek Web 已接入 · 开发预览");
-    expect(notice.findAll("p").map((paragraph) => paragraph.text())).toEqual([
+    expect(
+      notice.findAll(":scope > p").map((paragraph) => paragraph.text()),
+    ).toEqual([
       "复用已有登录状态，需有可用的 DeepSeek 会话，且输入框为空、无附件、未在生成。无需 Native API Key。",
-      "仅支持纯文本；页面在主窗口后台按需加载，B1 暂无前台登录或查看入口。真实学习通回填尚未完成验收。",
+      "仅支持纯文本；选择后检查登录状态，登录后可通过下方按钮查看网页，返回课程后仍在后台运行。真实学习通回填尚未完成验收。",
     ]);
   });
 });
