@@ -34,9 +34,9 @@ TypeScript 依赖采用双版本别名：`typescript` 指向提供编译器 API 
 
 `pnpm build` 先构建界面，再生成脚本，避免界面构建清理 `dist` 时删除脚本。直接执行 Cargo（包括 `cargo sync-bindings`）前，先运行 `pnpm build:scripts`。`dist/` 中的生成产物不作为源码维护。
 
-外部脚本由独立项目维护和构建，交付产物保存在 `external-scripts/`。DeepSeek adapter 的 `deepseek-web-adapter.iife.js` 在独立项目执行 `pnpm build` 后，从其 `dist/` 原样复制到这里；主项目通过 `src-tauri/src/core/script.rs` 中的 `include_str!` 直接编译嵌入，不接入主项目的 Node 构建或 `dist/` 生成流水线。更新流程为独立构建 → 替换对应文件 → 重新编译主项目。`external` 表示维护归属，不表示业务重要性或安全隔离；编译嵌入本身也不会执行脚本。
+DeepSeek adapter 的运行时源码位于 `injected/deepseek-web/adapter-core/`，按该目录的 [`UPSTREAM.md`](../../injected/deepseek-web/adapter-core/UPSTREAM.md) 手动同步上游；`injected/deepseek-web/adapter.js` 仅作为薄入口，通过 `injected/entries.json` 接入现有脚本构建管线。Vite/Rolldown 将其输出为 `dist/scripts/embedded/deepseek-web-adapter.js`，Rust 通过 `include_script!` 内嵌，无需单独构建或复制 IIFE 产物。
 
-当前 Tauri 未显式配置对 `external-scripts/` 的监听，更新外部产物后需手动重启 `pnpm tauri dev` 以重新编译。Cargo 对 `include_str!` 文件的依赖追踪不等同于 Tauri 的文件监听，不能据此假定开发进程会自动重启。
+`pnpm tauri dev`、`pnpm tauri build` 和 CI 均沿现有流程先生成 JavaScript 脚本，再编译 Rust。上文直接执行 Cargo 前生成脚本的要求也适用于 adapter；开发监听沿用 `dist/scripts/` 的现有配置。
 
 只调试 Vue 页面可运行 `pnpm dev`，但这不会创建 Tauri 窗口，不能验证 IPC、课程 WebView 或本地配置读写。
 

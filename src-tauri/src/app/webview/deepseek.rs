@@ -19,10 +19,10 @@ pub(super) fn is_target_url(url: &Url) -> bool {
 }
 
 fn adapter_initialization_script() -> String {
-    // Windows 也会进入子 frame；条件块保留外部 IIFE 顶层 var 的文档全局作用域。
+    // Windows 也会进入子 frame；仅在目标顶层文档中安装 Adapter。
     format!(
         "if (window.top === window && window.location.origin === 'https://chat.deepseek.com') {{\n{}\n}}",
-        crate::core::script::DEEPSEEK_ADAPTER_SCRIPT
+        include_script!("deepseek-web-adapter.js")
     )
 }
 

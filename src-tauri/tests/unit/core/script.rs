@@ -1,7 +1,6 @@
-use super::DEEPSEEK_ADAPTER_SCRIPT;
-
 #[test]
-fn embeds_the_deepseek_adapter_iife() {
-    assert!(!DEEPSEEK_ADAPTER_SCRIPT.trim().is_empty());
-    assert!(DEEPSEEK_ADAPTER_SCRIPT.contains("DeepSeekWebAdapter"));
+fn embeds_the_deepseek_adapter_embedded_iife() {
+    let script = include_script!("deepseek-web-adapter.js");
+    assert!(!script.trim().is_empty());
+    assert!(script.contains("DeepSeekWebAdapter"));
 }

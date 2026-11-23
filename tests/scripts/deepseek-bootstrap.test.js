@@ -1,7 +1,7 @@
 import { runInNewContext } from "node:vm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { main } from "@injected/deepseek-web/bootstrap.js";
-import adapterScript from "../../external-scripts/deepseek-web-adapter.iife.js?raw";
+import adapterScript from "../../dist/scripts/embedded/deepseek-web-adapter.js?raw";
 
 /** @typedef {import("@injected/deepseek-web/bootstrap.js").Adapter} Adapter */
 /** @typedef {import("@injected/deepseek-web/bootstrap.js").Host} Host */
@@ -398,7 +398,7 @@ describe("DeepSeek B2 single request bridge", () => {
 });
 
 describe("DeepSeek B1 bootstrap public adapter integration", () => {
-  it("the unchanged external IIFE exposes its public API in document global scope", () => {
+  it("the embedded IIFE exposes its public API in document global scope", () => {
     /** @type {{DeepSeekWebAdapter?: Host["DeepSeekWebAdapter"]}} */
     const documentGlobal = {};
     runInNewContext(adapterScript, documentGlobal);

@@ -23,10 +23,10 @@ fn targets_only_the_exact_https_origin() {
 }
 
 #[test]
-fn delivers_the_external_iife_unchanged_inside_a_top_origin_condition_not_a_function_scope() {
+fn delivers_the_embedded_iife_unchanged_inside_a_top_origin_condition_not_a_function_scope() {
     let expected = format!(
         "if (window.top === window && window.location.origin === 'https://chat.deepseek.com') {{\n{}\n}}",
-        crate::core::script::DEEPSEEK_ADAPTER_SCRIPT
+        include_script!("deepseek-web-adapter.js")
     );
     assert!(
         adapter_initialization_script() == expected,
