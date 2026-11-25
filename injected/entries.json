@@ -7,5 +7,7 @@
   "course-redirect": "chaoxing/course-redirect.js",
   "classroom-mute": "chaoxing/classroom-mute.js",
   "course-list-metadata": "chaoxing/course-list-metadata.js",
+  "deepseek-web-adapter": "deepseek-web/adapter.js",
+  "deepseek-web-bootstrap": "deepseek-web/bootstrap.js",
   "webview-log": "runtime/webview-log.js"
 }

@@ -3,7 +3,7 @@ import { createPinia } from "pinia";
 import TheMainPage from "./TheMainPage.vue";
 import { commands } from "./services/cmds";
 import { installConsoleLogger } from "./services/logger";
-import { defaultTheme, initializeTheme } from "./theme";
+import { defaultTheme, initializeTheme, syncSolverScrollbar } from "./theme";
 import "./theme.css";
 
 installConsoleLogger("main");
@@ -15,4 +15,9 @@ void commands
     console.error("Failed to load color theme:", cause);
     initializeTheme(defaultTheme);
   })
-  .finally(() => app.mount("#main"));
+  .finally(() => {
+    app.mount("#main");
+    void syncSolverScrollbar().catch((cause) => {
+      console.error("Failed to sync solver scrollbar theme:", cause);
+    });
+  });

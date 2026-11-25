@@ -6,6 +6,43 @@ use crate::app::webview::{UrlStack, home_url};
 use anyhow::anyhow;
 use tauri::{Manager, window};
 
+use crate::app::webview::solvers::{ActiveView, ViewActivation, WebSolverViews};
+
+fn switching_window(caller: &tauri::Webview) -> anyhow::Result<window::Window> {
+    anyhow::ensure!(
+        super::deepseek::is_local_main(caller),
+        "网页视图切换仅允许 app 窗口中的本地 main Webview"
+    );
+    Ok(caller.window())
+}
+
+#[uxs_commands::command]
+pub async fn activate_deepseek_view(caller: tauri::Webview) -> CommandsResult<ViewActivation> {
+    let window = switching_window(&caller)?;
+    Ok(window
+        .state::<WebSolverViews>()
+        .activate(&window, ActiveView::Deepseek)
+        .await?)
+}
+
+#[uxs_commands::command]
+pub async fn activate_chaoxing_view(caller: tauri::Webview) -> CommandsResult<ViewActivation> {
+    let window = switching_window(&caller)?;
+    Ok(window
+        .state::<WebSolverViews>()
+        .activate(&window, ActiveView::Chaoxing)
+        .await?)
+}
+
+#[uxs_commands::command]
+pub async fn current_webview(caller: tauri::Webview) -> CommandsResult<ActiveView> {
+    let window = switching_window(&caller)?;
+    Ok(window
+        .state::<WebSolverViews>()
+        .current_view(&window)
+        .await?)
+}
+
 fn stop_task(window: &window::Window) {
     window.state::<super::task::TaskSession>().clear();
 }

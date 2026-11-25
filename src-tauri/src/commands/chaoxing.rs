@@ -10,10 +10,9 @@ use crate::config::CONFIG;
 use crate::core::quiz::{
     Entry, Folio, Question,
     llm::{self, AnswerItem},
-    solve,
 };
 
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[uxs_commands::command]
 pub async fn load_course_cover(url: String) -> CommandsResult<String> {
@@ -61,10 +60,42 @@ mod tests;
 
 #[uxs_commands::command(webview = "chaoxing")]
 pub async fn solve_questions(
+    window: tauri::Window,
     payload: Folio,
     allow_partial: bool,
 ) -> CommandsResult<Vec<AnswerItem>> {
-    match solve(payload, allow_partial).await {
+    let solver = *CONFIG.solver.lock();
+    let requests = if solver == crate::config::solver::SolverKind::DeepSeekWeb {
+        Some(
+            window
+                .state::<crate::app::webview::solvers::WebSolverViews>()
+                .ensure(&window, solver)
+                .await?,
+        )
+    } else {
+        None
+    };
+    solve_questions_for(solver, requests.as_deref(), payload, allow_partial).await
+}
+
+/// 生产入口与本地协议验证共用业务调用，不要求测试构造 Tauri Runtime。
+#[cfg(test)]
+pub(crate) async fn solve_questions_with(
+    requests: &super::deepseek::RequestState,
+    payload: Folio,
+    allow_partial: bool,
+) -> CommandsResult<Vec<AnswerItem>> {
+    let solver = *CONFIG.solver.lock();
+    solve_questions_for(solver, Some(requests), payload, allow_partial).await
+}
+
+async fn solve_questions_for(
+    solver: crate::config::solver::SolverKind,
+    requests: Option<&super::deepseek::RequestState>,
+    payload: Folio,
+    allow_partial: bool,
+) -> CommandsResult<Vec<AnswerItem>> {
+    match crate::core::quiz::solve_with_solver(solver, payload, allow_partial, requests).await {
         Ok(answers) => {
             log::info!("solve_questions 答题成功，获得答案数量: {}", answers.len());
             Ok(answers)

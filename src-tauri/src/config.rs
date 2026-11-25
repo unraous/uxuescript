@@ -2,12 +2,14 @@ pub mod general;
 pub mod llm;
 pub mod options;
 pub mod path;
+pub mod solver;
 pub mod theme;
 
 use general::GeneralConfig;
 use llm::LLMConfig;
 use options::OptionsConfig;
 use path::PathsConfig;
+use solver::SolverKind;
 use theme::ThemeConfig;
 
 use anyhow::Result;
@@ -24,6 +26,7 @@ pub struct Config {
     pub options: Mutex<OptionsConfig>,
     pub general: Mutex<GeneralConfig>,
     pub theme: Mutex<ThemeConfig>,
+    pub solver: Mutex<SolverKind>,
     pub llm: LLMConfig,
 }
 
@@ -40,6 +43,7 @@ impl Default for Config {
             options: Mutex::new(OptionsConfig::default()),
             general: Mutex::new(GeneralConfig::default()),
             theme: Mutex::new(ThemeConfig::default()),
+            solver: Mutex::new(SolverKind::default()),
             llm: LLMConfig::default(),
         }
     }

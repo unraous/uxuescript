@@ -56,6 +56,8 @@ pub fn run() {
         .on_window_event(window::listener)
         .manage(UrlStack::default())
         .manage(Layers::default())
+        .manage(app::webview::lifecycle::Lifecycle::default())
+        .manage(app::webview::solvers::WebSolverViews::default())
         .manage(CourseMetaMap::default())
         .manage(TaskSession::default())
         .manage(Confirmations::default())

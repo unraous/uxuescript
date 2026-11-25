@@ -33,6 +33,76 @@ fn old_config_without_theme_uses_default_theme() {
 }
 
 #[test]
+fn old_config_without_solver_uses_native_llm() {
+    let loaded = Config::parse("[options]\nmuteWebview = true").unwrap();
+    let solver: &parking_lot::Mutex<super::solver::SolverKind> = &loaded.solver;
+    assert_eq!(*solver.lock(), super::solver::SolverKind::NativeLlm);
+}
+
+#[test]
+fn solver_kind_round_trip_preserves_deep_seek_web() {
+    let mut config = Config::default();
+    *config.solver.get_mut() = super::solver::SolverKind::DeepSeekWeb;
+    let deepseek = config.llm.providers.get_mut().get_mut("deepseek").unwrap();
+    deepseek.api_key = Some(super::llm::ApiKey::new("test-api-key".into()).unwrap());
+    deepseek.base_url = "https://example.com/chat/completions".into();
+
+    let saved = toml::to_string_pretty(&config).unwrap();
+    assert!(saved.contains("solver = \"deep_seek_web\""));
+
+    let loaded = Config::parse(&saved).unwrap();
+    assert_eq!(
+        *loaded.solver.lock(),
+        super::solver::SolverKind::DeepSeekWeb
+    );
+    let providers = loaded.llm.providers.lock();
+    assert_eq!(
+        providers["deepseek"].api_key.as_ref().unwrap().expose(),
+        "test-api-key"
+    );
+    assert_eq!(
+        providers["deepseek"].base_url,
+        "https://example.com/chat/completions"
+    );
+}
+
+#[test]
+fn solver_selection_saves_to_file_and_restores_native_configuration() {
+    let mut config = Config::default();
+    *config.llm.active_provider.get_mut() = "deepseek".into();
+    let provider = config.llm.providers.get_mut().get_mut("deepseek").unwrap();
+    provider.models = vec!["saved-model".into()];
+    provider.chosen_model = Some(0);
+    provider.base_url = "https://example.com/chat/completions".into();
+    provider.api_key = Some(super::llm::ApiKey::new("saved-native-api-key".into()).unwrap());
+    let native = serde_json::to_value(&config.llm).unwrap();
+    let unique = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+        "uxuescript-solver-{}-{unique}.toml",
+        std::process::id()
+    ));
+    std::fs::File::create_new(&path).unwrap();
+    config.paths.files.insert("config".into(), path.clone());
+
+    for solver in [
+        super::solver::SolverKind::DeepSeekWeb,
+        super::solver::SolverKind::NativeLlm,
+    ] {
+        *config.solver.lock() = solver;
+        config.save().unwrap();
+        let saved = std::fs::read_to_string(&path).unwrap();
+        let loaded = Config::parse(&saved).unwrap();
+        assert_eq!(*loaded.solver.lock(), solver);
+        assert_eq!(serde_json::to_value(&loaded.llm).unwrap(), native);
+        assert_eq!(serde_json::to_value(&config.llm).unwrap(), native);
+    }
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
 fn migration_and_round_trip_preserve_selected_theme() {
     let loaded = Config::parse("[metadata]\nlogLevel = 'Warn'\n[theme]\nname = 'iris'").unwrap();
     let saved = toml::to_string_pretty(&loaded).unwrap();

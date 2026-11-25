@@ -3,7 +3,9 @@ pub mod llm;
 use super::CommandsResult;
 
 use crate::config::general::GeneralConfig;
-use crate::config::{CONFIG, options::OptionsConfig, path::PathsConfig, theme::ThemeName};
+use crate::config::{
+    CONFIG, options::OptionsConfig, path::PathsConfig, solver::SolverKind, theme::ThemeName,
+};
 
 #[uxs_commands::command(webview = "mask")]
 pub fn general() -> GeneralConfig {
@@ -13,6 +15,25 @@ pub fn general() -> GeneralConfig {
 #[uxs_commands::command]
 pub fn set_general(general: GeneralConfig) {
     *CONFIG.general.lock() = general;
+}
+
+#[uxs_commands::command]
+pub fn current_solver() -> SolverKind {
+    *CONFIG.solver.lock()
+}
+
+#[uxs_commands::command]
+pub fn set_solver(window: tauri::Window, kind: SolverKind) {
+    select_solver(kind, |solver| {
+        crate::app::webview::solvers::preload(window, solver)
+    });
+}
+
+// Like other setters, selection updates memory. save_config (or exit) persists
+// it independently; a save failure never implies that preload did not happen.
+pub(crate) fn select_solver(kind: SolverKind, preload: impl FnOnce(SolverKind)) {
+    *CONFIG.solver.lock() = kind;
+    preload(kind);
 }
 
 /// Return the selected color theme for the main and mask WebViews.

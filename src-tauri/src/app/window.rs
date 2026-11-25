@@ -14,8 +14,8 @@ use std::{
     time::Duration,
 };
 use tauri::{
-    Emitter, Listener, LogicalPosition, LogicalSize, Manager, PhysicalSize, WindowBuilder,
-    WindowEvent, image::Image, webview::Webview, window::Window,
+    Emitter, Listener, LogicalSize, Manager, PhysicalSize, WindowBuilder, WindowEvent,
+    image::Image, webview::Webview, window::Window,
 };
 
 /// 执行窗口关闭前的应用状态刷新与持久化收尾工作
@@ -57,13 +57,21 @@ pub async fn prepare_exit(window: &Window) {
 }
 
 fn resize(webview: &Webview, size: LogicalSize<f64>) -> Result<()> {
-    let (pos, size) = match webview.label() {
-        "chaoxing" | "chaoxing-mask" => (
-            LogicalPosition::new(size.width * 0.51, size.height * 0.46),
-            LogicalSize::new(size.width * 0.48, size.height * 0.48),
-        ),
-        _ => (LogicalPosition::new(0.0, 0.0), size),
-    };
+    if !matches!(
+        webview.label(),
+        "main" | "chaoxing" | "chaoxing-mask" | "mask"
+    ) {
+        let position = webview.position()?;
+        let current_size = webview.size()?;
+        // The dynamic factory stages children entirely outside the window until
+        // native stacking is committed. A resize must not expose them early.
+        if i64::from(position.x) + i64::from(current_size.width) < 0
+            && i64::from(position.y) + i64::from(current_size.height) < 0
+        {
+            return Ok(());
+        }
+    }
+    let (pos, size) = webview::placement(webview.label(), size);
     webview.set_position(pos)?;
     webview.set_size(size)?;
     Ok(())
@@ -82,13 +90,22 @@ fn resize_webviews(window: &Window, size: PhysicalSize<u32>) -> Result<()> {
 pub fn listener(window: &tauri::Window, event: &tauri::WindowEvent) {
     log::debug!("监听到窗口事件: {:?}", event);
     match event {
-        WindowEvent::CloseRequested { api, .. } => {
+        WindowEvent::CloseRequested { api, .. } if window.label() == "app" => {
             api.prevent_close();
             tauri::async_runtime::spawn(close(window.clone()));
         }
         WindowEvent::Destroyed => {
-            window.state::<webview::layer::Layers>().remove(window);
-            log::debug!("主程序窗口已销毁，应用已关闭");
+            if window.label() == "app" {
+                window
+                    .state::<webview::solvers::WebSolverViews>()
+                    .destroyed();
+            }
+            window
+                .state::<webview::lifecycle::Lifecycle>()
+                .destroyed(window);
+            if window.label() == "app" {
+                log::debug!("主程序窗口已销毁，应用已关闭");
+            }
         }
         WindowEvent::Resized(physical_size) => {
             if let Err(e) = resize_webviews(window, *physical_size) {
@@ -147,10 +164,20 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
         .icon(Image::from_bytes(include_bytes!("../../icons/icon.ico"))?)?
         .build()?;
 
+    window
+        .state::<webview::lifecycle::Lifecycle>()
+        .register_window(&window);
+
     webview::init_on(&window, "main")?.hide()?;
     webview::init_on(&window, "chaoxing")?.hide()?;
     webview::init_on(&window, "chaoxing-mask")?.hide()?;
     let mask = webview::init_on(&window, "mask")?;
+    let theme_window = window.clone();
+    window.listen("theme-colors-changed", move |_| {
+        if let Some(deepseek) = theme_window.get_webview("deepseek") {
+            webview::deepseek::sync_scrollbar(&deepseek);
+        }
+    });
     window
         .state::<webview::layer::Layers>()
         .register(&window, &["main", "chaoxing", "chaoxing-mask", "mask"]);
@@ -169,6 +196,10 @@ pub fn init(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error:
             log::error!("启动开屏动画失败: {error}");
         }
     });
+
+    // Config was loaded from disk before init; release its lock before preload.
+    let solver = *CONFIG.solver.lock();
+    webview::solvers::preload(window.clone(), solver);
 
     log::info!("初始化应用窗口成功");
 

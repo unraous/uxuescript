@@ -5,6 +5,7 @@ use crate::commands::chaoxing::CourseStatus;
 
 use tauri::{Emitter, Manager};
 
+// 内部脚本资源：由本项目构建到 dist/scripts/embedded/。
 macro_rules! include_script {
     ($name:literal) => {
         include_str!(concat!(
@@ -58,3 +59,7 @@ pub fn load_on(webview: tauri::Webview, payload: tauri::webview::PageLoadPayload
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit/core/script.rs"]
+mod tests;

@@ -4,6 +4,8 @@
     {
       "commands": {
         "allow": [
+          "activate_chaoxing_view",
+          "activate_deepseek_view",
           "can_go_back",
           "can_go_forward",
           "cancel_update_download",
@@ -13,8 +15,12 @@
           "confirm",
           "course_automation",
           "current_provider",
+          "current_solver",
           "current_theme",
           "current_url",
+          "current_webview",
+          "deepseek_authentication",
+          "deepseek_generate_text",
           "download_update",
           "fetch_ollama_models",
           "general",
@@ -43,6 +49,7 @@
           "set_general",
           "set_key",
           "set_options",
+          "set_solver",
           "set_theme",
           "set_zoom",
           "show_content",

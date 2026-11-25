@@ -5,7 +5,7 @@ use anyhow::Result;
 #[error("答案格式错误: {0}")]
 pub(super) struct AnswerError(String);
 
-pub(super) fn parse<'a>(
+pub(in crate::core::quiz) fn parse<'a>(
     content: &str,
     questions: impl IntoIterator<Item = &'a Question>,
 ) -> Result<Vec<AnswerItem>> {

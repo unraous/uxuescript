@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { label } from "@/labels";
+import { label, translated } from "@/labels";
 import ZoomInIcon from "@/assets/zoom_in.svg?component";
 import ZoomOutIcon from "@/assets/zoom_out.svg?component";
 import ArrowIcon from "@/assets/arrow_forward.svg?component";
@@ -9,8 +9,23 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import VButton from "@/components/base/VButton.vue";
 import VRollTransition from "@/components/base/VRollTransition.vue";
-import { commands } from "@/services/cmds";
+import { commands, type ActiveView } from "@/services/cmds";
 import { showError } from "@/services/errors";
+
+// Layers is authoritative, including after HMR or a component remount.
+const currentView = ref<ActiveView | null>(null);
+const syncing = ref(true);
+const courseControlsDisabled = computed(
+  () => syncing.value || currentView.value !== "chaoxing",
+);
+let mounted = true;
+let viewRevision = 0;
+
+async function syncView() {
+  const revision = viewRevision;
+  const view = await commands.currentWebview();
+  if (mounted && revision === viewRevision) currentView.value = view;
+}
 
 // Webview 缩放控制阶梯表
 const ZOOM_LEVELS = [
@@ -29,19 +44,33 @@ const canZoomIn = computed(() => zoomIndex.value < ZOOM_LEVELS.length - 1);
 const canZoomOut = computed(() => zoomIndex.value > 0);
 
 watch(zoomIndex, async (newIndex) => {
-  await commands.setZoom(ZOOM_LEVELS[newIndex]).catch((e) =>
-    showError("设置Webview缩放失败", e),
-  );
+  await commands
+    .setZoom(ZOOM_LEVELS[newIndex])
+    .catch((e) => showError("设置Webview缩放失败", e));
 });
 
-const zoomIn = () => zoomIndex.value++;
-const zoomOut = () => zoomIndex.value--;
+const zoomIn = () => {
+  if (!courseControlsDisabled.value) zoomIndex.value++;
+};
+const zoomOut = () => {
+  if (!courseControlsDisabled.value) zoomIndex.value--;
+};
 
 const currentUrl = ref("");
+const displayedUrl = computed(() =>
+  currentView.value === "deepseek"
+    ? "DeepSeek"
+    : currentView.value === "chaoxing"
+      ? currentUrl.value
+      : syncing.value
+        ? translated("Syncing view…", "正在同步视图…")
+        : translated("View status unknown", "视图状态未知"),
+);
 const canGoBack = ref(false);
 const canGoForward = ref(false);
 const isNavigating = ref(false);
 let unlistenUrlUpdate: UnlistenFn | null = null;
+let unlistenViewUpdate: UnlistenFn | null = null;
 
 const updateNavState = async () => {
   try {
@@ -67,7 +96,8 @@ const withNavLock = (
   errMsg = "导航失败:",
 ) => {
   return async () => {
-    if (isNavigating.value || !condition()) return;
+    if (courseControlsDisabled.value || isNavigating.value || !condition())
+      return;
     isNavigating.value = true;
     try {
       await action();
@@ -102,10 +132,41 @@ const handleGoHome = withNavLock(
 onMounted(async () => {
   updateNavState();
   try {
-    unlistenUrlUpdate = await listen("url-update", async (event) => {
+    const unlisten = await listen<ActiveView>(
+      "active-webview-changed",
+      (event) => {
+        if (mounted) {
+          ++viewRevision;
+          currentView.value = event.payload;
+        }
+      },
+    );
+    if (!mounted) {
+      unlisten();
+      return;
+    }
+    unlistenViewUpdate = unlisten;
+    await syncView();
+  } catch (error) {
+    if (mounted)
+      await showError(
+        translated("Unable to read the active view", "获取当前网页失败"),
+        error,
+      );
+  } finally {
+    syncing.value = false;
+  }
+  if (!mounted) return;
+  try {
+    const unlisten = await listen("url-update", async (event) => {
       currentUrl.value = event.payload as string;
       await updateNavState();
     });
+    if (!mounted) {
+      unlisten();
+      return;
+    }
+    unlistenUrlUpdate = unlisten;
     zoomIndex.value = 5; //感觉默认改到80%好一点
   } catch (err) {
     await showError("注册 URL 监听失败:", err);
@@ -113,6 +174,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  mounted = false;
+  unlistenViewUpdate?.();
   if (unlistenUrlUpdate) {
     unlistenUrlUpdate();
     unlistenUrlUpdate = null;
@@ -125,7 +188,7 @@ onUnmounted(() => {
     <div class="navigation">
       <VButton
         :icon="ArrowIcon"
-        :disabled="!canGoBack || isNavigating"
+        :disabled="courseControlsDisabled || !canGoBack || isNavigating"
         color="var(--theme-surface-accent)"
         shape="circle"
         size="20%"
@@ -135,7 +198,7 @@ onUnmounted(() => {
       />
       <VButton
         :icon="ArrowIcon"
-        :disabled="!canGoForward || isNavigating"
+        :disabled="courseControlsDisabled || !canGoForward || isNavigating"
         color="var(--theme-surface-accent)"
         shape="circle"
         size="20%"
@@ -144,7 +207,8 @@ onUnmounted(() => {
       />
       <VButton
         :icon="RefreshIcon"
-        :disabled="isNavigating"
+        data-action="reload"
+        :disabled="courseControlsDisabled || isNavigating"
         color="var(--theme-surface-accent)"
         shape="circle"
         size="20%"
@@ -153,7 +217,7 @@ onUnmounted(() => {
       />
       <VButton
         :icon="HomeIcon"
-        :disabled="isNavigating"
+        :disabled="courseControlsDisabled || isNavigating"
         color="var(--theme-surface-accent)"
         shape="circle"
         size="20%"
@@ -164,24 +228,26 @@ onUnmounted(() => {
     <div class="capsule-slot">
       <VRollTransition
         v-slot="{ value }"
-        :value="currentUrl"
+        :value="displayedUrl"
         class="url-display"
       >
         <p class="url-text">{{ value }}</p>
       </VRollTransition>
       <VButton
         :icon="ZoomOutIcon"
-        :disabled="!canZoomOut"
+        :disabled="courseControlsDisabled || !canZoomOut"
         color="var(--theme-brand)"
         shape="circle"
         size="1.75rem"
         variant="translucent"
         @click="zoomOut"
       />
-      <span class="zoom-value">{{ currentZoomText }}</span>
+      <span class="zoom-value">{{
+        currentView === "chaoxing" ? currentZoomText : "—"
+      }}</span>
       <VButton
         :icon="ZoomInIcon"
-        :disabled="!canZoomIn"
+        :disabled="courseControlsDisabled || !canZoomIn"
         color="var(--theme-brand)"
         shape="circle"
         size="1.75rem"
@@ -190,7 +256,11 @@ onUnmounted(() => {
       />
     </div>
     <div class="title">
-      <VRollTransition v-slot="{ value }" :value="label('coursePage')" class="page-title">
+      <VRollTransition
+        v-slot="{ value }"
+        :value="currentView === 'deepseek' ? 'DeepSeek' : label('coursePage')"
+        class="page-title"
+      >
         {{ value }}
       </VRollTransition>
     </div>
@@ -201,11 +271,9 @@ onUnmounted(() => {
   width: 100%;
   height: 1.5em;
 }
-
 .page-title :deep(.roll-item) {
   justify-content: center;
 }
-
 .body {
   background-color: var(--theme-brand);
   display: flex;
@@ -262,6 +330,7 @@ onUnmounted(() => {
 .capsule-slot {
   height: 75%;
   flex: 1;
+  min-width: 0;
   background: var(--theme-page-gradient);
   border-radius: 999px;
   display: flex;

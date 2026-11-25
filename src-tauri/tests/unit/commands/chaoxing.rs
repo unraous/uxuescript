@@ -14,15 +14,33 @@ async fn probe_with<T>(
     provider: &LLMProvider,
     action: impl std::future::Future<Output = CommandsResult<T>>,
 ) -> CommandsResult<T> {
+    probe_with_solver(
+        Some(provider),
+        crate::config::solver::SolverKind::NativeLlm,
+        action,
+    )
+    .await
+}
+
+async fn probe_with_solver<T>(
+    provider: Option<&LLMProvider>,
+    solver: crate::config::solver::SolverKind,
+    action: impl std::future::Future<Output = CommandsResult<T>>,
+) -> CommandsResult<T> {
     let _lock = CONFIG_LOCK.lock().await;
+    let previous_solver = std::mem::replace(&mut *CONFIG.solver.lock(), solver);
     let id = "__healthy_test__".to_owned();
     let previous_id = std::mem::replace(&mut *CONFIG.llm.active_provider.lock(), id.clone());
-    let previous_provider = CONFIG
-        .llm
-        .providers
-        .lock()
-        .insert(id.clone(), provider.clone());
+    let previous_provider = CONFIG.llm.providers.lock().remove(&id);
+    if let Some(provider) = provider {
+        CONFIG
+            .llm
+            .providers
+            .lock()
+            .insert(id.clone(), provider.clone());
+    }
     let result = action.await;
+    *CONFIG.solver.lock() = previous_solver;
     *CONFIG.llm.active_provider.lock() = previous_id;
     let mut providers = CONFIG.llm.providers.lock();
     if let Some(previous) = previous_provider {
@@ -46,6 +64,210 @@ fn provider(protocol: LLMProtocol, base_url: String) -> LLMProvider {
     }
 }
 
+fn solver_payload() -> Folio {
+    let question = serde_json::from_value(json!({
+        "id": "1", "kind": "简答题", "stem": "测试题", "options": []
+    }))
+    .unwrap();
+    Folio {
+        entries: vec![Entry::Question(question)],
+        ..Default::default()
+    }
+}
+
+#[tokio::test]
+async fn solver_commands_update_memory_without_changing_native_configuration() {
+    let mut native = provider(
+        LLMProtocol::OpenAIChatCompletions,
+        "http://127.0.0.1:1".into(),
+    );
+    native.api_key = Some(crate::config::llm::ApiKey::new("saved-native-key".into()).unwrap());
+    let (initial, selected, restored, native_preserved) = probe_with(&native, async {
+        let before = serde_json::to_value(&CONFIG.llm).unwrap();
+        let initial = crate::commands::config::current_solver();
+        crate::commands::config::select_solver(
+            crate::config::solver::SolverKind::DeepSeekWeb,
+            |_| {},
+        );
+        let selected = crate::commands::config::current_solver();
+        crate::commands::config::select_solver(
+            crate::config::solver::SolverKind::NativeLlm,
+            |_| {},
+        );
+        let restored = crate::commands::config::current_solver();
+        Ok((
+            initial,
+            selected,
+            restored,
+            before == serde_json::to_value(&CONFIG.llm).unwrap(),
+        ))
+    })
+    .await
+    .unwrap();
+    assert_eq!(initial, crate::config::solver::SolverKind::NativeLlm);
+    assert_eq!(selected, crate::config::solver::SolverKind::DeepSeekWeb);
+    assert_eq!(restored, crate::config::solver::SolverKind::NativeLlm);
+    assert!(native_preserved);
+}
+
+#[tokio::test]
+async fn web_solver_reports_missing_webview_without_native_provider() {
+    let error = probe_with_solver(
+        None,
+        crate::config::solver::SolverKind::DeepSeekWeb,
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
+            solver_payload(),
+            false,
+        ),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "DeepSeek Web WEBVIEW_NOT_OPEN: delivery=not_sent remote=not_started quarantined=false；本次任务停止，未返回部分答案"
+    );
+}
+
+#[tokio::test]
+async fn web_solver_does_not_validate_native_models() {
+    for chosen_model in [None, Some(10)] {
+        let mut provider = provider(
+            LLMProtocol::OpenAIChatCompletions,
+            "http://127.0.0.1:1".into(),
+        );
+        provider.chosen_model = chosen_model;
+        let error = probe_with_solver(
+            Some(&provider),
+            crate::config::solver::SolverKind::DeepSeekWeb,
+            super::solve_questions_with(
+                &super::super::deepseek::RequestState::default(),
+                solver_payload(),
+                false,
+            ),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "DeepSeek Web WEBVIEW_NOT_OPEN: delivery=not_sent remote=not_started quarantined=false；本次任务停止，未返回部分答案"
+        );
+    }
+}
+
+#[tokio::test]
+async fn web_solver_does_not_send_native_api_requests() {
+    let protocol = LLMProtocol::OpenAIChatCompletions;
+    let body = response(
+        &protocol,
+        json!([{"index": "1", "content": "测试答案", "explanation": ""}]),
+    );
+    let (url, requests) = serve_sequence(vec![(200, body)]).await;
+    let result = probe_with_solver(
+        Some(&provider(protocol, url)),
+        crate::config::solver::SolverKind::DeepSeekWeb,
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
+            solver_payload(),
+            false,
+        ),
+    )
+    .await;
+    let sent_native_request = requests.is_finished();
+    requests.abort();
+    assert_eq!(
+        result.unwrap_err().to_string(),
+        "DeepSeek Web WEBVIEW_NOT_OPEN: delivery=not_sent remote=not_started quarantined=false；本次任务停止，未返回部分答案"
+    );
+    assert!(
+        !sent_native_request,
+        "Web Solver must not call the Native API"
+    );
+}
+
+#[tokio::test]
+async fn web_solver_validates_an_empty_folio_before_generating() {
+    let error = probe_with_solver(
+        None,
+        crate::config::solver::SolverKind::DeepSeekWeb,
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
+            Folio::default(),
+            false,
+        ),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.to_string(), "接收到空的题目列表");
+}
+
+#[tokio::test]
+async fn native_solver_keeps_all_protocols_on_the_solve_questions_entry() {
+    for protocol in [
+        LLMProtocol::OpenAIChatCompletions,
+        LLMProtocol::OpenAIResponses,
+        LLMProtocol::GoogleGemini,
+    ] {
+        let body = response(
+            &protocol,
+            json!([{"index": "1", "content": "测试答案", "explanation": ""}]),
+        );
+        let (url, request) = serve(200, body).await;
+        let result = probe_with(
+            &provider(protocol, url),
+            super::solve_questions_for(
+                crate::config::solver::SolverKind::NativeLlm,
+                None,
+                solver_payload(),
+                false,
+            ),
+        )
+        .await
+        .unwrap();
+        assert_eq!(result[0].content, "测试答案");
+        let sent = input_questions(&request.await.unwrap().body);
+        assert_eq!(sent[0]["id"], "1");
+        assert_eq!(sent[0]["stem"], "测试题");
+    }
+}
+
+#[tokio::test]
+async fn native_solver_keeps_empty_folio_and_provider_validation() {
+    for (payload, expected) in [
+        (Folio::default(), "题目解析失败"),
+        (solver_payload(), "大模型提供商 [__healthy_test__] 不存在"),
+    ] {
+        let error = probe_with_solver(
+            None,
+            crate::config::solver::SolverKind::NativeLlm,
+            super::solve_questions_with(
+                &super::super::deepseek::RequestState::default(),
+                payload,
+                false,
+            ),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.to_string(), expected);
+    }
+    let mut native = provider(
+        LLMProtocol::OpenAIChatCompletions,
+        "http://127.0.0.1:1".into(),
+    );
+    native.chosen_model = None;
+    let error = probe_with(
+        &native,
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
+            solver_payload(),
+            false,
+        ),
+    )
+    .await
+    .unwrap_err();
+    assert!(error.to_string().contains("选择有效模型"));
+}
+
 #[tokio::test]
 async fn sends_question_payload_to_the_selected_model_without_a_font() {
     let protocol = LLMProtocol::OpenAIChatCompletions;
@@ -63,7 +285,8 @@ async fn sends_question_payload_to_the_selected_model_without_a_font() {
     let questions: Vec<Question> = serde_json::from_value(input.clone()).unwrap();
     let result = probe_with(
         &provider(protocol, url),
-        super::solve_questions(
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
             Folio {
                 entries: questions.into_iter().map(Entry::Question).collect(),
                 ..Default::default()
@@ -109,7 +332,11 @@ async fn decrypts_question_payload_before_sending_it_to_the_model() {
     };
     let result = probe_with(
         &provider(protocol, url),
-        super::solve_questions(payload, false),
+        super::solve_questions_with(
+            &super::super::deepseek::RequestState::default(),
+            payload,
+            false,
+        ),
     )
     .await
     .unwrap();

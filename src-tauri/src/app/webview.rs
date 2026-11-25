@@ -5,10 +5,18 @@ use crate::core::{
 
 use anyhow::anyhow;
 use parking_lot::Mutex;
+use std::sync::Arc;
 use tauri::utils::config::BackgroundThrottlingPolicy;
 use tauri::{LogicalPosition, LogicalSize, Url, Webview, WebviewBuilder, WebviewUrl};
 
+pub(crate) mod deepseek;
 pub mod layer;
+pub(crate) mod lifecycle;
+pub(crate) mod solvers;
+
+fn is_deepseek_url(url: &Url) -> bool {
+    url.host_str() == Some("chat.deepseek.com")
+}
 
 fn select_home_url(old_home: bool) -> Url {
     let url = if old_home {
@@ -74,50 +82,79 @@ impl UrlStack {
 }
 
 pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn std::error::Error>> {
-    log::debug!("开始初始化Webview [{}]", label);
-    let logical_size: LogicalSize<f64> =
-        tauri::LogicalSize::from_physical(window.inner_size()?, window.scale_factor()?);
+    create_on(window, label, false, None)
+}
 
-    let (builder, position, size) = match label {
-        "main" => (
-            WebviewBuilder::new(label, WebviewUrl::App("main.html".into()))
-                .background_color((0, 0, 0, 0).into())
-                .devtools(cfg!(debug_assertions)),
-            LogicalPosition::new(0.0, 0.0),
-            logical_size,
+fn placement_on(
+    window: &tauri::Window,
+    label: &str,
+) -> Result<(LogicalPosition<f64>, LogicalSize<f64>), Box<dyn std::error::Error>> {
+    let logical_size: LogicalSize<f64> =
+        LogicalSize::from_physical(window.inner_size()?, window.scale_factor()?);
+    Ok(placement(label, logical_size))
+}
+
+pub(super) fn placement(
+    label: &str,
+    logical_size: LogicalSize<f64>,
+) -> (LogicalPosition<f64>, LogicalSize<f64>) {
+    match label {
+        "chaoxing" | "chaoxing-mask" | "deepseek" => (
+            LogicalPosition::new(logical_size.width * 0.51, logical_size.height * 0.46),
+            LogicalSize::new(logical_size.width * 0.48, logical_size.height * 0.48),
         ),
-        "mask" => (
-            WebviewBuilder::new(label, WebviewUrl::App("mask.html".into()))
-                .background_color((0, 0, 0, 0).into())
+        _ => (LogicalPosition::new(0.0, 0.0), logical_size),
+    }
+}
+
+fn create_on(
+    window: &tauri::Window,
+    label: &str,
+    staged: bool,
+    attempt: Option<Arc<deepseek::creation::Attempt>>,
+) -> Result<Webview, Box<dyn std::error::Error>> {
+    log::debug!("开始初始化Webview [{}]", label);
+    let (position, size) = placement_on(window, label)?;
+    let builder = match label {
+        "main" => WebviewBuilder::new(label, WebviewUrl::App("main.html".into()))
+            .background_color((0, 0, 0, 0).into())
+            .devtools(cfg!(debug_assertions)),
+        "mask" => WebviewBuilder::new(label, WebviewUrl::App("mask.html".into()))
+            .background_color((0, 0, 0, 0).into())
+            .devtools(true),
+        "chaoxing" => WebviewBuilder::new(label, WebviewUrl::External(home_url()))
+            .background_color((242, 244, 247).into())
+            .devtools(true)
+            .initialization_script(include_script!("webview-log.js"))
+            .initialization_script_for_all_frames(include_script!("course-redirect.js"))
+            .initialization_script_for_all_frames(include_script!("iframe-init.js"))
+            .initialization_script_for_all_frames(include_script!("classroom-mute.js"))
+            .initialization_script_for_all_frames(include_script!("course-list-metadata.js"))
+            .on_navigation(|url| {
+                log::debug!("检测到页面导航: {}", url);
+                classify(url) != Type::Unknown
+            })
+            .on_page_load(load_on),
+        "chaoxing-mask" => WebviewBuilder::new(label, WebviewUrl::App("mask.chaoxing.html".into()))
+            .background_color((0, 0, 0, 0).into())
+            .devtools(true)
+            .initialization_script(include_script!("webview-log.js")),
+        "deepseek" => {
+            deepseek::configure(
+                window,
+                WebviewBuilder::new(
+                    label,
+                    WebviewUrl::External("https://chat.deepseek.com/".parse()?),
+                )
+                .background_color((255, 255, 255).into())
                 .devtools(true),
-            LogicalPosition::new(0.0, 0.0),
-            logical_size,
-        ),
-        "chaoxing" => (
-            WebviewBuilder::new(label, WebviewUrl::External(home_url()))
-                .background_color((242, 244, 247).into())
-                .devtools(true)
-                .initialization_script(include_script!("webview-log.js"))
-                .initialization_script_for_all_frames(include_script!("course-redirect.js"))
-                .initialization_script_for_all_frames(include_script!("iframe-init.js"))
-                .initialization_script_for_all_frames(include_script!("classroom-mute.js"))
-                .initialization_script_for_all_frames(include_script!("course-list-metadata.js"))
-                .on_navigation(|url| {
-                    log::debug!("检测到页面导航: {}", url);
-                    classify(url) != Type::Unknown
-                })
-                .on_page_load(load_on),
-            LogicalPosition::new(logical_size.width * 0.51, logical_size.height * 0.46),
-            LogicalSize::new(logical_size.width * 0.48, logical_size.height * 0.48),
-        ),
-        "chaoxing-mask" => (
-            WebviewBuilder::new(label, WebviewUrl::App("mask.chaoxing.html".into()))
-                .background_color((0, 0, 0, 0).into())
-                .devtools(true)
-                .initialization_script(include_script!("webview-log.js")),
-            LogicalPosition::new(logical_size.width * 0.51, logical_size.height * 0.46),
-            LogicalSize::new(logical_size.width * 0.48, logical_size.height * 0.48),
-        ),
+                // 当前只允许聊天主机；手动登录若跳转到其他主机，再按实际导航补充。
+                is_deepseek_url,
+                attempt
+                    .clone()
+                    .ok_or_else(|| anyhow!("DeepSeek 创建缺少实例预约"))?,
+            )?
+        }
         _ => return Err(anyhow!("未知的Webview标签").into()),
     };
 
@@ -129,11 +166,36 @@ pub fn init_on(window: &tauri::Window, label: &str) -> Result<Webview, Box<dyn s
         size.width,
         size.height
     );
-    Ok(window.add_child(
+    if let Some(attempt) = &attempt {
+        attempt.native_creation_started()?;
+    }
+    let result = window.add_child(
         builder.background_throttling(BackgroundThrottlingPolicy::Disabled),
-        position,
+        // Dynamic children are created outside the window until their native
+        // stacking order is committed, avoiding a flash over the masks without
+        // hiding the document or interrupting its background JavaScript.
+        if staged {
+            LogicalPosition::new(-size.width - 1.0, -size.height - 1.0)
+        } else {
+            position
+        },
         size,
-    )?)
+    );
+    let view = result?;
+    if let Some(attempt) = &attempt {
+        attempt.native_created();
+    }
+    Ok(view)
+}
+
+// Factory rollback pairs configuration's page callbacks with native close.
+// Lifecycle retains the general resource rollback/unregistration sequence.
+fn rollback_created(view: &Webview, attempt: &deepseek::creation::Attempt) -> anyhow::Result<()> {
+    if view.label() == "deepseek" {
+        attempt.rollback(|| view.close().map_err(Into::into))
+    } else {
+        view.close().map_err(Into::into)
+    }
 }
 
 #[cfg(test)]

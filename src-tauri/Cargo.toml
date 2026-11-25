@@ -17,11 +17,17 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
 sync-bindings = []
+close-barrier-probe = []
 
 [[bin]]
 name = "sync-bindings"
 path = "src/bin/sync-bindings.rs"
 required-features = ["sync-bindings"]
+
+[[bin]]
+name = "close-barrier-probe"
+path = "src/bin/close-barrier-probe.rs"
+required-features = ["close-barrier-probe"]
 
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }

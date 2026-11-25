@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use parking_lot::Mutex;
 use std::{collections::HashMap, sync::Arc};
 use tauri::{Manager, Webview};
@@ -15,6 +15,10 @@ struct Entry {
 pub struct Layers(Mutex<HashMap<String, Arc<tokio::sync::Mutex<Vec<Entry>>>>>);
 
 impl Layers {
+    fn order(&self, window: &tauri::Window) -> Option<Arc<tokio::sync::Mutex<Vec<Entry>>>> {
+        self.0.lock().get(window.label()).cloned()
+    }
+
     pub fn register(&self, window: &tauri::Window, labels: &[&str]) {
         let entries = labels
             .iter()
@@ -33,12 +37,77 @@ impl Layers {
     pub fn remove(&self, window: &tauri::Window) {
         self.0.lock().remove(window.label());
     }
+
+    /// Read the committed order, including same-priority insertion order.
+    /// A missing dynamic child is expected before its first ensure.
+    pub(super) async fn is_above(
+        &self,
+        window: &tauri::Window,
+        label: &str,
+        anchor: &str,
+    ) -> Result<bool> {
+        let order = self
+            .order(window)
+            .context("窗口的 WebView 层级尚未初始化或已结束")?;
+        let order = order.lock().await;
+        let anchor = order
+            .iter()
+            .position(|entry| entry.label == anchor)
+            .with_context(|| format!("WebView [{anchor}] 未登记层级"))?;
+        Ok(order
+            .iter()
+            .position(|entry| entry.label == label)
+            .is_some_and(|index| index < anchor))
+    }
+
+    /// Dynamic views start behind all existing siblings, without reordering them.
+    pub(super) async fn add_entry(&self, webview: &Webview) -> Result<()> {
+        let window = webview.window();
+        let order = self
+            .order(&window)
+            .context("窗口的 WebView 层级尚未初始化")?;
+        let mut order = order.lock().await;
+        add_order(&mut order, webview.label(), |anchor| async {
+            move_in_window(webview, anchor).await
+        })
+        .await
+    }
+
+    pub(super) async fn remove_entry(&self, window: &tauri::Window, label: &str) {
+        // Destroyed may already have removed the entire window's order.
+        if let Some(order) = self.order(window) {
+            remove_order(&mut *order.lock().await, label);
+        }
+    }
+}
+
+async fn add_order<F, Fut>(order: &mut Vec<Entry>, label: &str, move_native: F) -> Result<()>
+where
+    F: FnOnce(Option<String>) -> Fut,
+    Fut: std::future::Future<Output = Result<()>>,
+{
+    if order.iter().any(|entry| entry.label == label) {
+        return Ok(());
+    }
+    // A new native child starts in front. Move it even though inserting at the
+    // logical destination would make update_order see an unchanged index.
+    move_native(order.last().map(|entry| entry.label.clone())).await?;
+    order.push(Entry {
+        label: label.to_owned(),
+        layer: order.last().map_or(0, |entry| entry.layer.min(0)),
+    });
+    Ok(())
+}
+
+fn remove_order(order: &mut Vec<Entry>, label: &str) {
+    order.retain(|entry| entry.label != label);
 }
 
 /// Controls a WebView's stacking position among its siblings.
 pub trait WebviewLayer {
     /// Larger values appear in front; a repeated value moves this view ahead of its peers.
-    /// Unset views start at zero in their creation order, newest in front.
+    /// Static views start at zero in creation order, newest in front. Dynamic
+    /// children initially sit at the back with a layer no larger than the tail.
     fn set_layer(&self, layer: i32) -> impl std::future::Future<Output = Result<()>> + Send;
 }
 
@@ -65,23 +134,36 @@ async fn set_layer(webview: &Webview, layer: i32) -> Result<()> {
     let window = webview.window();
     let layers = window.state::<Layers>();
     let order = layers
-        .0
-        .lock()
-        .get(window.label())
-        .cloned()
+        .order(&window)
         .context("窗口的 WebView 层级尚未初始化")?;
     let mut order = order.lock().await;
     update_order(&mut order, webview.label(), layer, |anchor| async {
-        let anchor = anchor
-            .map(|label| {
-                window
-                    .get_webview(&label)
-                    .with_context(|| format!("未找到同级 WebView: {label}"))
-            })
-            .transpose()?;
-        move_view(webview, anchor.as_ref()).await
+        move_in_window(webview, anchor).await
     })
     .await
+}
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+async fn move_in_window(webview: &Webview, anchor: Option<String>) -> Result<()> {
+    let window = webview.window();
+    let anchor = anchor
+        .map(|label| {
+            let view = window
+                .get_webview(&label)
+                .with_context(|| format!("未找到同级 WebView: {label}"))?;
+            anyhow::ensure!(
+                view.window().label() == window.label(),
+                "WebView [{label}] 不属于目标窗口"
+            );
+            Ok::<_, anyhow::Error>(view)
+        })
+        .transpose()?;
+    move_view(webview, anchor.as_ref()).await
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+async fn move_in_window(_webview: &Webview, _anchor: Option<String>) -> Result<()> {
+    anyhow::bail!("当前平台不支持动态 WebView 层级归位")
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows", test))]
@@ -157,7 +239,7 @@ fn move_native(webview: tauri::webview::PlatformWebview, anchor: Option<usize>) 
         let sibling = (0..siblings.count())
             .map(|i| siblings.objectAtIndex(i))
             .find(|item| (&**item as *const NSView) as usize == anchor)
-            .ok_or_else(|| anyhow!("目标同级 WebView 已不存在"))?;
+            .ok_or_else(|| anyhow::anyhow!("目标同级 WebView 已不存在"))?;
         parent.addSubview_positioned_relativeTo(view, NSWindowOrderingMode::Below, Some(&sibling));
     } else {
         parent.addSubview_positioned_relativeTo(view, NSWindowOrderingMode::Above, None);
@@ -196,6 +278,10 @@ fn move_native(webview: tauri::webview::PlatformWebview, anchor: Option<usize>) 
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit/app/layer.rs"]
+mod dynamic_tests;
 
 #[cfg(test)]
 mod tests {
@@ -247,7 +333,7 @@ mod tests {
         let before = order.clone();
         assert!(
             update_order(&mut order, "mask", 4, |_| async {
-                Err(anyhow!("native failure"))
+                Err(anyhow::anyhow!("native failure"))
             })
             .await
             .is_err()
