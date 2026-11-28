@@ -7,8 +7,17 @@ import { preserveFocusState } from "./focus.js";
  */
 const safeNavigate = (url) => {
   if (url.startsWith("javascript:")) return;
+  if (window === window.top) {
+    window.location.href = url;
+    return;
+  }
+  // 跨域 frame 直接改 top.location 会被浏览器静默拦下，这里的读取会抛错，
+  // 因而跨域时改走消息转发，由顶层页面完成导航。
   try {
-    window.top.location.href = url;
+    if (window.top.location.href) {
+      window.top.location.href = url;
+      return;
+    }
   } catch {
     window.top.postMessage({ __uxue_navigate: url }, "*");
   }
@@ -22,6 +31,16 @@ const safeNavigate = (url) => {
 const handleNavigationMessage = (event) => {
   if (event.data?.__uxue_navigate)
     window.location.href = event.data.__uxue_navigate;
+};
+
+/**
+ * 判断锚点是否要求打开到新窗口或顶层窗口。
+ * @param {HTMLAnchorElement} link 锚点元素。
+ * @returns {boolean}
+ */
+const opensInTop = (link) => {
+  const target = link.getAttribute("target") || link.target;
+  return target === "_blank" || target === "_top" || target === "_parent";
 };
 
 /**
@@ -39,12 +58,48 @@ const handleLinkClick = (e) => {
   const href = link.getAttribute("href");
   if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
 
-  const target = link.getAttribute("target") || link.target;
-  if (target === "_blank" || target === "_top" || target === "_parent") {
+  if (opensInTop(link)) {
     e.preventDefault();
     e.stopPropagation();
     safeNavigate(link.href);
   }
+};
+
+/**
+ * 接管尚未插入文档的锚点。部分平台（如继续教育平台）通过
+ * `a.dispatchEvent(new MouseEvent("click"))` 打开学习页，这类事件不经过
+ * document，只能在派发入口拦截，否则点击会被静默丢弃。
+ * @param {HTMLAnchorElement} link 锚点元素。
+ * @returns {void}
+ */
+const navigateDetachedLink = (link) => {
+  const href = link.getAttribute("href");
+  if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+  if (!opensInTop(link)) return;
+  safeNavigate(link.href);
+};
+
+/**
+ * 拦截动态锚点的 click 调用与事件派发。
+ * @returns {void}
+ */
+const installDetachedLinkBridge = () => {
+  const anchorClick = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function () {
+    if (!this.isConnected) navigateDetachedLink(this);
+    return anchorClick.apply(this, arguments);
+  };
+
+  const dispatchEvent = EventTarget.prototype.dispatchEvent;
+  EventTarget.prototype.dispatchEvent = function (/** @type {Event} */ event) {
+    if (
+      event?.type === "click" &&
+      this instanceof HTMLAnchorElement &&
+      !this.isConnected
+    )
+      navigateDetachedLink(this);
+    return dispatchEvent.call(this, event);
+  };
 };
 
 /**
@@ -63,4 +118,5 @@ export function main() {
   };
 
   document.addEventListener("click", handleLinkClick, true);
+  installDetachedLinkBridge();
 }
